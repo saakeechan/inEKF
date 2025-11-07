@@ -8,7 +8,7 @@
  *  @file   kinematics.cpp
  *  @author Ross Hartley
  *  @brief  Example of invariant filtering for contact-aided inertial navigation
- *  @date   September 25, 2018
+ *  @date   September 25, 2018 my birthday
  **/
 
 #include <iostream>
@@ -23,7 +23,7 @@
 #define DT_MIN 1e-6
 #define DT_MAX 1
 
-using std::cout;
+using std::cout;  
 using std::endl;
 //using namespace inekf;
 
@@ -162,10 +162,10 @@ cout<<"groundtruth row, col "<<row_index<<","<<column_index<<endl;
 // Ask why foot covariance is self confirming!!
 // Have a good conversation with Ziwon about this
 
-std::vector<double> InEKFilter::Variable_Contact_Cov(int time){
+std::vector<double> InEKFilter::Variable_Contact_Cov(int time){ // time is either 0 or 1 cause sliding window of 2
 
     std::vector<double> contact_cov_array;
-    contact_cov_array.clear();
+    contact_cov_array.clear(); // Redundant if you ask me
 
     for(int k=0; k<robot.leg_no; k++){
 
@@ -178,7 +178,10 @@ std::vector<double> InEKFilter::Variable_Contact_Cov(int time){
             if(variable_contact_cov_mode){
 
                 contact_cov = d_v[time].block(3*k,0,3,1).norm();
-                // I dont understand this line
+                //Check below for how d_v is computed
+
+                // Contact covariance increases exponentially with residual velocity which ideally should be zero
+                // 10^( log10(cov_contact_const) + ||d_v|| * cov_amplifier )
                 contact_cov = std::pow(10, log10(robot.cov_contact_const) + contact_cov*cov_amplifier );
 
                 if( contact_cov > robot.cov_slip_const ){
@@ -187,18 +190,22 @@ std::vector<double> InEKFilter::Variable_Contact_Cov(int time){
 
             }else if(slip_rejection_mode){
 
+                // If the residual velocity exceeds the slip threshold, assign a high covariance
                 if( (d_v[time].block(3*k,0, 3,1).norm() > slip_threshold)){
                     contact_cov = robot.cov_slip_const;
                 }else{
+                    // otherwise assign the default contact covariance
                     contact_cov = robot.cov_contact_const;
                 }
 
             }else{
+                // if neither mode is on, just assign the default contact covariance
                 contact_cov = robot.cov_contact_const;
             }
 
         }
 
+        //push back is like append for each iteration of the leg
         contact_cov_array.push_back( contact_cov );
 
     }
@@ -220,11 +227,15 @@ void InEKFilter::Initialize(double _dt, Eigen::Matrix<double,12,1> cov_val_setti
     sliding_window_flag = false;
     frame_count = 0;
     time_count = 0;
-    robot.Covariance_Reset(cov_val_setting);
+    robot.Covariance_Reset(cov_val_setting); // Set covariance of the 12x1 vector input
     robot.dt = _dt;
 
     dt = robot.dt;
     gravity << 0,0, -9.80665;
+
+
+        // // hardcoded is 1e-3, but initialized in main cpp is 10^-10....
+        // std::cout << "robot.cov_prior_orientation_const: " << robot.cov_prior_orientation_const << std::endl;
 
 
     std::string mode;
@@ -233,6 +244,8 @@ void InEKFilter::Initialize(double _dt, Eigen::Matrix<double,12,1> cov_val_setti
     }else if(slip_rejection_mode == true){
         mode="(SR" + BasicFunctions_Estimator::to_string_n_signficant_figures(slip_threshold,2) + ")";
     }
+    // print mode info
+    // e.g. InEKF(SR0.5)H(adj)(0_0_0_0_0_0_0_0_0_0_0_0)
 
     estimator_info = mode+"H(adj)";
     initial_info = "(" + BasicFunctions_Estimator::to_string_n_figures_under_0(initial_condition[0], 2) + "_" + BasicFunctions_Estimator::to_string_n_figures_under_0(initial_condition[1], 2) + "_"
@@ -243,11 +256,12 @@ void InEKFilter::Initialize(double _dt, Eigen::Matrix<double,12,1> cov_val_setti
                         + BasicFunctions_Estimator::to_string_n_figures_under_0(initial_condition[10], 2) + "_"+ BasicFunctions_Estimator::to_string_n_figures_under_0(initial_condition[11], 2) + ")";
 
 
-    //covariance setting
-    Eigen::Matrix<double,15,15> ForP;
+    //covariance setting, everything is diagonal and constant for each element
+    // 15x15 covariance matrix for the state [R, v, p, bg, ba]
+    Eigen::Matrix<double,15,15> ForP; 
     ForP.setZero();
-    ForP.block(0,0,9,9) = robot.cov_prior_orientation_const * Eigen::MatrixXd::Identity(9,9);
-    ForP.block(9,9,6,6) = robot.cov_prior_bias_gyro_const * Eigen::MatrixXd::Identity(6,6);
+    ForP.block(0,0,9,9) = robot.cov_prior_orientation_const * Eigen::MatrixXd::Identity(9,9); // orientation, position, velocity all have same prior covariance
+    ForP.block(9,9,6,6) = robot.cov_prior_bias_gyro_const * Eigen::MatrixXd::Identity(6,6); // bias gyro, bias accel all have same prior covariance
 
 
     Eigen::Matrix3d R0;
@@ -257,23 +271,25 @@ void InEKFilter::Initialize(double _dt, Eigen::Matrix<double,12,1> cov_val_setti
 
     if(textfile_flag){
 
-
-
+        // initialize from ground truth + initial condition offset (initial conditions aren't initial
+        // conditions per se but additive offsets to ground truth)
         p0 << GroundTruth[1+gt_sd][12]+initial_condition(0),GroundTruth[1+gt_sd][13]+initial_condition(1),GroundTruth[1+gt_sd][14]+initial_condition(2);
         v0 << GroundTruth[1+gt_sd][9]+initial_condition(7),GroundTruth[1+gt_sd][10]+initial_condition(8),GroundTruth[1+gt_sd][11]+initial_condition(9);
 
+        // These are zero for now
         bg0 << initial_condition(10), initial_condition(11), initial_condition(12);
         ba0 << initial_condition(13), initial_condition(14), initial_condition(15);
 
         R0 <<GroundTruth[1+gt_sd][0],GroundTruth[1+gt_sd][1],GroundTruth[1+gt_sd][2]
                 ,GroundTruth[1+gt_sd][3],GroundTruth[1+gt_sd][4],GroundTruth[1+gt_sd][5]
-                ,GroundTruth[1+gt_sd][6],GroundTruth[1+gt_sd][7],GroundTruth[1+gt_sd][8];
+                ,GroundTruth[1+gt_sd][6],GroundTruth[1+gt_sd][7],GroundTruth[1+gt_sd][8]; // converted from roll pitch yaw to R matrix
 
-        Vector3d Euler = BasicFunctions_Estimator::Rotation_to_EulerZYX(R0);
+        Vector3d Euler = BasicFunctions_Estimator::Rotation_to_EulerZYX(R0); // converted back to euler angles to add offset
+        // add initial condition offset
         Euler(0) = Euler(0)+ initial_condition[3];
         Euler(1) = Euler(1)+ initial_condition[4];
         Euler(2) = Euler(2)+ initial_condition[5];
-        R0 = BasicFunctions_Estimator::EulerZYX_to_R_bw(Euler);
+        R0 = BasicFunctions_Estimator::EulerZYX_to_R_bw(Euler); // back to rotation matrix
 
     }else{
 
@@ -295,7 +311,7 @@ void InEKFilter::Initialize(double _dt, Eigen::Matrix<double,12,1> cov_val_setti
 
 
     imu_measurement = Eigen::Matrix<double,6,1>::Zero();
-    imu_measurement_prev = Eigen::Matrix<double,6,1>::Zero();
+    imu_measurement_prev = Eigen::Matrix<double,6,1>::Zero(); // its 
 
     // Initialize state covariance
     inekf::NoiseParams noise_params;
@@ -309,16 +325,21 @@ void InEKFilter::Initialize(double _dt, Eigen::Matrix<double,12,1> cov_val_setti
     // Initialize filter
     filter.setState(initial_state);
     filter.setNoiseParams(noise_params);
-//    cout << "Noise parameters are initialized to: \n";
-//    cout << filter.getNoiseParams() << endl;
-//    cout << "Robot's state is initialized to: \n";
-//    cout << filter.getState() << endl;
+
+   cout << "Noise parameters are initialized to: \n";
+   cout << filter.getNoiseParams() << endl;
+   cout << "Robot's state is initialized to: \n";
+   cout << filter.getState() << endl;
+
+//    cout << R0 << endl;
+//    cout << "Initial position (x,y,z): " << p0.transpose() << endl;
+//    cout << "Initial velocity (x,y,z): " << v0.transpose() << endl;
 
 }
 
 
 
-
+// Inputs are 30x1 sensor measurement vector and 4x1 contact state vector
 void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Matrix<bool,4,1> &Contact_i)
 {
 
@@ -329,16 +350,16 @@ void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Ma
 
         int j=time_count + 1;
 
-        IMU_Gyro[frame_count] << SensorData[j][0],SensorData[j][1],SensorData[j][2];
-        IMU_Acc[frame_count] << SensorData[j][3],SensorData[j][4],SensorData[j][5];
+        IMU_Gyro[frame_count] << SensorData[j][0],SensorData[j][1],SensorData[j][2]; // Save from sensor file
+        IMU_Acc[frame_count] << SensorData[j][3],SensorData[j][4],SensorData[j][5]; // Save from sensor file
 
         ENCODER[frame_count] <<SensorData[j][6],SensorData[j][7],SensorData[j][8],SensorData[j][9],SensorData[j][10],SensorData[j][11],
-                SensorData[j][12],SensorData[j][13],SensorData[j][14],SensorData[j][15],SensorData[j][16],SensorData[j][17];
+                SensorData[j][12],SensorData[j][13],SensorData[j][14],SensorData[j][15],SensorData[j][16],SensorData[j][17]; // 12 encoder values for 4 legs (3 each)
 
         ENCODERDOT[frame_count] <<SensorData[j][18],SensorData[j][19],SensorData[j][20],SensorData[j][21],SensorData[j][22],SensorData[j][23],
                 SensorData[j][24],SensorData[j][25],SensorData[j][26],SensorData[j][27],SensorData[j][28],SensorData[j][29];
 
-        CONTACT_t[frame_count] << GroundTruth[j][19],GroundTruth[j][20],GroundTruth[j][21],GroundTruth[j][22];
+        CONTACT_t[frame_count] << GroundTruth[j][19],GroundTruth[j][20],GroundTruth[j][21],GroundTruth[j][22]; // 4 contact states for 4 legs (last columns of ground truth file)
 
         imu_measurement <<IMU_Gyro[frame_count], IMU_Acc[frame_count];
 
@@ -365,17 +386,18 @@ void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Ma
 
         for (int k=0; k<4; k++){
             SLIP_t[0](k) = false;
-            HARD_CONTACT_t[0](k)  = CONTACT_t[0](k)-SLIP_t[0](k);
+            HARD_CONTACT_t[0](k)  = CONTACT_t[0](k)-SLIP_t[0](k); // Actual hard contacts are contact - slip (what is this logic?)(true - false = true, true - true = false)
         }
 
     }else{
 
-        Eigen::Vector3d phi = (imu_measurement.block(0,0, 3,1)-filter.getState().getGyroscopeBias())*dt;
-        Rotation_s[1] = filter.getState().getRotation() * BasicFunctions_Estimator::Expm_Vec(phi);
-        JacobiSVD<Matrix3d> svd(Rotation_s[frame_count], ComputeFullU|ComputeFullV);
+        Eigen::Vector3d phi = (imu_measurement.block(0,0, 3,1)-filter.getState().getGyroscopeBias())*dt; // (angular increment - gyro bias)(*dt)
+        Rotation_s[1] = filter.getState().getRotation() * BasicFunctions_Estimator::Expm_Vec(phi); // Rotation update with gyro bias correction
+        JacobiSVD<Matrix3d> svd(Rotation_s[frame_count], ComputeFullU|ComputeFullV); // Cause we're doing dt, we need to re-orthogonalize the rotation matrix back to its manifold
         Rotation_s[1] = svd.matrixU() * svd.matrixV().transpose();
 
         Velocity_s[1] = filter.getState().getVelocity() + (Rotation_s[1]*(imu_measurement.block(3,0, 3,1)-filter.getState().getAccelerometerBias()) + gravity)*dt;
+        // Velocity update with accel bias correction and gravity
 
 
 //        double contact_dv_mean = 0;
@@ -399,20 +421,21 @@ void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Ma
 //        }
 //        //robot.slip_threshold = contact_dv_mean*2;
 
-        for(int p=1; p<=1; p++){
+        for(int p=1; p<=1; p++){ // originally kept for a larger window size, but now just 1
 
             for (int k=0; k<robot.leg_no; k++) {
 
                 d_v[p].block(3*k,0,3,1) = Velocity_s[p]
                                           + Rotation_s[p]*robot.Jacobian_Leg(ENCODER[p].block<3,1>(3*k,0), k+1)*ENCODERDOT[p].block<3,1>(3*k,0)
                                           + Rotation_s[p]*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[p] - Bias_Gyro_s[p])*robot.Forward_Kinematics_Leg(ENCODER[p].block<3,1>(3*k,0), k+1);
+                                          // Check math later
 
                 HARD_CONTACT_t[p](k)  = CONTACT_t[p](k);
 
                 if ((slip_rejection_mode == true) && (CONTACT_t[p](k) == true) &&
                     (d_v[p].block(3 * k, 0, 3, 1).norm() > robot.slip_threshold)) {
                     SLIP_t[p](k) = true;
-                }
+                } // if its checking here, then whats the point of checking above in variable contact cov?
 
 //            HARD_CONTACT_t[1](k)  = CONTACT_t[1](k)-SLIP_t[1](k);
             }
@@ -434,13 +457,15 @@ void InEKFilter::Propagate_Correct()
 {
 
     if(frame_count>0) {
-        filter.Propagate(imu_measurement_prev, dt, Variable_Contact_Cov(0));
+        filter.Propagate(imu_measurement_prev, dt, Variable_Contact_Cov(0)); // propagate with previous imu measurement and dt
     }
 
+    // change imu measurement_prev after inputting to propagation
     imu_measurement_prev = imu_measurement;
 
 
-
+    // Rewrite contact list for filter
+        std::
     vector<pair<int,bool> > contacts;
 
         for (int i=0; i<4; i++) {
@@ -464,21 +489,21 @@ void InEKFilter::Propagate_Correct()
     for (int k=0; k<4; k++) {
         id = k;
         pose.block<3,3>(0,0) = Eigen::Matrix3d::Identity();
-        pose.block<3,1>(0,3) = robot.Forward_Kinematics_Leg(ENCODER[frame_count].block(3*k,0,3,1), k+1);
+        pose.block<3,1>(0,3) = robot.Forward_Kinematics_Leg(ENCODER[frame_count].block(3*k,0,3,1), k+1); // vector from body to foot in world frame
 
         Eigen::Matrix3d FK_Jacobian;
         Eigen::Matrix3d Covariance_Encoder_leg;
-        FK_Jacobian = robot.Jacobian_Leg(ENCODER[frame_count].block(3*k,0,3,1),k+1);
-        Covariance_Encoder_leg = robot.cov_enc_const * Eigen::Matrix3d::Identity();
+        FK_Jacobian = robot.Jacobian_Leg(ENCODER[frame_count].block(3*k,0,3,1),k+1); // Jacobian of the forward kinematics wrt encoder values
+        Covariance_Encoder_leg = robot.cov_enc_const * Eigen::Matrix3d::Identity(); // Encoder covariance for each encoder
         covariance.block(3,3, 3,3) = FK_Jacobian * Covariance_Encoder_leg * FK_Jacobian.transpose();
 
-        inekf::Kinematics frame(id, pose, covariance);
-        measured_kinematics.push_back(frame);
+        inekf::Kinematics frame(id, pose, covariance); // pose is in body frame and covariance is 6x6 but here we only fill the last 3 blocks because we dont care about rotation?
+        measured_kinematics.push_back(frame); // just create a vector of kinematics for all 4 legs
     }
     // Correct state using kinematic measurements
 
-    bool flag = true;
-    if(time_count%10==5){
+    bool flag = true; // should be false for loop below to work properly
+    if(time_count%10==5){ // correct every 10th step from 5, 15, 25, ..etc
         flag = true;
     }
 
@@ -675,7 +700,7 @@ void InEKFilter::SAVE_onestep_Z1(int cnt){
 
 }
 
-
+// where previous data is moved to index 0 and new data is moved to index 1
 void InEKFilter::sliding_window(){
 
     if (frame_count>0){
@@ -728,13 +753,19 @@ void InEKFilter::do_SAVE_Z1_all(std::string cov_info){
     cout<<"*** SAVE_Z1 DONE ***"<<endl;
     //    cout<<"!!"<<endl;
 
+    // Print a short summary of the column categories written to the result file
+    cout << "Saved categories in file (column groups in order): "
+         << "TRUE_Rotation(9), TRUE_Velocity(3), TRUE_Position(3), TRUE_dv(12), TRUE_Bias_Gyro(3), TRUE_Bias_Acc(3), TRUE_Contact(4), TRUE_Slip(4), TRUE_Hard_Contact(4), TRUE_rpy(3), "
+         << "EST_Rotation(9), EST_Velocity(3), EST_Position(3), EST_dv(12), EST_Bias_Gyro(3), EST_Bias_Acc(3), EST_Contact(4), EST_Slip(4), EST_Hard_Contact(4), EST_rpy(3), "
+         << "ITERATION_No(1), BACKPPGN_No(1), TIME_PER_STEP(1), COST(4), JAC_STD(1)" << endl;
+
 }
 
 
 
 
 
-
+// Inputs are 30x1 sensor measurement vector and 4x1 contact state vector
 void InEKFilter::Onestep(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Matrix<bool,4,1> &Contact_i,ROBOT_STATES &state_){
 
     //std::cout<<endl<<endl<<"Now step "<<time_count<<" starts!"<<endl;
@@ -742,7 +773,7 @@ void InEKFilter::Onestep(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Matrix<boo
     double duration;
     start = clock();
 
-    new_measurement(Sensor_i, Contact_i);
+    new_measurement(Sensor_i, Contact_i); // read in new measurement and calculate rotation, velocity updates and slip states
     Propagate_Correct();
 
     send_states(state_);
@@ -773,6 +804,7 @@ void InEKFilter::Onestep(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Matrix<boo
     }
 
 
+    // Frame 1 information is now moved to frame 0
     sliding_window();
 
 

@@ -36,7 +36,7 @@ class RobotState {
         // RobotState(RobotState&& other); // Move initialization
         RobotState(const RobotState& other); // Copy initialization
         // RobotState& operator=(RobotState&& other); // Move assignment
-        RobotState& operator=(const RobotState& other); // Copy assignment
+        RobotSt ate& operator=(const RobotState& other); // Copy assignment
 #endif
 
         const Eigen::MatrixXd getX();

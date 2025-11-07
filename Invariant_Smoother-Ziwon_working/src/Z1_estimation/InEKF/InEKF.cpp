@@ -124,26 +124,28 @@ std::map<int,bool> InEKF::getContacts() {
 
 
 // InEKF Propagation - Inertial Data
+// IMU data is gyroscope angular velocity and accelerometer linear acceleration
 void InEKF::Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector<double> contact_cov_array) {
 
-    Eigen::Vector3d w = m.head(3) - state_.getGyroscopeBias();    // Angular Velocity
-    Eigen::Vector3d a = m.tail(3) - state_.getAccelerometerBias(); // Linear Acceleration
+    Eigen::Vector3d w = m.head(3) - state_.getGyroscopeBias();    // Angular Velocity corrected for bias
+    Eigen::Vector3d a = m.tail(3) - state_.getAccelerometerBias(); // Linear Acceleration corrected for bias
     
-    Eigen::MatrixXd X = state_.getX();
-    Eigen::MatrixXd P = state_.getP();
+    Eigen::MatrixXd X = state_.getX(); // Current state matrix
+    Eigen::MatrixXd P = state_.getP(); // Current state covariance
 
     // Extract State
-    Eigen::Matrix3d R = state_.getRotation();
-    Eigen::Vector3d v = state_.getVelocity();
-    Eigen::Vector3d p = state_.getPosition();
+    Eigen::Matrix3d R = state_.getRotation(); // Rotation matrix
+    Eigen::Vector3d v = state_.getVelocity(); // Velocity
+    Eigen::Vector3d p = state_.getPosition(); // Position
 
     // Strapdown IMU motion model
-    Eigen::Vector3d phi = w*dt; 
-    Eigen::Matrix3d R_pred = R * Exp_SO3(phi);
-    JacobiSVD<Matrix3d> svd(R_pred, ComputeFullU|ComputeFullV);
+    Eigen::Vector3d phi = w*dt; // Infinitesimal rotation
+    Eigen::Matrix3d R_pred = R * Exp_SO3(phi); // Rotation update
+    JacobiSVD<Matrix3d> svd(R_pred, ComputeFullU|ComputeFullV); // Re-orthogonalization
     R_pred = svd.matrixU() * svd.matrixV().transpose();
 
-    Eigen::Vector3d v_pred = v + (R*a + g_)*dt;
+    Eigen::Vector3d v_pred = v + (R*a + g_)*dt; // I could do it with the new R but whatever, 
+                                                //or even the average of the two but its more expensive
     Eigen::Vector3d p_pred = p + v*dt + 0.5*(R*a + g_)*dt*dt;
 
     // Set new state (bias has constant dynamics)
@@ -155,9 +157,9 @@ void InEKF::Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector
     int dimX = state_.dimX();
     int dimP = state_.dimP();
     int dimTheta = state_.dimTheta();
-    Eigen::MatrixXd A = Eigen::MatrixXd::Zero(dimP,dimP);
+    Eigen::MatrixXd A = Eigen::MatrixXd::Zero(dimP,dimP); // they included bias terms in A
     // Inertial terms
-    A.block<3,3>(3,0) = skew(g_); // TODO: Efficiency could be improved by not computing the constant terms every time
+    A.block<3,3>(3,0) = skew(g_); // TODO: Efficiency could be improved by not computing the constant terms every time; just declare it in the header bro
     A.block<3,3>(6,3) = Eigen::Matrix3d::Identity();
     A.block<3,3>(6,0) = 0.5 * BasicFunctions_Estimator::Hat_so3(g_) * dt; //added by Z1
     // Bias terms
@@ -190,9 +192,8 @@ void InEKF::Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector
     Eigen::MatrixXd Phi = I + A*dt; // Fast approximation of exp(A*dt). TODO: explore using the full exp() instead
     Eigen::MatrixXd Adj = I;
     Adj.block(0,0,dimP-dimTheta,dimP-dimTheta) = Adjoint_SEK3(X); // Approx 200 microseconds
-    Eigen::MatrixXd PhiAdj = Phi * Adj;
-    Eigen::MatrixXd Qk_hat = Adj*dt * Qk * dt*Adj.transpose(); // Approximated discretized noise matrix (faster by 400 microseconds)
-
+    // Eigen::MatrixXd PhiAdj = Phi * Adj;
+    Eigen::MatrixXd Qk_hat = Adj*dt * Qk * dt*Adj.transpose(); // Further simplified from PhiAdj*Qk*PhiAdj.transpose() to reduce computation time
     // Propagate Covariance
     Eigen::MatrixXd P_pred = Phi * P * Phi.transpose() + Qk_hat;
 
@@ -429,7 +430,7 @@ void InEKF::CorrectKinematics(const vectorKinematics& measured_kinematics, bool 
         // If contact is not indicated and id is found in estimated_contacts_, then remove state
         if (!contact_indicated && found) {
             remove_contacts.push_back(*it_estimated); // Add id to remove list
-        //  If contact is indicated and id is not found i n estimated_contacts_, then augment state
+        //  If contact is indicated and id is not found in estimated_contacts_, then augment state
         } else if (contact_indicated && !found) {
             new_contacts.push_back(*it); // Add to augment list
 
@@ -439,7 +440,7 @@ void InEKF::CorrectKinematics(const vectorKinematics& measured_kinematics, bool 
             int dimP = state_.dimP();
             int startIndex;
 
-            // Fill out Y
+            // Fill out Y Selector matrix to access X to itself (basically X has both the measurements and IMU readings both in it)
             startIndex = Y.rows();
             Y.conservativeResize(startIndex+dimX, Eigen::NoChange);
             Y.segment(startIndex,dimX) = Eigen::VectorXd::Zero(dimX);
@@ -447,28 +448,29 @@ void InEKF::CorrectKinematics(const vectorKinematics& measured_kinematics, bool 
             Y(startIndex+4) = 1; 
             Y(startIndex+it_estimated->second) = -1;       
 
-            // Fill out b
+            // Fill out b bias
             startIndex = b.rows();
             b.conservativeResize(startIndex+dimX, Eigen::NoChange);
             b.segment(startIndex,dimX) = Eigen::VectorXd::Zero(dimX);
             b(startIndex+4) = 1;       
             b(startIndex+it_estimated->second) = -1;       
 
-            // Fill out H
-            startIndex = H.rows();
+            // Fill out H // Fully didn't understand this selector matrix to map elements in state within state and P elements within P
+            startIndex = H.rows(); // Still don't understand why we don't have R*P_BC here
             H.conservativeResize(startIndex+3, dimP);
             H.block(startIndex,0,3,dimP) = Eigen::MatrixXd::Zero(3,dimP);
             H.block(startIndex,6,3,3) = -Eigen::Matrix3d::Identity(); // -I
             H.block(startIndex,3*it_estimated->second-6,3,3) = Eigen::Matrix3d::Identity(); // I
 
-            // Fill out N
+            
+            // Fill out N // Noise terms from encoders mapped to forward kinematics rotated to world frame
             startIndex = N.rows();
             N.conservativeResize(startIndex+3, startIndex+3);
             N.block(startIndex,0,3,startIndex) = Eigen::MatrixXd::Zero(3,startIndex);
             N.block(0,startIndex,startIndex,3) = Eigen::MatrixXd::Zero(startIndex,3);
             N.block(startIndex,startIndex,3,3) = R * it->covariance.block<3,3>(3,3) * R.transpose();
 
-            // Fill out PI      
+            // Fill out PI      Selector for contact measurement
             startIndex = PI.rows();
             int startIndex2 = PI.cols();
             PI.conservativeResize(startIndex+3, startIndex2+dimX);
@@ -492,7 +494,7 @@ void InEKF::CorrectKinematics(const vectorKinematics& measured_kinematics, bool 
             this->Correct(obs);
         }
     }
-
+    // Remove and add states after update to keep matrices dimensions consistent
     // Remove contacts from state
     if (remove_contacts.size() > 0) {
         Eigen::MatrixXd X_rem = state_.getX(); 

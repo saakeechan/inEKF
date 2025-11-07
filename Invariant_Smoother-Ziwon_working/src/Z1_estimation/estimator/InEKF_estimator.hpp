@@ -67,7 +67,7 @@ int NUM_OF_TRASH_DATA = 1;
 
 
     //Necessary classes & variables
-    Robot_Model_mini_cheetah robot;
+    Robot_Model_mini_cheetah robot; // This is where robot model is defined. Should change this when we redfine with pinnochio
 
     bool sliding_window_flag=false;
     int frame_count=0;

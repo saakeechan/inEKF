@@ -43,25 +43,30 @@ int main() {
     int time_length = 27000;
     bool SR = true;
     double slip_thr = 0.3;
-    double lt_v_th = 0.3;
-    double lt_a_th = 40;
+    double lt_v_th = 0.3; // long term vel threshold is used only in IS and PIS and others (Smoothers)
+    double lt_a_th = 40; // long term acc threshold is used only in IS and PIS and others (Smoothers)
     //    double slip_thr = 0.4;
 //    double slip_thr = 0.5;
-    bool VCC = false;
-    double cov_amplifier = 5;
-    bool retraction_flag = false;
+    bool VCC = false; // variable contact covariance mode
+    double cov_amplifier = 5; // this is multiplied to contact covariance when VCC is true
+    bool retraction_flag = false; // Only used in IS and PIS and others (Smoothers)
 
 
-    int max_backpp_no = 3;
+    // Smoother Stuff
+    int max_backpp_no = 3; 
     double backpp_rate = 0.3;
     int max_it_no = 10;
     double convergence_cond = 1e-3;
 
-    Eigen::Matrix<double, 12, 1> Estimator_Covariances;
+    Eigen::Matrix<double, 12, 1> Estimator_Covariances; // Initialize Estimator Covariances which is a 12x1 vector
+    //gyro, acc, slip, contact, encoder, bias gyro, 
+    //bias acc, prior ori, prior vel, prior pos, prior bias gyro, prior bias acc
+    // Slip covariance is the covariance used when we detect slip and we blow up the contact covariance
+    // Contact covariance is the nominal contact covariance
 
 
-    double gyro_exp = -5, acc_exp = -1, slip_exp = -1, contact_exp = -4, encoder_exp = -8; // for paper
-    double bg_exp = -10, ba_exp = -7;
+    double gyro_exp = -10, acc_exp = -10, slip_exp = -5, contact_exp = -4, encoder_exp = -8; // for paper
+    double bg_exp = -10, ba_exp = -10;
 //    double bg_exp = -7, ba_exp = -3;
     double pri_ori_exp = -10, pri_vel_exp = -10, pri_pos_exp = -10;
     double pri_bg_exp = -10, pri_ba_exp = -10;
@@ -71,6 +76,7 @@ int main() {
             pow(10, bg_exp), pow(10, ba_exp), //bias gyro, bias acc
             pow(10, pri_ori_exp), pow(10, pri_vel_exp), pow(10, pri_pos_exp), //prior ori, vel, pos, contact
             pow(10, pri_bg_exp), pow(10, pri_ba_exp); //prior bias gyro, acc
+            // << means to load elements from top to down or left to right in the order
 
     Eigen::Matrix<double, 16, 1> initial_condition;
     initial_condition << 0.0, 0.0, 0, // Px,Py,Pz
@@ -80,14 +86,28 @@ int main() {
             0, 0, 0;    //bax, bay, baz
 
 
-    int sample_no = 1;
-    int data_no = 5;
+    int sample_no = 1; // Usage is commented out below
+    int data_no = 5; // Usage is commented out below
     bool IEKF_flag = true;
     bool IS_f_flag = false, NIS_f_flag = false, AIS_ff_flag = false;
     bool IS_1_flag = false, NIS_1_flag = false, AIS_1f_flag = false;
     bool AIS_f1_flag = false, AIS_11_flag = false;
 
     bool PIS_f_flag = false, PIS_1_flag = false;
+
+    // Name all the flags (probably)
+        // IEKF_flag : InEKF
+        // IS_f_flag : Invariant Smoother (forward)
+        // IS_1_flag : Invariant Smoother (1 iteration)
+        // AIS_f_flag : Analytic Invariant Smoother (forward)
+        // AIS_1f_flag : Analytic Invariant Smoother (1 iteration forward)
+        // AIS_f1_flag : Analytic Invariant Smoother (forward 1 iteration)
+        // AIS_11_flag : Analytic Invariant Smoother (1 iteration 1 iteration)
+        // PIS_f_flag : Pseudo Invariant Smoother (forward)
+        // PIS_1_flag : Pseudo Invariant Smoother (1 iteration)
+        // NIS_f_flag : Nonlinear (Traditional) Invariant Smoother (forward)
+        // NIS_1_flag : Nonlinear (Traditional) Invariant Smoother (1 iteration)
+        
 
     std::string cov_info;
     cov_info = "(" + BasicFunctions_Estimator::to_string_n_signficant_figures(gyro_exp, 2) +
@@ -98,12 +118,16 @@ int main() {
                + " " + BasicFunctions_Estimator::to_string_n_signficant_figures(bg_exp, 2)
                + " " + BasicFunctions_Estimator::to_string_n_signficant_figures(pri_ori_exp, 2) +
                BasicFunctions_Estimator::to_string_n_signficant_figures(pri_bg_exp, 2) + ")";
-//
-    Eigen::Matrix<double, 30, 1> Sensor_;
+
+    // print example cov_info : (5.0-1.0-1.0-4.0-8.0 -10.0 -100.0-10.0)
+    // What happened to the other covariances? They are not included in the string
+    //
+    Eigen::Matrix<double, 30, 1> Sensor_; // Initialize Sensor_ which is a 30x1 vector
     Sensor_.setZero();
-    Eigen::Matrix<bool, 4, 1> Contact_;
+    Eigen::Matrix<bool, 4, 1> Contact_; // Initialize Contact_ which is a 4x1 boolean vector covering all legs
     Contact_.setZero();
-    ROBOT_STATES state_;
+    ROBOT_STATES state_; // Initialize state_ which is a struct defined in RobotState_Smoother.hpp
+    // 3*5 + 3*contact_leg_num(4) + 3*contact_leg_num(4)(vel) = max 39
 
     bool varying_cov = true;
     double var_cov_start = contact_exp, var_cov_end = contact_exp;
@@ -224,7 +248,7 @@ int main() {
 
 
             if (IEKF_flag) {
-
+            
                 estimator_IEKF.robot.leg_no = 4;
                 estimator_IEKF.Optimization_Epsilon = 1e-3;
                 estimator_IEKF.Max_Iteration = max_it_no;
@@ -232,7 +256,7 @@ int main() {
                 estimator_IEKF.NUM_OF_TRASH_DATA = starting_point;
                 estimator_IEKF.Call_File(file_name);
                 estimator_IEKF.slip_rejection_mode = SR;
-                estimator_IEKF.slip_threshold = slip_thr;
+                estimator_IEKF.slip_threshold = slip_thr; // This is slip threshold number. Is it in m/s? Find units
                 estimator_IEKF.variable_contact_cov_mode = VCC;
                 estimator_IEKF.cov_amplifier = cov_amplifier;
 
