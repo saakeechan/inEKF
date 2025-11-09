@@ -12,13 +12,21 @@
 #include <eigen3/Eigen/Geometry>
 #include <stdio.h>
 #include <iostream>
+#include <fstream>
 #include "BasicFunctions_Estimator.hpp"
 #include <vector>
 
+// Pinocchio includes
+#include <pinocchio/parsers/urdf.hpp>
+#include <pinocchio/algorithm/kinematics.hpp>
+#include <pinocchio/algorithm/jacobian.hpp>
+#include <pinocchio/algorithm/frames.hpp>
+#include <pinocchio/multibody/model.hpp>
+#include <pinocchio/multibody/data.hpp>
 
 
 // 0: MINI_CHEETAH_REAL, 1: MINI_CHEETAH_SIM, 2: HOUND
-#define ROBOT 2
+#define ROBOT 1
 
 
 const int leg_num = 4;
@@ -61,7 +69,7 @@ public:
     LFF  = Left Front Foot
     */
 
-    int leg_no=4;
+    int leg_no=4; // hardcoded number of legs
     bool NANNAN;
     double err_max;
     int num_itter;
@@ -185,16 +193,37 @@ public:
 
     Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Gyro             ;
     Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Acc              ;
-    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Contact      ;
-    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Slip      ;
-    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Encoder          ;
-    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Bias_Gyro        ;
-    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Bias_Acc         ;
+    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Contact          ;
+    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Slip             ;
+    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Encoder         ;
+    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Bias_Gyro       ;
+    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Bias_Acc        ;
     Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Prior_Orientation;
     Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Prior_Velocity   ;
     Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Prior_Position   ;
     Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Prior_Bias_Gyro  ;
     Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Prior_Bias_Acc   ;
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////// Pinocchio Integration   /////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////
+    
+    // Pinocchio model and data
+    pinocchio::Model pin_model;
+    pinocchio::Data pin_data;
+    std::vector<pinocchio::FrameIndex> foot_frame_ids;  // 4 feet: [RR, RL, FR, FL]
+    // pinocchio::FrameIndex base_frame_id;                // base frame
+    // std::string base_frame_name;                        // name of base link/frame
+    //           - If loading fails, automatically sets to false and uses hardcoded
+    //   false = Use hardcoded analytical kinematics only
+    //           - Won't attempt URDF loading if manually set to false
+    //           - Permanently disabled if URDF loading fails
+    bool use_pinocchio = true;
+    
+    
+    // Load URDF and initialize Pinocchio model
+    void load_urdf(const std::string& urdf_path);
 
 
     void Covariance_Reset(Eigen::Matrix<double,12,1> cov_val_setting);
@@ -247,9 +276,90 @@ public:
 
 
 
+    // Batch forward kinematics: compute all 4 foot positions at once
+    // Input: 12x1 vector of all joint angles [leg1_q1, leg1_q2, leg1_q3, leg2_q1, ...]
+    // Output: 12x1 vector of all foot positions [foot1_x, foot1_y, foot1_z, foot2_x, ...]
+    Eigen::Matrix<double, 12, 1> Forward_Kinematics_All_Legs(const Eigen::Matrix<double,12,1> &all_joints) const
+    {
+        Eigen::Matrix<double, 12, 1> all_foot_positions;
+        
+        // Try to use Pinocchio kinematics if enabled
+        if (use_pinocchio && !foot_frame_ids.empty()) {
+            // Remap joints from encoder order [RR, RL, FR, FL] to URDF order [LF, LH, RF, RH]
+            // Encoder: [RR(0:2), RL(3:5), FR(6:8), FL(9:11)]
+            // URDF:    [LF(0:2), LH(3:5), RF(6:8), RH(9:11)]
+            // Mapping: LF<-FL, LH<-RL, RF<-FR, RH<-RR
+            Eigen::VectorXd q = Eigen::VectorXd::Zero(pin_model.nq);
+            q.segment<3>(0) = all_joints.segment<3>(9);  // LF <- FL (encoder leg 4)
+            q.segment<3>(3) = all_joints.segment<3>(3);  // LH <- RL (encoder leg 2)
+            q.segment<3>(6) = all_joints.segment<3>(6);  // RF <- FR (encoder leg 3)
+            q.segment<3>(9) = all_joints.segment<3>(0);  // RH <- RR (encoder leg 1)
+            
+            // Compute forward kinematics once for all legs
+            pinocchio::forwardKinematics(pin_model, const_cast<pinocchio::Data&>(pin_data), q);
+            pinocchio::updateFramePlacements(pin_model, const_cast<pinocchio::Data&>(pin_data));
+            
+            // Extract foot positions from URDF order and remap back to encoder order
+            // foot_frame_ids = [rh, lh, rf, lf] from load_urdf
+            // Need to output in encoder order: [RR, RL, FR, FL]
+            const pinocchio::SE3 & rh_foot = pin_data.oMf[foot_frame_ids[0]]; // RH
+            const pinocchio::SE3 & lh_foot = pin_data.oMf[foot_frame_ids[1]]; // LH
+            const pinocchio::SE3 & rf_foot = pin_data.oMf[foot_frame_ids[2]]; // RF
+            const pinocchio::SE3 & lf_foot = pin_data.oMf[foot_frame_ids[3]]; // LF
+            
+            all_foot_positions.segment<3>(0) = IMU2BD + rh_foot.translation();  // Leg 1: RR
+            all_foot_positions.segment<3>(3) = IMU2BD + lh_foot.translation();  // Leg 2: RL
+            all_foot_positions.segment<3>(6) = IMU2BD + rf_foot.translation();  // Leg 3: FR
+            all_foot_positions.segment<3>(9) = IMU2BD + lf_foot.translation();  // Leg 4: FL
+
+            std::ofstream ofs("foot_positions_pinnochio.txt", std::ios::app);
+            if (ofs.is_open()) {
+                for (int i = 0; i < 4; i++) {
+                    ofs << "Leg " << (i+1) << " foot position: " << all_foot_positions.segment<3>(i * 3).transpose() << std::endl;
+                }
+                ofs.close();
+            }
+
+            return all_foot_positions;
+        }
+        
+        // Fallback: compute using hardcoded kinematics
+        for (int i = 0; i < 4; i++) {
+            Eigen::Vector3d leg_joints = all_joints.segment<3>(i * 3);
+            all_foot_positions.segment<3>(i * 3) = Forward_Kinematics_Leg(leg_joints, i + 1);
+        }
+        
+        
+        return all_foot_positions;
+    }
+
     Eigen::Matrix<double, 3, 1> Forward_Kinematics_Leg(const Eigen::Matrix<double,3,1> &vec,int i_leg) const
     {
+        
+        // // Try to use Pinocchio kinematics if enabled
+        // if (use_pinocchio && !foot_frame_ids.empty()) {
+        //     // Build full joint configuration vector (assuming 12 DoF: 4 legs × 3 joints)
+        //     Eigen::VectorXd q = Eigen::VectorXd::Zero(pin_model.nq);
+            
+        //     // Map leg joint angles to model indices
+        //     // i_leg is 1-indexed: 1=RR, 2=RL, 3=FR, 4=FL (for ROBOT==2)
+        //     int leg_start_idx = (i_leg - 1) * 3;
+        //     q.segment<3>(leg_start_idx) = vec;
+            
+        //     // Compute forward kinematics
+        //     pinocchio::forwardKinematics(pin_model, const_cast<pinocchio::Data&>(pin_data), q);
+        //     pinocchio::updateFramePlacements(pin_model, const_cast<pinocchio::Data&>(pin_data));
+            
+        //     // Get foot position in body frame and add IMU2BD offset (to match hardcoded kinematics)
+        //     const pinocchio::SE3 & foot_placement = pin_data.oMf[foot_frame_ids[i_leg - 1]];
 
+        //     // create a variable that will store all the values of final footplacement and save it in a .txt file later
+        //     Eigen::Vector3d foot_position = IMU2BD + foot_placement.translation();
+
+
+        // }
+        
+        // Fallback to hardcoded kinematics
         Eigen::Vector3d dp = Eigen::Vector3d::Zero(3);
         Eigen::Vector3d pHip = Eigen::Vector3d::Zero(3);
         Eigen::Vector3d p = Eigen::Vector3d::Zero(3);
@@ -334,6 +444,13 @@ public:
 
         p = IMU2BD + p;
 
+        // do the same thing for p
+        std::ofstream ofs("foot_positions_manual.txt", std::ios::app);
+        if (ofs.is_open()) {
+            ofs << "Leg " << i_leg << " foot position: " << p.transpose() << std::endl;
+            ofs.close();
+        }
+
         return p;
     }
 
@@ -375,9 +492,92 @@ public:
 
 
 
+    // Batch Jacobian computation: compute all 4 leg Jacobians at once
+    // Input: 12x1 vector of all joint angles
+    // Output: 12x12 block diagonal Jacobian matrix (each 3x3 block for one leg)
+    Eigen::Matrix<double, 12, 12> Jacobian_All_Legs(const Eigen::Matrix<double,12,1> &all_joints) const
+    {
+        Eigen::Matrix<double, 12, 12> J_all;
+        J_all.setZero();
+        
+        // Try to use Pinocchio kinematics if enabled
+        if (use_pinocchio && !foot_frame_ids.empty()) {
+            // Remap joints from encoder order [RR, RL, FR, FL] to URDF order [LF, LH, RF, RH]
+            Eigen::VectorXd q = Eigen::VectorXd::Zero(pin_model.nq);
+            q.segment<3>(0) = all_joints.segment<3>(9);  // LF <- FL (encoder leg 4)
+            q.segment<3>(3) = all_joints.segment<3>(3);  // LH <- RL (encoder leg 2)
+            q.segment<3>(6) = all_joints.segment<3>(6);  // RF <- FR (encoder leg 3)
+            q.segment<3>(9) = all_joints.segment<3>(0);  // RH <- RR (encoder leg 1)
+            
+            // Compute kinematics once for all legs
+            pinocchio::forwardKinematics(pin_model, const_cast<pinocchio::Data&>(pin_data), q);
+            pinocchio::updateFramePlacements(pin_model, const_cast<pinocchio::Data&>(pin_data));
+            
+            // Compute Jacobians for each foot frame in URDF order
+            Eigen::MatrixXd J_rh(6, pin_model.nv), J_lh(6, pin_model.nv);
+            Eigen::MatrixXd J_rf(6, pin_model.nv), J_lf(6, pin_model.nv);
+            
+            pinocchio::computeFrameJacobian(pin_model, const_cast<pinocchio::Data&>(pin_data), q, 
+                                           foot_frame_ids[0], pinocchio::LOCAL_WORLD_ALIGNED, J_rh);
+            pinocchio::computeFrameJacobian(pin_model, const_cast<pinocchio::Data&>(pin_data), q, 
+                                           foot_frame_ids[1], pinocchio::LOCAL_WORLD_ALIGNED, J_lh);
+            pinocchio::computeFrameJacobian(pin_model, const_cast<pinocchio::Data&>(pin_data), q, 
+                                           foot_frame_ids[2], pinocchio::LOCAL_WORLD_ALIGNED, J_rf);
+            pinocchio::computeFrameJacobian(pin_model, const_cast<pinocchio::Data&>(pin_data), q, 
+                                           foot_frame_ids[3], pinocchio::LOCAL_WORLD_ALIGNED, J_lf);
+            
+            // Extract 3x3 blocks and place in encoder order [RR, RL, FR, FL]
+            // RR (leg 1): use RH jacobian w.r.t. RH joints (q 9:11)
+            J_all.block<3, 3>(0, 0) = J_rh.block<3, 3>(0, 9);
+            // RL (leg 2): use LH jacobian w.r.t. LH joints (q 3:5)
+            J_all.block<3, 3>(3, 3) = J_lh.block<3, 3>(0, 3);
+            // FR (leg 3): use RF jacobian w.r.t. RF joints (q 6:8)
+            J_all.block<3, 3>(6, 6) = J_rf.block<3, 3>(0, 6);
+            // FL (leg 4): use LF jacobian w.r.t. LF joints (q 0:2)
+            J_all.block<3, 3>(9, 9) = J_lf.block<3, 3>(0, 0);
+            
+            return J_all;
+        }
+        
+        // Fallback: compute using hardcoded kinematics
+        for (int i = 0; i < 4; i++) {
+            Eigen::Vector3d leg_joints = all_joints.segment<3>(i * 3);
+            J_all.block<3, 3>(i * 3, i * 3) = Jacobian_Leg(leg_joints, i + 1);
+        }
+        
+        return J_all;
+    }
+
     Eigen::Matrix<double, 3, 3> Jacobian_Leg(const Eigen::Matrix<double,3,1> &vec,int i_leg) const
     {
-
+        
+        // Use Pinocchio if successfully initialized, otherwise fallback to hardcoded
+        if (use_pinocchio && !foot_frame_ids.empty()) {
+            // Build full joint configuration vector
+            Eigen::VectorXd q = Eigen::VectorXd::Zero(pin_model.nq);
+                
+                // Map leg joint angles to model indices
+                int leg_start_idx = (i_leg - 1) * 3;
+                q.segment<3>(leg_start_idx) = vec;
+                
+                // Compute Jacobian (need kinematics first)
+                pinocchio::forwardKinematics(pin_model, const_cast<pinocchio::Data&>(pin_data), q);
+                
+                // Compute frame Jacobian in LOCAL_WORLD_ALIGNED frame
+                Eigen::MatrixXd J_full(6, pin_model.nv);
+                pinocchio::computeFrameJacobian(pin_model, const_cast<pinocchio::Data&>(pin_data), q, 
+                                               foot_frame_ids[i_leg - 1], 
+                                               pinocchio::LOCAL_WORLD_ALIGNED, 
+                                               J_full);
+                
+                // Extract 3×3 linear velocity Jacobian for the 3 leg joints
+                // J_full is 6×nv (linear velocity in rows 0-2, angular in 3-5)
+                Eigen::Matrix<double, 3, 3> J = J_full.block<3, 3>(0, leg_start_idx);
+                
+                return J;
+        }
+        
+        // Fallback to hardcoded Jacobian
         Eigen::Matrix<double, 3, 3> J = Eigen::Matrix3d::Zero(3,3);
 
         double q1 = vec(0);

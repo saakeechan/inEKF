@@ -8,7 +8,7 @@ cd result/
 % --- File information ---
 slip = 0.3;
 SRmode = sprintf('(SR%.1f)', slip);
-cov = '-10-10-5-4-8 1 -10-10';
+cov = '-5-1-1-4-8 -10 -10-10';
 initial = '0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00';
 data = '20220623_IEKF_01x27000_';
 index = 1;
@@ -185,7 +185,6 @@ legend('V_z true', 'V_z estimated');
 grid minor;
 
 sgtitle('Relative Velocity Comparison (True vs Estimated)');
-
 
 
 % Bias (Single File Only)

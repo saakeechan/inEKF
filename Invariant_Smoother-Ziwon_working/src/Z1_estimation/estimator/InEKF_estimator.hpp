@@ -73,7 +73,7 @@ int NUM_OF_TRASH_DATA = 1;
     int frame_count=0;
     int time_count=0;
 
-    double dt = robot.dt;
+    double dt = robot.dt; // From Robot_Model_mini_cheetah
     Vector3d gravity;
 
 
@@ -105,7 +105,7 @@ int NUM_OF_TRASH_DATA = 1;
 
 
     // True Values and measurement Buffer
-    Eigen::Matrix<bool, 4,1>   HARD_CONTACT_t  [2];
+    Eigen::Matrix<bool, 4,1>   HARD_CONTACT_t  [2]; // Hardcoded bools for 4 legs
     Eigen::Matrix<bool, 4,1>   CONTACT_t       [2];
     Eigen::Matrix<bool, 4,1>   SLIP_t          [2];
 
@@ -128,7 +128,7 @@ int NUM_OF_TRASH_DATA = 1;
     double SAVE_Z1 [SAVEMAX][SAVEMAXCNT];
     int SAVE_cnt = 0;
 
-    int idx_TRUE_Rotation           = 0;
+    int idx_TRUE_Rotation           = 0; // Hardcoded values for 4 legs here too
     int idx_TRUE_Velocity           = idx_TRUE_Rotation + 9;
     int idx_TRUE_Position           = idx_TRUE_Velocity + 3;
     int idx_TRUE_dv                  = idx_TRUE_Position + 3;

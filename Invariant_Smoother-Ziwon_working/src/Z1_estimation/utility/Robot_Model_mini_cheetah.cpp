@@ -67,10 +67,110 @@ Robot_Model_mini_cheetah::Robot_Model_mini_cheetah() {
     IMU2BD.setZero();
 
 
+    
+
+    // Definitive behavior: if Pinocchio is enabled, load URDF now
+    if (use_pinocchio) {
+        load_urdf("../robot_description/urdf/champ.urdf");
+    }
+
 }
 
 Robot_Model_mini_cheetah::~Robot_Model_mini_cheetah() {
 
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////// Pinocchio Integration   /////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////
+
+void Robot_Model_mini_cheetah::load_urdf(const std::string& urdf_path) {
+    
+    // If use_pinocchio is already false, user has disabled it - don't attempt loading
+    if (!use_pinocchio) {
+        return;
+    }
+
+    // Check if already successfully loaded; Can delete later - a redundant check
+    if (!foot_frame_ids.empty()) {
+        return;
+    }
+    
+    try {
+        // Build the model from URDF
+        pinocchio::urdf::buildModel(urdf_path, pin_model);
+        pin_data = pinocchio::Data(pin_model);
+        
+        std::cout << "Successfully loaded URDF: " << urdf_path << std::endl;
+        std::cout << "Model name: " << pin_model.name << std::endl;
+        std::cout << "Number of joints: " << pin_model.njoints << std::endl;
+        std::cout << "Number of frames: " << pin_model.nframes << std::endl;
+        
+        // Print all joint names and indices
+        std::cout << "\n=== Joint Information ===" << std::endl;
+        for (pinocchio::JointIndex joint_id = 0; joint_id < pin_model.njoints; joint_id++) {
+            std::cout << "Joint " << joint_id << ": " << pin_model.names[joint_id] << std::endl;
+        }
+        
+        // Print configuration space info
+        std::cout << "\n=== Configuration Space ===" << std::endl;
+        std::cout << "nq (configuration dimension): " << pin_model.nq << std::endl;
+        std::cout << "nv (velocity dimension): " << pin_model.nv << std::endl;
+        
+        // Print joint index to configuration index mapping
+        std::cout << "\n=== Joint to Config Index Mapping ===" << std::endl;
+        for (pinocchio::JointIndex joint_id = 1; joint_id < pin_model.njoints; joint_id++) {
+            std::cout << "Joint " << joint_id << " (" << pin_model.names[joint_id] 
+                      << "): q_index = " << pin_model.joints[joint_id].idx_q()
+                      << ", nq = " << pin_model.joints[joint_id].nq()
+                      << ", nv = " << pin_model.joints[joint_id].nv() << std::endl;
+        }
+        std::cout << "========================\n" << std::endl;
+        
+        // Find foot frame IDs based on leg_indexing enum
+        // ROBOT == 2 uses: RR=1, RL=2, FR=3, FL=4
+        // Frame names in champ.urdf: lf_foot_link, rf_foot_link, lh_foot_link, rh_foot_link
+        
+        foot_frame_ids.clear();
+        foot_frame_ids.resize(4);
+        
+        // Map leg indices to frame names (adjust based on URDF)
+        std::vector<std::string> frame_names = {"rh_foot_link", "lh_foot_link", "rf_foot_link", "lf_foot_link"}; // RR, RL, FR, FL
+        // // get base frame info
+        // base_frame_name = "base_link";
+        // if (pin_model.existFrame(base_frame_name)) {
+        //     base_frame_id = pin_model.getFrameId(base_frame_name);
+        //     std::cout << "Found base frame " << base_frame_name << " with ID " << base_frame_id << std::endl;
+        // } else {
+        //     std::cerr << "WARNING: Base frame " << base_frame_name << " not found in URDF!" << std::endl;
+        //     std::cerr << "Disabling Pinocchio, falling back to hardcoded kinematics." << std::endl;
+        //     use_pinocchio = false;  // Permanently disable for this instance
+        //     foot_frame_ids.clear();
+        //     return;
+        // }
+        
+        for (int i = 0; i < 4; i++) {
+            if (pin_model.existFrame(frame_names[i])) {
+                foot_frame_ids[i] = pin_model.getFrameId(frame_names[i]);
+                std::cout << "Found frame " << frame_names[i] << " with ID " << foot_frame_ids[i] << std::endl;
+            } else {
+                std::cerr << "WARNING: Frame " << frame_names[i] << " not found in URDF!" << std::endl;
+                std::cerr << "Disabling Pinocchio, falling back to hardcoded kinematics." << std::endl;
+                use_pinocchio = false;  // Permanently disable for this instance
+                foot_frame_ids.clear();
+                return;
+            }
+        }
+        
+        std::cout << "Pinocchio initialization successful!" << std::endl;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "Error loading URDF with Pinocchio: " << e.what() << std::endl;
+        std::cerr << "Disabling Pinocchio, falling back to hardcoded kinematics." << std::endl;
+        use_pinocchio = false;  // Permanently disable for this instance
+        foot_frame_ids.clear();
+    }
 }
 
 

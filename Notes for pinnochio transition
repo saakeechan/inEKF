@@ -1,4 +1,4 @@
 RobotState_smoother has hardcoded 4 legs code
 InEKF also has harcoded values for 4 legged robots
 BasicFunctions_Estimator is fine 
-
+Not including IMU2BD in pinnochio modelling because its zero right now

@@ -4,13 +4,15 @@
 #include <string>
 #include <cstdlib>
 
+#include <cmath> // for std::pow
+
 #include <eigen3/Eigen/Dense>
 #include <eigen3/Eigen/Geometry>
 #include <vector>
-#include "Z1_JH_estimator.hpp"
-#include "Z1_estimator.hpp"
-#include "Pseudo_Invariant_estimator.hpp"
-#include "Traditional_estimator.hpp"
+// #include "Z1_JH_estimator.hpp"
+// #include "Z1_estimator.hpp"
+// #include "Pseudo_Invariant_estimator.hpp"
+// #include "Traditional_estimator.hpp"
 #include "InEKF_estimator.hpp"
 #include <sstream>
 #include <iomanip>
@@ -23,18 +25,20 @@ using std::cout;
 using std::endl;
 
 InEKFilter estimator_IEKF;
-InEKFilter estimator_IEKF_SR;
-Z1_estimator estimator_IS_1;
-Z1_JH_estimator estimator_AIS_1;
-Pseudo_Invariant_estimator estimator_PIS_1;
-Traditional_estimator estimator_NIS_1;
-Z1_estimator estimator_IS_f;
-Z1_JH_estimator estimator_AIS_f;
-Z1_JH_estimator estimator_AIS_1f;
-Z1_JH_estimator estimator_AIS_f1;
-Pseudo_Invariant_estimator estimator_PIS_f;
-Traditional_estimator estimator_NIS_f;
+// InEKFilter estimator_IEKF_SR; // Second IEKF instance (SR variant) – keep if needed, unused otherwise
+// Z1_estimator estimator_IS_1;
+// Z1_JH_estimator estimator_AIS_1;
+// Pseudo_Invariant_estimator estimator_PIS_1;
+// Traditional_estimator estimator_NIS_1;
+// Z1_estimator estimator_IS_f;
+// Z1_JH_estimator estimator_AIS_f;
+// Z1_JH_estimator estimator_AIS_1f;
+// Z1_JH_estimator estimator_AIS_f1;
+// Pseudo_Invariant_estimator estimator_PIS_f;
+// Traditional_estimator estimator_NIS_f;
 
+/// @brief 
+/// @return 
 int main() {
 
     double dt = 0.005;
@@ -65,8 +69,8 @@ int main() {
     // Contact covariance is the nominal contact covariance
 
 
-    double gyro_exp = -10, acc_exp = -10, slip_exp = -5, contact_exp = -4, encoder_exp = -8; // for paper
-    double bg_exp = -10, ba_exp = -10;
+    double gyro_exp = -5, acc_exp = -1, slip_exp = -1, contact_exp = -4, encoder_exp = -8; // for paper
+    double bg_exp = -10, ba_exp = -7;
 //    double bg_exp = -7, ba_exp = -3;
     double pri_ori_exp = -10, pri_vel_exp = -10, pri_pos_exp = -10;
     double pri_bg_exp = -10, pri_ba_exp = -10;
@@ -275,319 +279,319 @@ int main() {
             }
 
 
-            if (IS_f_flag) {
+            // if (IS_f_flag) {
 
-                estimator_IS_f.robot.leg_no = 4;
-                estimator_IS_f.Optimization_Epsilon = convergence_cond;
-                estimator_IS_f.Max_Iteration = max_it_no;
-                estimator_IS_f.Max_backpropagate_num = max_backpp_no;
-                estimator_IS_f.backppgn_rate = backpp_rate;
+            //     estimator_IS_f.robot.leg_no = 4;
+            //     estimator_IS_f.Optimization_Epsilon = convergence_cond;
+            //     estimator_IS_f.Max_Iteration = max_it_no;
+            //     estimator_IS_f.Max_backpropagate_num = max_backpp_no;
+            //     estimator_IS_f.backppgn_rate = backpp_rate;
 
-                estimator_IS_f.NUM_OF_TRASH_DATA = starting_point;
-                estimator_IS_f.Call_File(file_name);
-                estimator_IS_f.slip_rejection_mode = SR;
-                estimator_IS_f.slip_threshold = slip_thr;
-                estimator_IS_f.variable_contact_cov_mode = VCC;
-                estimator_IS_f.cov_amplifier = cov_amplifier;
+            //     estimator_IS_f.NUM_OF_TRASH_DATA = starting_point;
+            //     estimator_IS_f.Call_File(file_name);
+            //     estimator_IS_f.slip_rejection_mode = SR;
+            //     estimator_IS_f.slip_threshold = slip_thr;
+            //     estimator_IS_f.variable_contact_cov_mode = VCC;
+            //     estimator_IS_f.cov_amplifier = cov_amplifier;
 
-                estimator_IS_f.long_term_v_threshold = lt_v_th;
-                estimator_IS_f.long_term_a_threshold = lt_a_th;
+            //     estimator_IS_f.long_term_v_threshold = lt_v_th;
+            //     estimator_IS_f.long_term_a_threshold = lt_a_th;
 
-                estimator_IS_f.Retract_All_flag = retraction_flag;
-                //robot.define(REAL_ROBOT);
-                estimator_IS_f.Initialize(dt, Estimator_Covariances, initial_condition);
-
-                for (int time = 0; time < time_length; time++) {
-                    if(time%1000==0)
-                    {
-                        cout<<"now step "<<time<<endl;
-                    }
-                    estimator_IS_f.Onestep(Sensor_, Contact_, state_);
-                }
+            //     estimator_IS_f.Retract_All_flag = retraction_flag;
+            //     //robot.define(REAL_ROBOT);
+            //     estimator_IS_f.Initialize(dt, Estimator_Covariances, initial_condition);
+
+            //     for (int time = 0; time < time_length; time++) {
+            //         if(time%1000==0)
+            //         {
+            //             cout<<"now step "<<time<<endl;
+            //         }
+            //         estimator_IS_f.Onestep(Sensor_, Contact_, state_);
+            //     }
 
-                estimator_IS_f.do_SAVE_Z1_all(cov_info);
+            //     estimator_IS_f.do_SAVE_Z1_all(cov_info);
 
-            }
+            // }
 
 
-            if (PIS_f_flag) {
+            // if (PIS_f_flag) {
 
-                estimator_PIS_f.robot.leg_no = 4;
-                estimator_PIS_f.Optimization_Epsilon = convergence_cond;
-                estimator_PIS_f.Max_Iteration = max_it_no;
-                estimator_PIS_f.Max_backpropagate_num = max_backpp_no;
-                estimator_PIS_f.backppgn_rate = backpp_rate;
+            //     estimator_PIS_f.robot.leg_no = 4;
+            //     estimator_PIS_f.Optimization_Epsilon = convergence_cond;
+            //     estimator_PIS_f.Max_Iteration = max_it_no;
+            //     estimator_PIS_f.Max_backpropagate_num = max_backpp_no;
+            //     estimator_PIS_f.backppgn_rate = backpp_rate;
 
-                estimator_PIS_f.NUM_OF_TRASH_DATA = starting_point;
-                estimator_PIS_f.Call_File(file_name);
-                estimator_PIS_f.Retract_All_flag = retraction_flag;
-                estimator_PIS_f.slip_rejection_mode = SR;
-                estimator_PIS_f.slip_threshold = slip_thr;
-                estimator_PIS_f.variable_contact_cov_mode = VCC;
-                estimator_PIS_f.cov_amplifier = cov_amplifier;
+            //     estimator_PIS_f.NUM_OF_TRASH_DATA = starting_point;
+            //     estimator_PIS_f.Call_File(file_name);
+            //     estimator_PIS_f.Retract_All_flag = retraction_flag;
+            //     estimator_PIS_f.slip_rejection_mode = SR;
+            //     estimator_PIS_f.slip_threshold = slip_thr;
+            //     estimator_PIS_f.variable_contact_cov_mode = VCC;
+            //     estimator_PIS_f.cov_amplifier = cov_amplifier;
 
-                //robot.define(REAL_ROBOT);
-                estimator_PIS_f.Initialize(dt, Estimator_Covariances, initial_condition);
+            //     //robot.define(REAL_ROBOT);
+            //     estimator_PIS_f.Initialize(dt, Estimator_Covariances, initial_condition);
 
-                for (int time = 0; time < time_length; time++) {
-                    //cout<<"now step "<<time<<endl;
-                    estimator_PIS_f.Onestep(Sensor_, Contact_, state_);
-                }
+            //     for (int time = 0; time < time_length; time++) {
+            //         //cout<<"now step "<<time<<endl;
+            //         estimator_PIS_f.Onestep(Sensor_, Contact_, state_);
+            //     }
 
-                estimator_PIS_f.do_SAVE_Z1_all(cov_info);
+            //     estimator_PIS_f.do_SAVE_Z1_all(cov_info);
 
-            }
+            // }
 
 
-            if (NIS_f_flag) {
+            // if (NIS_f_flag) {
 
-                estimator_NIS_f.robot.leg_no = 4;
-                estimator_NIS_f.Optimization_Epsilon = convergence_cond;
-                estimator_NIS_f.Max_Iteration = max_it_no;
-                estimator_NIS_f.Max_backpropagate_num = max_backpp_no;
-                estimator_NIS_f.backppgn_rate = backpp_rate;
+            //     estimator_NIS_f.robot.leg_no = 4;
+            //     estimator_NIS_f.Optimization_Epsilon = convergence_cond;
+            //     estimator_NIS_f.Max_Iteration = max_it_no;
+            //     estimator_NIS_f.Max_backpropagate_num = max_backpp_no;
+            //     estimator_NIS_f.backppgn_rate = backpp_rate;
 
-                estimator_NIS_f.NUM_OF_TRASH_DATA = starting_point;
-                estimator_NIS_f.Call_File(file_name);
-                estimator_NIS_f.slip_rejection_mode = SR;
-                estimator_NIS_f.slip_threshold = slip_thr;
-                estimator_NIS_f.variable_contact_cov_mode = VCC;
-                estimator_NIS_f.cov_amplifier = cov_amplifier;
+            //     estimator_NIS_f.NUM_OF_TRASH_DATA = starting_point;
+            //     estimator_NIS_f.Call_File(file_name);
+            //     estimator_NIS_f.slip_rejection_mode = SR;
+            //     estimator_NIS_f.slip_threshold = slip_thr;
+            //     estimator_NIS_f.variable_contact_cov_mode = VCC;
+            //     estimator_NIS_f.cov_amplifier = cov_amplifier;
 
-                estimator_NIS_f.long_term_v_threshold = lt_v_th;
-                estimator_NIS_f.long_term_a_threshold = lt_a_th;
+            //     estimator_NIS_f.long_term_v_threshold = lt_v_th;
+            //     estimator_NIS_f.long_term_a_threshold = lt_a_th;
 
-                //robot.define(REAL_ROBOT);
-                estimator_NIS_f.Initialize(dt, Estimator_Covariances, initial_condition);
+            //     //robot.define(REAL_ROBOT);
+            //     estimator_NIS_f.Initialize(dt, Estimator_Covariances, initial_condition);
 
 
-                for (int time = 0; time < time_length; time++) {
-                    //cout<<"now step "<<time<<endl;
-                    estimator_NIS_f.Onestep(Sensor_, Contact_, state_);
-                }
-
-                estimator_NIS_f.do_SAVE_Z1_all(cov_info);
-            }
+            //     for (int time = 0; time < time_length; time++) {
+            //         //cout<<"now step "<<time<<endl;
+            //         estimator_NIS_f.Onestep(Sensor_, Contact_, state_);
+            //     }
+
+            //     estimator_NIS_f.do_SAVE_Z1_all(cov_info);
+            // }
 
-            if (AIS_ff_flag) {
+            // if (AIS_ff_flag) {
 
-                estimator_AIS_f.robot.leg_no = 4;
-                estimator_AIS_f.Optimization_Epsilon = convergence_cond;
-                estimator_AIS_f.Max_Iteration = max_it_no;
-                estimator_AIS_f.Max_backpropagate_num = max_backpp_no;
-                estimator_AIS_f.backppgn_rate = backpp_rate;
-
-                estimator_AIS_f.NUM_OF_TRASH_DATA = starting_point;
-                estimator_AIS_f.Call_File(file_name);
-                estimator_AIS_f.Retract_All_flag = retraction_flag;
-                estimator_AIS_f.slip_rejection_mode = SR;
-                estimator_AIS_f.slip_threshold = slip_thr;
-                estimator_AIS_f.variable_contact_cov_mode = VCC;
-                estimator_AIS_f.cov_amplifier = cov_amplifier;
-
-                //robot.define(REAL_ROBOT);
-                estimator_AIS_f.Initialize(dt, Estimator_Covariances, initial_condition);
-
-
-                for (int time = 0; time < time_length; time++) {
-                    if(time%10==0)
-                    {
-                        cout<<"now step "<<time<<endl;
-                    }
-                    estimator_AIS_f.Onestep(Sensor_, Contact_, state_);
-                }
-
-                estimator_AIS_f.do_SAVE_Z1_all(cov_info);
+            //     estimator_AIS_f.robot.leg_no = 4;
+            //     estimator_AIS_f.Optimization_Epsilon = convergence_cond;
+            //     estimator_AIS_f.Max_Iteration = max_it_no;
+            //     estimator_AIS_f.Max_backpropagate_num = max_backpp_no;
+            //     estimator_AIS_f.backppgn_rate = backpp_rate;
+
+            //     estimator_AIS_f.NUM_OF_TRASH_DATA = starting_point;
+            //     estimator_AIS_f.Call_File(file_name);
+            //     estimator_AIS_f.Retract_All_flag = retraction_flag;
+            //     estimator_AIS_f.slip_rejection_mode = SR;
+            //     estimator_AIS_f.slip_threshold = slip_thr;
+            //     estimator_AIS_f.variable_contact_cov_mode = VCC;
+            //     estimator_AIS_f.cov_amplifier = cov_amplifier;
+
+            //     //robot.define(REAL_ROBOT);
+            //     estimator_AIS_f.Initialize(dt, Estimator_Covariances, initial_condition);
+
+
+            //     for (int time = 0; time < time_length; time++) {
+            //         if(time%10==0)
+            //         {
+            //             cout<<"now step "<<time<<endl;
+            //         }
+            //         estimator_AIS_f.Onestep(Sensor_, Contact_, state_);
+            //     }
+
+            //     estimator_AIS_f.do_SAVE_Z1_all(cov_info);
 
-            }
+            // }
 
 
-            if (IS_1_flag) {
+            // if (IS_1_flag) {
 
-                estimator_IS_1.robot.leg_no = 4;
-                estimator_IS_1.Optimization_Epsilon = convergence_cond;
-                estimator_IS_1.Max_Iteration = 1;
-                estimator_IS_1.Max_backpropagate_num = 1000;
-                estimator_IS_1.backppgn_rate = backpp_rate;
+            //     estimator_IS_1.robot.leg_no = 4;
+            //     estimator_IS_1.Optimization_Epsilon = convergence_cond;
+            //     estimator_IS_1.Max_Iteration = 1;
+            //     estimator_IS_1.Max_backpropagate_num = 1000;
+            //     estimator_IS_1.backppgn_rate = backpp_rate;
 
-                estimator_IS_1.NUM_OF_TRASH_DATA = starting_point;
-                estimator_IS_1.Call_File(file_name);
-                estimator_IS_1.slip_rejection_mode = SR;
-                estimator_IS_1.slip_threshold = slip_thr;
-                estimator_IS_1.variable_contact_cov_mode = VCC;
-                estimator_IS_1.cov_amplifier = cov_amplifier;
-
-                estimator_IS_1.long_term_v_threshold = lt_v_th;
-                estimator_IS_1.long_term_a_threshold = lt_a_th;
+            //     estimator_IS_1.NUM_OF_TRASH_DATA = starting_point;
+            //     estimator_IS_1.Call_File(file_name);
+            //     estimator_IS_1.slip_rejection_mode = SR;
+            //     estimator_IS_1.slip_threshold = slip_thr;
+            //     estimator_IS_1.variable_contact_cov_mode = VCC;
+            //     estimator_IS_1.cov_amplifier = cov_amplifier;
+
+            //     estimator_IS_1.long_term_v_threshold = lt_v_th;
+            //     estimator_IS_1.long_term_a_threshold = lt_a_th;
 
-                estimator_IS_1.Retract_All_flag = false;
-                //robot.define(REAL_ROBOT);
-                estimator_IS_1.Initialize(dt, Estimator_Covariances, initial_condition);
+            //     estimator_IS_1.Retract_All_flag = false;
+            //     //robot.define(REAL_ROBOT);
+            //     estimator_IS_1.Initialize(dt, Estimator_Covariances, initial_condition);
 
-                for (int time = 0; time < time_length; time++) {
-                    if(time%10==0)
-                    {
-                        cout<<"now step "<<time<<endl;
-                    }
-                    estimator_IS_1.Onestep(Sensor_, Contact_, state_);
-                }
+            //     for (int time = 0; time < time_length; time++) {
+            //         if(time%10==0)
+            //         {
+            //             cout<<"now step "<<time<<endl;
+            //         }
+            //         estimator_IS_1.Onestep(Sensor_, Contact_, state_);
+            //     }
 
-                estimator_IS_1.do_SAVE_Z1_all(cov_info);
+            //     estimator_IS_1.do_SAVE_Z1_all(cov_info);
 
-            }
-            //
+            // }
+            // //
 
-            if (PIS_1_flag) {
+            // if (PIS_1_flag) {
 
-                estimator_PIS_1.robot.leg_no = 4;
-                estimator_PIS_1.Optimization_Epsilon = convergence_cond;
-                estimator_PIS_1.Max_Iteration = 1;
-                estimator_PIS_1.Max_backpropagate_num = 1000;
-                estimator_PIS_1.backppgn_rate = backpp_rate;
+            //     estimator_PIS_1.robot.leg_no = 4;
+            //     estimator_PIS_1.Optimization_Epsilon = convergence_cond;
+            //     estimator_PIS_1.Max_Iteration = 1;
+            //     estimator_PIS_1.Max_backpropagate_num = 1000;
+            //     estimator_PIS_1.backppgn_rate = backpp_rate;
 
-                estimator_PIS_1.NUM_OF_TRASH_DATA = starting_point;
-                estimator_PIS_1.Call_File(file_name);
-                estimator_PIS_1.Retract_All_flag = false;
-                estimator_PIS_1.slip_rejection_mode = SR;
-                estimator_PIS_1.slip_threshold = slip_thr;
-                estimator_PIS_1.variable_contact_cov_mode = VCC;
-                estimator_PIS_1.cov_amplifier = cov_amplifier;
+            //     estimator_PIS_1.NUM_OF_TRASH_DATA = starting_point;
+            //     estimator_PIS_1.Call_File(file_name);
+            //     estimator_PIS_1.Retract_All_flag = false;
+            //     estimator_PIS_1.slip_rejection_mode = SR;
+            //     estimator_PIS_1.slip_threshold = slip_thr;
+            //     estimator_PIS_1.variable_contact_cov_mode = VCC;
+            //     estimator_PIS_1.cov_amplifier = cov_amplifier;
 
-                //robot.define(REAL_ROBOT);
-                estimator_PIS_1.Initialize(dt, Estimator_Covariances, initial_condition);
+            //     //robot.define(REAL_ROBOT);
+            //     estimator_PIS_1.Initialize(dt, Estimator_Covariances, initial_condition);
 
 
-                for (int time = 0; time < time_length; time++) {
-                    if(time%10==0)
-                    {
-                        cout<<"now step "<<time<<endl;
-                    }
-                    //cout<<"now step "<<time<<endl;
-                    estimator_PIS_1.Onestep(Sensor_, Contact_, state_);
-                }
+            //     for (int time = 0; time < time_length; time++) {
+            //         if(time%10==0)
+            //         {
+            //             cout<<"now step "<<time<<endl;
+            //         }
+            //         //cout<<"now step "<<time<<endl;
+            //         estimator_PIS_1.Onestep(Sensor_, Contact_, state_);
+            //     }
 
-                estimator_PIS_1.do_SAVE_Z1_all(cov_info);
+            //     estimator_PIS_1.do_SAVE_Z1_all(cov_info);
 
-            }
+            // }
 
-            if (AIS_11_flag) {
+            // if (AIS_11_flag) {
 
-                estimator_AIS_1.robot.leg_no = 4;
-                estimator_AIS_1.Optimization_Epsilon = convergence_cond;
-                estimator_AIS_1.Max_Iteration = 1;
-                estimator_AIS_1.Max_backpropagate_num = 1000;
-                estimator_AIS_1.backppgn_rate = backpp_rate;
+            //     estimator_AIS_1.robot.leg_no = 4;
+            //     estimator_AIS_1.Optimization_Epsilon = convergence_cond;
+            //     estimator_AIS_1.Max_Iteration = 1;
+            //     estimator_AIS_1.Max_backpropagate_num = 1000;
+            //     estimator_AIS_1.backppgn_rate = backpp_rate;
 
-                estimator_AIS_1.NUM_OF_TRASH_DATA = starting_point;
-                estimator_AIS_1.Call_File(file_name);
-                estimator_AIS_1.Retract_All_flag = retraction_flag;
-                estimator_AIS_1.slip_rejection_mode = SR;
-                estimator_AIS_1.slip_threshold = slip_thr;
-                estimator_AIS_1.variable_contact_cov_mode = VCC;
-                estimator_AIS_1.cov_amplifier = cov_amplifier;
+            //     estimator_AIS_1.NUM_OF_TRASH_DATA = starting_point;
+            //     estimator_AIS_1.Call_File(file_name);
+            //     estimator_AIS_1.Retract_All_flag = retraction_flag;
+            //     estimator_AIS_1.slip_rejection_mode = SR;
+            //     estimator_AIS_1.slip_threshold = slip_thr;
+            //     estimator_AIS_1.variable_contact_cov_mode = VCC;
+            //     estimator_AIS_1.cov_amplifier = cov_amplifier;
 
-                //robot.define(REAL_ROBOT);
-                estimator_AIS_1.Initialize(dt, Estimator_Covariances, initial_condition);
+            //     //robot.define(REAL_ROBOT);
+            //     estimator_AIS_1.Initialize(dt, Estimator_Covariances, initial_condition);
 
 
-                for (int time = 0; time < time_length; time++) {
-                    //cout<<"now step "<<time<<endl;
-                    estimator_AIS_1.Onestep(Sensor_, Contact_, state_);
-                }
+            //     for (int time = 0; time < time_length; time++) {
+            //         //cout<<"now step "<<time<<endl;
+            //         estimator_AIS_1.Onestep(Sensor_, Contact_, state_);
+            //     }
 
-                estimator_AIS_1.do_SAVE_Z1_all(cov_info);
+            //     estimator_AIS_1.do_SAVE_Z1_all(cov_info);
 
-            }
+            // }
 
-            if (AIS_1f_flag) {
+            // if (AIS_1f_flag) {
 
-                estimator_AIS_1f.robot.leg_no = 4;
-                estimator_AIS_1f.Optimization_Epsilon = convergence_cond;
-                estimator_AIS_1f.Max_Iteration = 1;
-                estimator_AIS_1f.Max_backpropagate_num = max_backpp_no;
-                estimator_AIS_1f.backppgn_rate = backpp_rate;
+            //     estimator_AIS_1f.robot.leg_no = 4;
+            //     estimator_AIS_1f.Optimization_Epsilon = convergence_cond;
+            //     estimator_AIS_1f.Max_Iteration = 1;
+            //     estimator_AIS_1f.Max_backpropagate_num = max_backpp_no;
+            //     estimator_AIS_1f.backppgn_rate = backpp_rate;
 
-                estimator_AIS_1f.NUM_OF_TRASH_DATA = starting_point;
-                estimator_AIS_1f.Call_File(file_name);
-                estimator_AIS_1f.Retract_All_flag = retraction_flag;
-                estimator_AIS_1f.slip_rejection_mode = SR;
-                estimator_AIS_1f.slip_threshold = slip_thr;
-                estimator_AIS_1f.variable_contact_cov_mode = VCC;
-                estimator_AIS_1f.cov_amplifier = cov_amplifier;
+            //     estimator_AIS_1f.NUM_OF_TRASH_DATA = starting_point;
+            //     estimator_AIS_1f.Call_File(file_name);
+            //     estimator_AIS_1f.Retract_All_flag = retraction_flag;
+            //     estimator_AIS_1f.slip_rejection_mode = SR;
+            //     estimator_AIS_1f.slip_threshold = slip_thr;
+            //     estimator_AIS_1f.variable_contact_cov_mode = VCC;
+            //     estimator_AIS_1f.cov_amplifier = cov_amplifier;
 
-                //robot.define(REAL_ROBOT);
-                estimator_AIS_1f.Initialize(dt, Estimator_Covariances, initial_condition);
+            //     //robot.define(REAL_ROBOT);
+            //     estimator_AIS_1f.Initialize(dt, Estimator_Covariances, initial_condition);
 
 
-                for (int time = 0; time < time_length; time++) {
-                    //cout<<"now step "<<time<<endl;
-                    estimator_AIS_1f.Onestep(Sensor_, Contact_, state_);
-                }
+            //     for (int time = 0; time < time_length; time++) {
+            //         //cout<<"now step "<<time<<endl;
+            //         estimator_AIS_1f.Onestep(Sensor_, Contact_, state_);
+            //     }
 
-                estimator_AIS_1f.do_SAVE_Z1_all(cov_info);
+            //     estimator_AIS_1f.do_SAVE_Z1_all(cov_info);
 
-            }
+            // }
 
-            if (AIS_f1_flag) {
+            // if (AIS_f1_flag) {
 
-                estimator_AIS_f1.robot.leg_no = 4;
-                estimator_AIS_f1.Optimization_Epsilon = convergence_cond;
-                estimator_AIS_f1.Max_Iteration = max_it_no;
-                estimator_AIS_f1.Max_backpropagate_num = 1000;
-                estimator_AIS_f1.backppgn_rate = backpp_rate;
+            //     estimator_AIS_f1.robot.leg_no = 4;
+            //     estimator_AIS_f1.Optimization_Epsilon = convergence_cond;
+            //     estimator_AIS_f1.Max_Iteration = max_it_no;
+            //     estimator_AIS_f1.Max_backpropagate_num = 1000;
+            //     estimator_AIS_f1.backppgn_rate = backpp_rate;
 
-                estimator_AIS_f1.NUM_OF_TRASH_DATA = starting_point;
-                estimator_AIS_f1.Call_File(file_name);
-                estimator_AIS_f1.Retract_All_flag = retraction_flag;
-                estimator_AIS_f1.slip_rejection_mode = SR;
-                estimator_AIS_f1.slip_threshold = slip_thr;
-                estimator_AIS_f1.variable_contact_cov_mode = VCC;
-                estimator_AIS_f1.cov_amplifier = cov_amplifier;
+            //     estimator_AIS_f1.NUM_OF_TRASH_DATA = starting_point;
+            //     estimator_AIS_f1.Call_File(file_name);
+            //     estimator_AIS_f1.Retract_All_flag = retraction_flag;
+            //     estimator_AIS_f1.slip_rejection_mode = SR;
+            //     estimator_AIS_f1.slip_threshold = slip_thr;
+            //     estimator_AIS_f1.variable_contact_cov_mode = VCC;
+            //     estimator_AIS_f1.cov_amplifier = cov_amplifier;
 
-                //robot.define(REAL_ROBOT);
-                estimator_AIS_f1.Initialize(dt, Estimator_Covariances, initial_condition);
+            //     //robot.define(REAL_ROBOT);
+            //     estimator_AIS_f1.Initialize(dt, Estimator_Covariances, initial_condition);
 
 
-                for (int time = 0; time < time_length; time++) {
-                    //cout<<"now step "<<time<<endl;
-                    estimator_AIS_f1.Onestep(Sensor_, Contact_, state_);
-                }
+            //     for (int time = 0; time < time_length; time++) {
+            //         //cout<<"now step "<<time<<endl;
+            //         estimator_AIS_f1.Onestep(Sensor_, Contact_, state_);
+            //     }
 
-                estimator_AIS_f1.do_SAVE_Z1_all(cov_info);
+            //     estimator_AIS_f1.do_SAVE_Z1_all(cov_info);
 
-            }
+            // }
 
 
-            if (NIS_1_flag) {
+            // if (NIS_1_flag) {
 
-                estimator_NIS_1.robot.leg_no = 4;
-                estimator_NIS_1.Optimization_Epsilon = convergence_cond;
-                estimator_NIS_1.Max_Iteration = 1;
-                estimator_NIS_1.Max_backpropagate_num = 1000;
-                estimator_NIS_1.backppgn_rate = backpp_rate;
+            //     estimator_NIS_1.robot.leg_no = 4;
+            //     estimator_NIS_1.Optimization_Epsilon = convergence_cond;
+            //     estimator_NIS_1.Max_Iteration = 1;
+            //     estimator_NIS_1.Max_backpropagate_num = 1000;
+            //     estimator_NIS_1.backppgn_rate = backpp_rate;
 
-                estimator_NIS_1.NUM_OF_TRASH_DATA = starting_point;
-                estimator_NIS_1.Call_File(file_name);
-                estimator_NIS_1.slip_rejection_mode = SR;
-                estimator_NIS_1.slip_threshold = slip_thr;
+            //     estimator_NIS_1.NUM_OF_TRASH_DATA = starting_point;
+            //     estimator_NIS_1.Call_File(file_name);
+            //     estimator_NIS_1.slip_rejection_mode = SR;
+            //     estimator_NIS_1.slip_threshold = slip_thr;
 
-                estimator_NIS_1.long_term_v_threshold = lt_v_th;
-                estimator_NIS_1.long_term_a_threshold = lt_a_th;
+            //     estimator_NIS_1.long_term_v_threshold = lt_v_th;
+            //     estimator_NIS_1.long_term_a_threshold = lt_a_th;
 
-                estimator_NIS_1.variable_contact_cov_mode = VCC;
-                estimator_NIS_1.cov_amplifier = cov_amplifier;
+            //     estimator_NIS_1.variable_contact_cov_mode = VCC;
+            //     estimator_NIS_1.cov_amplifier = cov_amplifier;
 
-                //robot.define(REAL_ROBOT);
-                estimator_NIS_1.Initialize(dt, Estimator_Covariances, initial_condition);
+            //     //robot.define(REAL_ROBOT);
+            //     estimator_NIS_1.Initialize(dt, Estimator_Covariances, initial_condition);
 
 
-                for (int time = 0; time < time_length; time++) {
-                    //cout<<"now step "<<time<<endl;
-                    estimator_NIS_1.Onestep(Sensor_, Contact_, state_);
-                }
+            //     for (int time = 0; time < time_length; time++) {
+            //         //cout<<"now step "<<time<<endl;
+            //         estimator_NIS_1.Onestep(Sensor_, Contact_, state_);
+            //     }
 
-                estimator_NIS_1.do_SAVE_Z1_all(cov_info);
-            }
+            //     estimator_NIS_1.do_SAVE_Z1_all(cov_info);
+            // }
         }
     }
     return 0;

@@ -423,19 +423,26 @@ void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Ma
 
         for(int p=1; p<=1; p++){ // originally kept for a larger window size, but now just 1
 
+            // Compute FK and Jacobian for all legs at once
+            Eigen::Matrix<double, 12, 1> all_foot_positions = robot.Forward_Kinematics_All_Legs(ENCODER[p]);
+            Eigen::Matrix<double, 12, 12> all_jacobians = robot.Jacobian_All_Legs(ENCODER[p]);
+            
             for (int k=0; k<robot.leg_no; k++) {
 
+                // Extract 3x3 Jacobian block and 3x1 foot position for this leg
+                Eigen::Matrix<double, 3, 3> J_leg = all_jacobians.block<3, 3>(3*k, 3*k);
+                Eigen::Vector3d foot_pos = all_foot_positions.segment<3>(3*k);
+                
                 d_v[p].block(3*k,0,3,1) = Velocity_s[p]
-                                          + Rotation_s[p]*robot.Jacobian_Leg(ENCODER[p].block<3,1>(3*k,0), k+1)*ENCODERDOT[p].block<3,1>(3*k,0)
-                                          + Rotation_s[p]*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[p] - Bias_Gyro_s[p])*robot.Forward_Kinematics_Leg(ENCODER[p].block<3,1>(3*k,0), k+1);
-                                          // Check math later
+                                          + Rotation_s[p]*J_leg*ENCODERDOT[p].block<3,1>(3*k,0)
+                                          + Rotation_s[p]*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[p] - Bias_Gyro_s[p])*foot_pos;
 
                 HARD_CONTACT_t[p](k)  = CONTACT_t[p](k);
 
                 if ((slip_rejection_mode == true) && (CONTACT_t[p](k) == true) &&
                     (d_v[p].block(3 * k, 0, 3, 1).norm() > robot.slip_threshold)) {
                     SLIP_t[p](k) = true;
-                } // if its checking here, then whats the point of checking above in variable contact cov?
+                }
 
 //            HARD_CONTACT_t[1](k)  = CONTACT_t[1](k)-SLIP_t[1](k);
             }
@@ -478,27 +485,28 @@ void InEKFilter::Propagate_Correct()
     //cout<<"HC "<<HARD_CONTACT_t[frame_count]<<endl;
     filter.setContacts(contacts);
 
-
+    // Compute FK and Jacobian for all legs at once
+    Eigen::Matrix<double, 12, 1> all_foot_positions_fc = robot.Forward_Kinematics_All_Legs(ENCODER[frame_count]);
+    Eigen::Matrix<double, 12, 12> all_jacobians_fc = robot.Jacobian_All_Legs(ENCODER[frame_count]);
 
     int id;
     Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
     Eigen::Matrix<double,6,6> covariance;
     inekf::vectorKinematics measured_kinematics;
+    Eigen::Matrix3d Covariance_Encoder_leg = robot.cov_enc_const * Eigen::Matrix3d::Identity();
 
-
+    // Build measured kinematics from batch results
     for (int k=0; k<4; k++) {
         id = k;
         pose.block<3,3>(0,0) = Eigen::Matrix3d::Identity();
-        pose.block<3,1>(0,3) = robot.Forward_Kinematics_Leg(ENCODER[frame_count].block(3*k,0,3,1), k+1); // vector from body to foot in world frame
-
-        Eigen::Matrix3d FK_Jacobian;
-        Eigen::Matrix3d Covariance_Encoder_leg;
-        FK_Jacobian = robot.Jacobian_Leg(ENCODER[frame_count].block(3*k,0,3,1),k+1); // Jacobian of the forward kinematics wrt encoder values
-        Covariance_Encoder_leg = robot.cov_enc_const * Eigen::Matrix3d::Identity(); // Encoder covariance for each encoder
+        pose.block<3,1>(0,3) = all_foot_positions_fc.segment<3>(3*k); // Extract foot position for this leg
+        
+        // Extract Jacobian for this leg and compute measurement covariance
+        Eigen::Matrix3d FK_Jacobian = all_jacobians_fc.block<3, 3>(3*k, 3*k);
         covariance.block(3,3, 3,3) = FK_Jacobian * Covariance_Encoder_leg * FK_Jacobian.transpose();
 
-        inekf::Kinematics frame(id, pose, covariance); // pose is in body frame and covariance is 6x6 but here we only fill the last 3 blocks because we dont care about rotation?
-        measured_kinematics.push_back(frame); // just create a vector of kinematics for all 4 legs
+        inekf::Kinematics frame(id, pose, covariance);
+        measured_kinematics.push_back(frame);
     }
     // Correct state using kinematic measurements
 
@@ -509,10 +517,18 @@ void InEKFilter::Propagate_Correct()
 
     filter.CorrectKinematics(measured_kinematics, flag);
 
+    // Compute FK and Jacobian for all legs at once
+    Eigen::Matrix<double, 12, 1> all_foot_positions = robot.Forward_Kinematics_All_Legs(ENCODER[1]);
+    Eigen::Matrix<double, 12, 12> all_jacobians = robot.Jacobian_All_Legs(ENCODER[1]);
+    
     for (int k=0; k<robot.leg_no; k++){
+        // Extract 3x3 Jacobian block and 3x1 foot position for this leg
+        Eigen::Matrix<double, 3, 3> J_leg = all_jacobians.block<3, 3>(3*k, 3*k);
+        Eigen::Vector3d foot_pos = all_foot_positions.segment<3>(3*k);
+        
         d_v[1].block(3*k,0,3,1) = filter.getState().getVelocity()
-                + filter.getState().getRotation()*robot.Jacobian_Leg(ENCODER[1].block<3,1>(3*k,0), k+1)*ENCODERDOT[1].block<3,1>(3*k,0)
-                + filter.getState().getRotation()*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[1] - filter.getState().getGyroscopeBias())*robot.Forward_Kinematics_Leg(ENCODER[1].block<3,1>(3*k,0), k+1);
+                + filter.getState().getRotation()*J_leg*ENCODERDOT[1].block<3,1>(3*k,0)
+                + filter.getState().getRotation()*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[1] - filter.getState().getGyroscopeBias())*foot_pos;
 
 
         //Test Junny
@@ -603,6 +619,10 @@ void InEKFilter::SAVE_onestep_Z1(int cnt){
             Eigen::Matrix<double,3,1> dv_true;
             Eigen::Matrix3d R_true;
 
+            // Compute FK and Jacobian for all legs at once
+            Eigen::Matrix<double, 12, 1> all_foot_positions = robot.Forward_Kinematics_All_Legs(ENCODER[frame_count]);
+            Eigen::Matrix<double, 12, 12> all_jacobians = robot.Jacobian_All_Legs(ENCODER[frame_count]);
+
             for(int i=0;i<robot.leg_no;i++){
 
                 v_true << GroundTruth[time_count+1][9], GroundTruth[time_count+1][10], GroundTruth[time_count+1][11];
@@ -610,9 +630,13 @@ void InEKFilter::SAVE_onestep_Z1(int cnt){
                         GroundTruth[time_count+1][3], GroundTruth[time_count+1][4], GroundTruth[time_count+1][5],
                         GroundTruth[time_count+1][6], GroundTruth[time_count+1][7], GroundTruth[time_count+1][8];
 
+                // Extract 3x3 Jacobian block and 3x1 foot position for this leg
+                Eigen::Matrix<double, 3, 3> J_leg = all_jacobians.block<3, 3>(3*i, 3*i);
+                Eigen::Vector3d foot_pos = all_foot_positions.segment<3>(3*i);
+                
                 dv_true = v_true
-                          + R_true * robot.Jacobian_Leg(ENCODER[frame_count].block(3*i,0, 3,1), i+1)*ENCODERDOT[frame_count].block(3*i,0, 3,1)
-                          + R_true * BasicFunctions_Estimator::Hat_so3(IMU_Gyro[frame_count])*robot.Forward_Kinematics_Leg(ENCODER[frame_count].block(3*i,0, 3,1), i+1);
+                          + R_true * J_leg*ENCODERDOT[frame_count].block(3*i,0, 3,1)
+                          + R_true * BasicFunctions_Estimator::Hat_so3(IMU_Gyro[frame_count])*foot_pos;
 
 
                 for(int k=0; k<3; k++){
