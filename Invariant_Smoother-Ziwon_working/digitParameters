@@ -1,0 +1,188 @@
+
+============================================================
+Model Information:
+============================================================
+Number of joints (nq): 61
+Number of velocities (nv): 54
+Number of bodies: 38
+Number of frames: 83
+
+============================================================
+Joint Information:
+============================================================
+ 0. baseJoint_0
+ 1. left-hip-roll
+ 2. left-hip-yaw
+ 3. left-hip-pitch
+ 4. left-achilles-rod
+ 5. left-knee
+ 6. left-shin
+ 7. left-tarsus
+ 8. left-heel-spring
+ 9. left-toe-A
+10. left-toe-A-rod
+11. left-toe-B
+12. left-toe-B-rod
+13. left-toe-pitch
+14. left-toe-roll
+15. left-shoulder-roll
+16. left-shoulder-pitch
+17. left-shoulder-yaw
+18. left-elbow
+19. right-hip-roll
+20. right-hip-yaw
+21. right-hip-pitch
+22. right-achilles-rod
+23. right-knee
+24. right-shin
+25. right-tarsus
+26. right-heel-spring
+27. right-toe-A
+28. right-toe-A-rod
+29. right-toe-B
+30. right-toe-B-rod
+31. right-toe-pitch
+32. right-toe-roll
+33. right-shoulder-roll
+34. right-shoulder-pitch
+35. right-shoulder-yaw
+36. right-elbow
+
+============================================================
+Configuration Vector (q) Mapping:
+============================================================
+Total configuration size: 61
+
+q index → Joint mapping:
+  q[0:7]  → baseJoint_0 (JointModelFreeFlyer)
+  q[7]      → left-hip-roll (JointModelRZ)
+  q[8]      → left-hip-yaw (JointModelRZ)
+  q[9]      → left-hip-pitch (JointModelRevoluteUnaligned)
+  q[10:14]  → left-achilles-rod (JointModelSpherical)
+  q[14]      → left-knee (JointModelRZ)
+  q[15]      → left-shin (JointModelRZ)
+  q[16]      → left-tarsus (JointModelRZ)
+  q[17]      → left-heel-spring (JointModelRZ)
+  q[18]      → left-toe-A (JointModelRZ)
+  q[19:23]  → left-toe-A-rod (JointModelSpherical)
+  q[23]      → left-toe-B (JointModelRZ)
+  q[24:28]  → left-toe-B-rod (JointModelSpherical)
+  q[28]      → left-toe-pitch (JointModelRZ)
+  q[29]      → left-toe-roll (JointModelRZ)
+  q[30]      → left-shoulder-roll (JointModelRZ)
+  q[31]      → left-shoulder-pitch (JointModelRevoluteUnaligned)
+  q[32]      → left-shoulder-yaw (JointModelRZ)
+  q[33]      → left-elbow (JointModelRZ)
+  q[34]      → right-hip-roll (JointModelRZ)
+  q[35]      → right-hip-yaw (JointModelRZ)
+  q[36]      → right-hip-pitch (JointModelRevoluteUnaligned)
+  q[37:41]  → right-achilles-rod (JointModelSpherical)
+  q[41]      → right-knee (JointModelRZ)
+  q[42]      → right-shin (JointModelRZ)
+  q[43]      → right-tarsus (JointModelRZ)
+  q[44]      → right-heel-spring (JointModelRZ)
+  q[45]      → right-toe-A (JointModelRZ)
+  q[46:50]  → right-toe-A-rod (JointModelSpherical)
+  q[50]      → right-toe-B (JointModelRZ)
+  q[51:55]  → right-toe-B-rod (JointModelSpherical)
+  q[55]      → right-toe-pitch (JointModelRZ)
+  q[56]      → right-toe-roll (JointModelRZ)
+  q[57]      → right-shoulder-roll (JointModelRZ)
+  q[58]      → right-shoulder-pitch (JointModelRevoluteUnaligned)
+  q[59]      → right-shoulder-yaw (JointModelRZ)
+  q[60]      → right-elbow (JointModelRZ)
+
+============================================================
+Identifying Left Foot Frame:
+============================================================
+  Found: left-foot_fixed (frame index 31)
+
+============================================================
+All Frame Indices:
+============================================================
+  Frame[ 0]: universe                       (parent joint: universe)
+  Frame[ 1]: baseJoint_0                    (parent joint: baseJoint_0)
+  Frame[ 2]: base                           (parent joint: baseJoint_0)
+  Frame[ 3]: left-hip-roll                  (parent joint: left-hip-roll)
+  Frame[ 4]: left-hip-roll                  (parent joint: left-hip-roll)
+  Frame[ 5]: left-hip-yaw                   (parent joint: left-hip-yaw)
+  Frame[ 6]: left-hip-yaw                   (parent joint: left-hip-yaw)
+  Frame[ 7]: left-hip-pitch                 (parent joint: left-hip-pitch)
+  Frame[ 8]: left-hip-pitch                 (parent joint: left-hip-pitch)
+  Frame[ 9]: left-achilles-rod              (parent joint: left-achilles-rod)
+  Frame[10]: left-achilles-rod              (parent joint: left-achilles-rod)
+  Frame[11]: left-knee                      (parent joint: left-knee)
+  Frame[12]: left-knee                      (parent joint: left-knee)
+  Frame[13]: left-shin                      (parent joint: left-shin)
+  Frame[14]: left-shin                      (parent joint: left-shin)
+  Frame[15]: left-tarsus                    (parent joint: left-tarsus)
+  Frame[16]: left-tarsus                    (parent joint: left-tarsus)
+  Frame[17]: left-heel-spring               (parent joint: left-heel-spring)
+  Frame[18]: left-heel-spring               (parent joint: left-heel-spring)
+  Frame[19]: left-toe-A                     (parent joint: left-toe-A)
+  Frame[20]: left-toe-A                     (parent joint: left-toe-A)
+  Frame[21]: left-toe-A-rod                 (parent joint: left-toe-A-rod)
+  Frame[22]: left-toe-A-rod                 (parent joint: left-toe-A-rod)
+  Frame[23]: left-toe-B                     (parent joint: left-toe-B)
+  Frame[24]: left-toe-B                     (parent joint: left-toe-B)
+  Frame[25]: left-toe-B-rod                 (parent joint: left-toe-B-rod)
+  Frame[26]: left-toe-B-rod                 (parent joint: left-toe-B-rod)
+  Frame[27]: left-toe-pitch                 (parent joint: left-toe-pitch)
+  Frame[28]: left-toe-pitch                 (parent joint: left-toe-pitch)
+  Frame[29]: left-toe-roll                  (parent joint: left-toe-roll)
+  Frame[30]: left-toe-roll                  (parent joint: left-toe-roll)
+  Frame[31]: left-foot_fixed                (parent joint: left-toe-roll)
+  Frame[32]: left-foot                      (parent joint: left-toe-roll)
+  Frame[33]: left-shoulder-roll             (parent joint: left-shoulder-roll)
+  Frame[34]: left-shoulder-roll             (parent joint: left-shoulder-roll)
+  Frame[35]: left-shoulder-pitch            (parent joint: left-shoulder-pitch)
+  Frame[36]: left-shoulder-pitch            (parent joint: left-shoulder-pitch)
+  Frame[37]: left-shoulder-yaw              (parent joint: left-shoulder-yaw)
+  Frame[38]: left-shoulder-yaw              (parent joint: left-shoulder-yaw)
+  Frame[39]: left-elbow                     (parent joint: left-elbow)
+  Frame[40]: left-elbow                     (parent joint: left-elbow)
+  Frame[41]: left-hand_fixed                (parent joint: left-elbow)
+  Frame[42]: left-hand                      (parent joint: left-elbow)
+  Frame[43]: right-hip-roll                 (parent joint: right-hip-roll)
+  Frame[44]: right-hip-roll                 (parent joint: right-hip-roll)
+  Frame[45]: right-hip-yaw                  (parent joint: right-hip-yaw)
+  Frame[46]: right-hip-yaw                  (parent joint: right-hip-yaw)
+  Frame[47]: right-hip-pitch                (parent joint: right-hip-pitch)
+  Frame[48]: right-hip-pitch                (parent joint: right-hip-pitch)
+  Frame[49]: right-achilles-rod             (parent joint: right-achilles-rod)
+  Frame[50]: right-achilles-rod             (parent joint: right-achilles-rod)
+  Frame[51]: right-knee                     (parent joint: right-knee)
+  Frame[52]: right-knee                     (parent joint: right-knee)
+  Frame[53]: right-shin                     (parent joint: right-shin)
+  Frame[54]: right-shin                     (parent joint: right-shin)
+  Frame[55]: right-tarsus                   (parent joint: right-tarsus)
+  Frame[56]: right-tarsus                   (parent joint: right-tarsus)
+  Frame[57]: right-heel-spring              (parent joint: right-heel-spring)
+  Frame[58]: right-heel-spring              (parent joint: right-heel-spring)
+  Frame[59]: right-toe-A                    (parent joint: right-toe-A)
+  Frame[60]: right-toe-A                    (parent joint: right-toe-A)
+  Frame[61]: right-toe-A-rod                (parent joint: right-toe-A-rod)
+  Frame[62]: right-toe-A-rod                (parent joint: right-toe-A-rod)
+  Frame[63]: right-toe-B                    (parent joint: right-toe-B)
+  Frame[64]: right-toe-B                    (parent joint: right-toe-B)
+  Frame[65]: right-toe-B-rod                (parent joint: right-toe-B-rod)
+  Frame[66]: right-toe-B-rod                (parent joint: right-toe-B-rod)
+  Frame[67]: right-toe-pitch                (parent joint: right-toe-pitch)
+  Frame[68]: right-toe-pitch                (parent joint: right-toe-pitch)
+  Frame[69]: right-toe-roll                 (parent joint: right-toe-roll)
+  Frame[70]: right-toe-roll                 (parent joint: right-toe-roll)
+  Frame[71]: right-foot_fixed               (parent joint: right-toe-roll)
+  Frame[72]: right-foot                     (parent joint: right-toe-roll)
+  Frame[73]: right-shoulder-roll            (parent joint: right-shoulder-roll)
+  Frame[74]: right-shoulder-roll            (parent joint: right-shoulder-roll)
+  Frame[75]: right-shoulder-pitch           (parent joint: right-shoulder-pitch)
+  Frame[76]: right-shoulder-pitch           (parent joint: right-shoulder-pitch)
+  Frame[77]: right-shoulder-yaw             (parent joint: right-shoulder-yaw)
+  Frame[78]: right-shoulder-yaw             (parent joint: right-shoulder-yaw)
+  Frame[79]: right-elbow                    (parent joint: right-elbow)
+  Frame[80]: right-elbow                    (parent joint: right-elbow)
+  Frame[81]: right-hand_fixed               (parent joint: right-elbow)
+  Frame[82]: right-hand                     (parent joint: right-elbow)
+  
+  
+  

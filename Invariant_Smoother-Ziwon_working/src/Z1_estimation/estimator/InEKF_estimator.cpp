@@ -32,126 +32,10 @@ using std::endl;
 
 // This is just reading of the sensor data file and ground truth data file
 
-void InEKFilter::Call_File(std::string file_name){
-
-    //--------------_Call_File-------------------
-    file_info = file_name;
-
-    ifstream myfile;
-    std::string sensor_data_path = "../../polished_data/" + file_name + "_sensordata.txt";
-    std::string groundtruth_data_path = "../../polished_data/" + file_name + "_groundtruth.txt";
-    myfile.open(sensor_data_path);
-    //myfile.open("/home/zwy/Desktop/data_making_file/slippery7_sensordata_0.01.txt");
-    //sensordata is sensor measurement 0~5 : IMU gyro/acc, 6~17 : 3 encoder values for 4 legs
-
-    // Print the file name and directory for debugging
-    std::cout << "Trying to open file: " << sensor_data_path << std::endl;
-
-    char abs_path[4096];
-    if (realpath(sensor_data_path.c_str(), abs_path) != NULL) {
-        std::cout << "Absolute path: " << abs_path << std::endl;
-    } else {
-        perror("realpath() error");
-    }
-
-    if (myfile.is_open()) {
-        std::cout << "yes file opened" << std::endl;
-    } else {
-        std::cout << "no file didnt open" << std::endl;
-    }
-
-    string line;
-    string temp = "";
-
-    string trash;
-    for(int k=0; k<NUM_OF_TRASH_DATA; k++){
-        std::getline(myfile, trash);
-    }
-
-    row_index = 0;
-    while (std::getline(myfile, line)) { //while there is a line
-
-
-        column_index = 0;
-        for (int i = 0; i < line.size(); i++) { // for each character in rowstring
-            if (!isblank(line[i])) { // if it is not blank, do this
-                string d(1, line[i]); // convert character to string
-                temp.append(d); // append the two strings
-            } else {
-                SensorData[row_index][column_index] = stod(temp);  // convert string to double
-                temp = ""; // reset the capture
-                column_index++; // increment b cause we have a new number
-            }
-        }
-
-        SensorData[row_index][column_index] = stod(temp);
-
-        if (row_index >= max_time){
-            break;
-        }
-        temp = "";
-        row_index++; // onto next row
-
-
-
-    }
-    myfile.close();
-//cout<<"sensordata row, col "<<row_index<<","<<column_index<<endl;
-
-    myfile.open(groundtruth_data_path);
-
-    //myfile.open("/home/zwy/Desktop/data_making_file/slippery7_groundtruth_0.01.txt");
-    //groundtruth is true state value (motion capture)
-    //0~2 is body position, 3~6 is quaternion
-
-
-    row_index = 0; // row index
-
-    gt_sd = 8;
-
-    string line2;
-    temp = "";
-
-    for(int k=0; k<NUM_OF_TRASH_DATA; k++){
-        std::getline(myfile, trash);
-    }
-
-
-    while (std::getline(myfile, line2)) { //while there is a line
-        column_index = 0;
-
-        for (int i = 0; i < line2.size(); i++) { // for each character in rowstring
-            if (!isblank(line2[i])) { // if it is not blank, do this
-                string d(1, line2[i]); // convert character to string
-                temp.append(d); // append the two strings
-
-            } else {
-                GroundTruth[row_index][column_index] = stod(temp);  // convert string to double
-
-
-                temp = ""; // reset the capture
-                column_index++; // increment b cause we have a new number
-            }
-        }
-
-
-        GroundTruth[row_index][column_index] = stod(temp);
-        if (row_index >= max_time){
-
-
-            break;
-        }
-        temp = "";
-        row_index++; // onto next row
-
-    }
-
-
-cout<<"groundtruth row, col "<<row_index<<","<<column_index<<endl;
-    myfile.close();
-
-
-    textfile_flag = true;
+void InEKFilter::LoadCSVData(const std::string& csv_filename) {
+    csvData = ParseDigitCSV(csv_filename);
+    std::cout << "Loaded CSV data with " << csvData.timestamp.size() << " rows." << std::endl;
+    textfile_flag  = true;
 }
 
 
@@ -271,25 +155,34 @@ void InEKFilter::Initialize(double _dt, Eigen::Matrix<double,12,1> cov_val_setti
 
     if(textfile_flag){
 
-        // initialize from ground truth + initial condition offset (initial conditions aren't initial
-        // conditions per se but additive offsets to ground truth)
-        p0 << GroundTruth[1+gt_sd][12]+initial_condition(0),GroundTruth[1+gt_sd][13]+initial_condition(1),GroundTruth[1+gt_sd][14]+initial_condition(2);
-        v0 << GroundTruth[1+gt_sd][9]+initial_condition(7),GroundTruth[1+gt_sd][10]+initial_condition(8),GroundTruth[1+gt_sd][11]+initial_condition(9);
+        // initialize from CSV data + initial condition offset
+        int idx = 1 + gt_sd; // figure out why + 1 leave like this for now
+        
+        // Position from CSV data (pos_x, pos_y, pos_z)
+        p0 << csvData.pos_x[idx] + initial_condition(0),
+              csvData.pos_y[idx] + initial_condition(1),
+              csvData.pos_z[idx] + initial_condition(2);
+        
+        // Velocity from CSV data (vel_x, vel_y, vel_z)
+        v0 << csvData.vel_x[idx] + initial_condition(7),
+              csvData.vel_y[idx] + initial_condition(8),
+              csvData.vel_z[idx] + initial_condition(9);
 
-        // These are zero for now
+        // Bias initialization
         bg0 << initial_condition(10), initial_condition(11), initial_condition(12);
         ba0 << initial_condition(13), initial_condition(14), initial_condition(15);
 
-        R0 <<GroundTruth[1+gt_sd][0],GroundTruth[1+gt_sd][1],GroundTruth[1+gt_sd][2]
-                ,GroundTruth[1+gt_sd][3],GroundTruth[1+gt_sd][4],GroundTruth[1+gt_sd][5]
-                ,GroundTruth[1+gt_sd][6],GroundTruth[1+gt_sd][7],GroundTruth[1+gt_sd][8]; // converted from roll pitch yaw to R matrix
+        // Convert quaternion from CSV to rotation matrix
+        Eigen::Vector4d quat;
+        quat << csvData.quat_w[idx], csvData.quat_i[idx], csvData.quat_j[idx], csvData.quat_k[idx];
+        R0 = BasicFunctions_Estimator::Quaternion_to_Rotation_Matrix(quat);
 
-        Vector3d Euler = BasicFunctions_Estimator::Rotation_to_EulerZYX(R0); // converted back to euler angles to add offset
+        Vector3d Euler = BasicFunctions_Estimator::Rotation_to_EulerZYX(R0);
         // add initial condition offset
-        Euler(0) = Euler(0)+ initial_condition[3];
-        Euler(1) = Euler(1)+ initial_condition[4];
-        Euler(2) = Euler(2)+ initial_condition[5];
-        R0 = BasicFunctions_Estimator::EulerZYX_to_R_bw(Euler); // back to rotation matrix
+        Euler(0) = Euler(0) + initial_condition[3];
+        Euler(1) = Euler(1) + initial_condition[4];
+        Euler(2) = Euler(2) + initial_condition[5];
+        R0 = BasicFunctions_Estimator::EulerZYX_to_R_bw(Euler);
 
     }else{
 
@@ -348,20 +241,171 @@ void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Ma
     if(textfile_flag)
     {
 
-        int j=time_count + 1;
+        int j = time_count + 1;
 
-        IMU_Gyro[frame_count] << SensorData[j][0],SensorData[j][1],SensorData[j][2]; // Save from sensor file
-        IMU_Acc[frame_count] << SensorData[j][3],SensorData[j][4],SensorData[j][5]; // Save from sensor file
+        // IMU data from CSV (gyro_x, gyro_y, gyro_z, acc_x, acc_y, acc_z)
+        IMU_Gyro[frame_count] << csvData.gyro_x[j], csvData.gyro_y[j], csvData.gyro_z[j];
+        IMU_Acc[frame_count] << csvData.acc_x[j], csvData.acc_y[j], csvData.acc_z[j];
 
-        ENCODER[frame_count] <<SensorData[j][6],SensorData[j][7],SensorData[j][8],SensorData[j][9],SensorData[j][10],SensorData[j][11],
-                SensorData[j][12],SensorData[j][13],SensorData[j][14],SensorData[j][15],SensorData[j][16],SensorData[j][17]; // 12 encoder values for 4 legs (3 each)
+        // Populate ENCODER with 61 configuration values for Pinocchio FK
+        // q[0:7] → baseJoint_0 (position + quaternion) - from base state
+        ENCODER[frame_count](0) = csvData.pos_x[j];
+        ENCODER[frame_count](1) = csvData.pos_y[j];
+        ENCODER[frame_count](2) = csvData.pos_z[j];
+        ENCODER[frame_count](3) = csvData.quat_w[j];
+        ENCODER[frame_count](4) = csvData.quat_i[j];
+        ENCODER[frame_count](5) = csvData.quat_j[j];
+        ENCODER[frame_count](6) = csvData.quat_k[j];
+        
+        // q[7:10] → Left hip (roll, yaw, pitch)
+        ENCODER[frame_count](7) = csvData.left_hip_roll[j];
+        ENCODER[frame_count](8) = csvData.left_hip_yaw[j];
+        ENCODER[frame_count](9) = csvData.left_hip_pitch[j];
+        
+        // q[10:14] → left-achilles-rod (spherical joint) - set to zeros
+        ENCODER[frame_count](10) = 0.0;
+        ENCODER[frame_count](11) = 0.0;
+        ENCODER[frame_count](12) = 0.0;
+        ENCODER[frame_count](13) = 0.0;
+        
+        // q[14:18] → Left knee, shin, tarsus, heel-spring
+        ENCODER[frame_count](14) = csvData.left_knee[j];
+        ENCODER[frame_count](15) = csvData.left_shin[j];
+        ENCODER[frame_count](16) = csvData.left_tarsus[j];
+        ENCODER[frame_count](17) = csvData.left_heel_spring[j];
+        
+        // q[18:19] → left-toe-A
+        ENCODER[frame_count](18) = csvData.left_toe_A[j];
+        
+        // q[19:23] → left-toe-A-rod (spherical joint) - set to zeros
+        ENCODER[frame_count](19) = 0.0;
+        ENCODER[frame_count](20) = 0.0;
+        ENCODER[frame_count](21) = 0.0;
+        ENCODER[frame_count](22) = 0.0;
+        
+        // q[23] → left-toe-B
+        ENCODER[frame_count](23) = csvData.left_toe_B[j];
+        
+        // q[24:28] → left-toe-B-rod (spherical joint) - set to zeros
+        ENCODER[frame_count](24) = 0.0;
+        ENCODER[frame_count](25) = 0.0;
+        ENCODER[frame_count](26) = 0.0;
+        ENCODER[frame_count](27) = 0.0;
+        
+        // q[28:30] → left toe pitch and roll
+        ENCODER[frame_count](28) = csvData.left_toe_pitch[j];
+        ENCODER[frame_count](29) = csvData.left_toe_roll[j];
+        
+        // q[30:34] → Left arm (shoulder roll, pitch, yaw, elbow) - set to zeros for now
+        ENCODER[frame_count](30) = 0.0; // csvData.left_shoulder_roll[j];
+        ENCODER[frame_count](31) = 0.0; // csvData.left_shoulder_pitch[j];
+        ENCODER[frame_count](32) = 0.0; // csvData.left_shoulder_yaw[j];
+        ENCODER[frame_count](33) = 0.0; // csvData.left_elbow[j];
+        
+        // q[34:37] → Right hip (roll, yaw, pitch)
+        ENCODER[frame_count](34) = csvData.right_hip_roll[j];
+        ENCODER[frame_count](35) = csvData.right_hip_yaw[j];
+        ENCODER[frame_count](36) = csvData.right_hip_pitch[j];
+        
+        // q[37:41] → right-achilles-rod (spherical joint) - set to zeros
+        ENCODER[frame_count](37) = 0.0;
+        ENCODER[frame_count](38) = 0.0;
+        ENCODER[frame_count](39) = 0.0;
+        ENCODER[frame_count](40) = 0.0;
+        
+        // q[41:45] → Right knee, shin, tarsus, heel-spring
+        ENCODER[frame_count](41) = csvData.right_knee[j];
+        ENCODER[frame_count](42) = csvData.right_shin[j];
+        ENCODER[frame_count](43) = csvData.right_tarsus[j];
+        ENCODER[frame_count](44) = csvData.right_heel_spring[j];
+        
+        // q[45] → right-toe-A
+        ENCODER[frame_count](45) = csvData.right_toe_A[j];
+        
+        // q[46:50] → right-toe-A-rod (spherical joint) - set to zeros
+        ENCODER[frame_count](46) = 0.0;
+        ENCODER[frame_count](47) = 0.0;
+        ENCODER[frame_count](48) = 0.0;
+        ENCODER[frame_count](49) = 0.0;
+        
+        // q[50] → right-toe-B
+        ENCODER[frame_count](50) = csvData.right_toe_B[j];
+        
+        // q[51:55] → right-toe-B-rod (spherical joint) - set to zeros
+        ENCODER[frame_count](51) = 0.0;
+        ENCODER[frame_count](52) = 0.0;
+        ENCODER[frame_count](53) = 0.0;
+        ENCODER[frame_count](54) = 0.0;
+        
+        // q[55:57] → right toe pitch and roll
+        ENCODER[frame_count](55) = csvData.right_toe_pitch[j];
+        ENCODER[frame_count](56) = csvData.right_toe_roll[j];
+        
+        // q[57:61] → Right arm (shoulder roll, pitch, yaw, elbow) - set to zeros for now
+        ENCODER[frame_count](57) = 0.0; // csvData.right_shoulder_roll[j];
+        ENCODER[frame_count](58) = 0.0; // csvData.right_shoulder_pitch[j];
+        ENCODER[frame_count](59) = 0.0; // csvData.right_shoulder_yaw[j];
+        ENCODER[frame_count](60) = 0.0; // csvData.right_elbow[j];
 
-        ENCODERDOT[frame_count] <<SensorData[j][18],SensorData[j][19],SensorData[j][20],SensorData[j][21],SensorData[j][22],SensorData[j][23],
-                SensorData[j][24],SensorData[j][25],SensorData[j][26],SensorData[j][27],SensorData[j][28],SensorData[j][29];
+        // ENCODERDOT - populate with velocity data (55 velocity DOFs)
+        // For now, using available joint velocities from CSV
+        // Base velocities (linear)
+        ENCODERDOT[frame_count](0) = csvData.vel_x[j];
+        ENCODERDOT[frame_count](1) = csvData.vel_y[j];
+        ENCODERDOT[frame_count](2) = csvData.vel_z[j];
+        // Base angular velocities
+        ENCODERDOT[frame_count](3) = csvData.r_rate[j];
+        ENCODERDOT[frame_count](4) = csvData.p_rate[j];
+        ENCODERDOT[frame_count](5) = csvData.y_rate[j];
+        
+        // Left leg joint velocities
+        ENCODERDOT[frame_count](6) = csvData.left_hip_roll_vel[j];
+        ENCODERDOT[frame_count](7) = csvData.left_hip_yaw_vel[j];
+        ENCODERDOT[frame_count](8) = csvData.left_hip_pitch_vel[j];
+        ENCODERDOT[frame_count](9) = 0.0; // achilles-rod
+        ENCODERDOT[frame_count](10) = csvData.left_knee_vel[j];
+        ENCODERDOT[frame_count](11) = csvData.left_shin_vel[j];
+        ENCODERDOT[frame_count](12) = csvData.left_tarsus_vel[j];
+        ENCODERDOT[frame_count](13) = csvData.left_heel_spring_vel[j];
+        ENCODERDOT[frame_count](14) = csvData.left_toe_A_vel[j];
+        ENCODERDOT[frame_count](15) = 0.0; // toe-A-rod
+        ENCODERDOT[frame_count](16) = csvData.left_toe_B_vel[j];
+        ENCODERDOT[frame_count](17) = 0.0; // toe-B-rod
+        ENCODERDOT[frame_count](18) = csvData.left_toe_pitch_vel[j];
+        ENCODERDOT[frame_count](19) = csvData.left_toe_roll_vel[j];
+        
+        // Left arm velocities - set to zeros
+        ENCODERDOT[frame_count](20) = 0.0;
+        ENCODERDOT[frame_count](21) = 0.0;
+        ENCODERDOT[frame_count](22) = 0.0;
+        ENCODERDOT[frame_count](23) = 0.0;
+        
+        // Right leg joint velocities
+        ENCODERDOT[frame_count](24) = csvData.right_hip_roll_vel[j];
+        ENCODERDOT[frame_count](25) = csvData.right_hip_yaw_vel[j];
+        ENCODERDOT[frame_count](26) = csvData.right_hip_pitch_vel[j];
+        ENCODERDOT[frame_count](27) = 0.0; // achilles-rod
+        ENCODERDOT[frame_count](28) = csvData.right_knee_vel[j];
+        ENCODERDOT[frame_count](29) = csvData.right_shin_vel[j];
+        ENCODERDOT[frame_count](30) = csvData.right_tarsus_vel[j];
+        ENCODERDOT[frame_count](31) = csvData.right_heel_spring_vel[j];
+        ENCODERDOT[frame_count](32) = csvData.right_toe_A_vel[j];
+        ENCODERDOT[frame_count](33) = 0.0; // toe-A-rod
+        ENCODERDOT[frame_count](34) = csvData.right_toe_B_vel[j];
+        ENCODERDOT[frame_count](35) = 0.0; // toe-B-rod
+        ENCODERDOT[frame_count](36) = csvData.right_toe_pitch_vel[j];
+        ENCODERDOT[frame_count](37) = csvData.right_toe_roll_vel[j];
+        
+        // Right arm velocities - set to zeros
+        ENCODERDOT[frame_count](38) = 0.0;
+        ENCODERDOT[frame_count](39) = 0.0;
+        ENCODERDOT[frame_count](40) = 0.0;
+        ENCODERDOT[frame_count](41) = 0.0;
 
-        CONTACT_t[frame_count] << GroundTruth[j][19],GroundTruth[j][20],GroundTruth[j][21],GroundTruth[j][22]; // 4 contact states for 4 legs (last columns of ground truth file)
+        // Contact states for 2 legs (left and right foot)
+        CONTACT_t[frame_count] << csvData.lfoot_contact[j], csvData.rfoot_contact[j];
 
-        imu_measurement <<IMU_Gyro[frame_count], IMU_Acc[frame_count];
+        imu_measurement << IMU_Gyro[frame_count], IMU_Acc[frame_count];
 
     }else{
 
@@ -384,7 +428,7 @@ void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Ma
 
     if ( frame_count==0 ){
 
-        for (int k=0; k<4; k++){
+        for (int k=0; k<robot.leg_no; k++){
             SLIP_t[0](k) = false;
             HARD_CONTACT_t[0](k)  = CONTACT_t[0](k)-SLIP_t[0](k); // Actual hard contacts are contact - slip (what is this logic?)(true - false = true, true - true = false)
         }
@@ -421,30 +465,25 @@ void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Ma
 //        }
 //        //robot.slip_threshold = contact_dv_mean*2;
 
-        for(int p=1; p<=1; p++){ // originally kept for a larger window size, but now just 1
+        // Compute forward kinematics and Jacobians for all legs at once
+        Eigen::Matrix<double, 12, 1> all_foot_positions = robot.Forward_Kinematics_All_Legs(ENCODER[1]);
+        Eigen::Matrix<double, 12, 12> all_jacobians = robot.Jacobian_All_Legs(ENCODER[1]);
+        
+        for (int k=0; k<robot.leg_no; k++) {
 
-            // Compute FK and Jacobian for all legs at once
-            Eigen::Matrix<double, 12, 1> all_foot_positions = robot.Forward_Kinematics_All_Legs(ENCODER[p]);
-            Eigen::Matrix<double, 12, 12> all_jacobians = robot.Jacobian_All_Legs(ENCODER[p]);
+            // Extract 3x3 Jacobian block and 3x1 foot position for this leg
+            Eigen::Matrix<double, 3, 3> J_leg = all_jacobians.block<3, 3>(3*k, 3*k);
+            Eigen::Vector3d foot_pos = all_foot_positions.segment<3>(3*k);
             
-            for (int k=0; k<robot.leg_no; k++) {
+            d_v[1].block(3*k,0,3,1) = Velocity_s[1]
+                                      + Rotation_s[1]*J_leg*ENCODERDOT[1].block<3,1>(3*k,0)
+                                      + Rotation_s[1]*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[1] - Bias_Gyro_s[1])*foot_pos;
 
-                // Extract 3x3 Jacobian block and 3x1 foot position for this leg
-                Eigen::Matrix<double, 3, 3> J_leg = all_jacobians.block<3, 3>(3*k, 3*k);
-                Eigen::Vector3d foot_pos = all_foot_positions.segment<3>(3*k);
-                
-                d_v[p].block(3*k,0,3,1) = Velocity_s[p]
-                                          + Rotation_s[p]*J_leg*ENCODERDOT[p].block<3,1>(3*k,0)
-                                          + Rotation_s[p]*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[p] - Bias_Gyro_s[p])*foot_pos;
+            HARD_CONTACT_t[1](k)  = CONTACT_t[1](k);
 
-                HARD_CONTACT_t[p](k)  = CONTACT_t[p](k);
-
-                if ((slip_rejection_mode == true) && (CONTACT_t[p](k) == true) &&
-                    (d_v[p].block(3 * k, 0, 3, 1).norm() > robot.slip_threshold)) {
-                    SLIP_t[p](k) = true;
-                }
-
-//            HARD_CONTACT_t[1](k)  = CONTACT_t[1](k)-SLIP_t[1](k);
+            if ((slip_rejection_mode == true) && (CONTACT_t[1](k) == true) &&
+                (d_v[1].block(3 * k, 0, 3, 1).norm() > robot.slip_threshold)) {
+                SLIP_t[1](k) = true;
             }
         }
 
