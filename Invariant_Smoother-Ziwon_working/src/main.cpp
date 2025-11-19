@@ -5,6 +5,7 @@
 #include <cstdlib>
 
 #include <cmath> // for std::pow
+#include <chrono> // for timing
 
 #include <eigen3/Eigen/Dense>
 #include <eigen3/Eigen/Geometry>
@@ -42,9 +43,9 @@ InEKFilter estimator_IEKF;
 int main() {
 
     double dt = 0.005;
-    int starting_point = 2000;
-    std::string file_name = "20220623_IEKF_01";
-    int time_length = 27000;
+    int starting_point = 0;
+    std::string file_name = "../digit_cropped_data.csv";
+    int time_length = 975;
     bool SR = true;
     double slip_thr = 0.3;
     double lt_v_th = 0.3; // long term vel threshold is used only in IS and PIS and others (Smoothers)
@@ -128,7 +129,7 @@ int main() {
     //
     Eigen::Matrix<double, 30, 1> Sensor_; // Initialize Sensor_ which is a 30x1 vector
     Sensor_.setZero();
-    Eigen::Matrix<bool, 4, 1> Contact_; // Initialize Contact_ which is a 4x1 boolean vector covering all legs
+    Eigen::Matrix<bool, 2, 1> Contact_; // Initialize Contact_ which is a 2x1 boolean vector covering both legs
     Contact_.setZero();
     ROBOT_STATES state_; // Initialize state_ which is a struct defined in RobotState_Smoother.hpp
     // 3*5 + 3*contact_leg_num(4) + 3*contact_leg_num(4)(vel) = max 39
@@ -253,12 +254,12 @@ int main() {
 
             if (IEKF_flag) {
             
-                estimator_IEKF.robot.leg_no = 4;
-                estimator_IEKF.Optimization_Epsilon = 1e-3;
-                estimator_IEKF.Max_Iteration = max_it_no;
+                estimator_IEKF.robot.leg_no = 2;
+                // estimator_IEKF.Optimization_Epsilon = 1e-3;
+                // estimator_IEKF.Max_Iteration = max_it_no;
 
                 estimator_IEKF.NUM_OF_TRASH_DATA = starting_point;
-                estimator_IEKF.Call_File(file_name);
+                estimator_IEKF.LoadCSVData(file_name);
                 estimator_IEKF.slip_rejection_mode = SR;
                 estimator_IEKF.slip_threshold = slip_thr; // This is slip threshold number. Is it in m/s? Find units
                 estimator_IEKF.variable_contact_cov_mode = VCC;
@@ -269,8 +270,12 @@ int main() {
 
 
                 for (int time = 0; time < time_length; time++) {
-                    //cout<<"now step "<<time<<endl;
+                    auto start = std::chrono::high_resolution_clock::now();
                     estimator_IEKF.Onestep(Sensor_, Contact_, state_);
+                    auto end = std::chrono::high_resolution_clock::now();
+                    std::chrono::duration<double> elapsed = end - start;
+                    std::cout << "Time step " << time << " took " << std::fixed << std::setprecision(8) << elapsed.count() << " seconds" << std::endl;
+                    std::exit(0);
                 }
 
                 estimator_IEKF.do_SAVE_Z1_all(cov_info);

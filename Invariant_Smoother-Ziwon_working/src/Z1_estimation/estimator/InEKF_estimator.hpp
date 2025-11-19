@@ -27,7 +27,6 @@
 
 #include "../InEKF/InEKF.h"
 #include "../utility/BasicFunctions_Estimator.hpp"
-// #include "../utility/Robot_Model_mini_cheetah.hpp"
 #include "../utility/Robot_Model_Digit.hpp"
 #include "DigitCSVData.hpp"
 
@@ -50,7 +49,7 @@ public:
     void LoadCSVData(const std::string& csv_filename);
     void Initialize(double _dt, Eigen::Matrix<double,12,1> cov_val_setting, Eigen::Matrix<double, 16, 1> initial_condition);
 
-    void new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Matrix<bool,4,1> &Contact_i);
+    void new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Matrix<bool,2,1> &Contact_i);
 
     void Propagate_Correct();
     std::vector<double> Variable_Contact_Cov(int time);
@@ -60,7 +59,7 @@ public:
 
     void SAVE_onestep_Z1(int cnt);
 
-    void Onestep(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Matrix<bool,4,1> &Contact_i,ROBOT_STATES &state_);
+    void Onestep(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Matrix<bool,2,1> &Contact_i,ROBOT_STATES &state_);
 
     void do_SAVE_Z1_all(std::string cov_info);
 
@@ -107,14 +106,14 @@ int NUM_OF_TRASH_DATA = 1;
 
 
     // True Values and measurement Buffer
-    Eigen::Matrix<bool, 2,1>   HARD_CONTACT_t  [2]; // Hardcoded bools for 4 legs
+    Eigen::Matrix<bool, 2,1>   HARD_CONTACT_t  [2];
     Eigen::Matrix<bool, 2,1>   CONTACT_t       [2];
     Eigen::Matrix<bool, 2,1>   SLIP_t          [2];
 
     Eigen::Matrix<double, 3,1>         IMU_Gyro         [2];
     Eigen::Matrix<double, 3,1>         IMU_Acc          [2];
-    Eigen::Matrix<double,61,1>         ENCODER          [2]; // have too confirm later
-    Eigen::Matrix<double,55,1>         ENCODERDOT       [2];
+    Eigen::Matrix<double,61,1>         ENCODER          [2];
+    Eigen::Matrix<double,54,1>         ENCODERDOT       [2];
 
 
 

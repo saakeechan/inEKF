@@ -32,15 +32,15 @@ typedef struct _ROBOT_STATES_
     Eigen::Vector3d Velocity;
     Eigen::Vector3d Position;
 
-    Eigen::Matrix<double, 12, 1> d;
-    Eigen::Matrix<double, 12, 1> d_v;
+    Eigen::Matrix<double, 6, 1> d;
+    Eigen::Matrix<double, 6, 1> d_v;
 
     Eigen::Vector3d Bias_Gyro;
     Eigen::Vector3d Bias_Acc;
 
-    Eigen::Matrix<bool, 4, 1> Contact;
-    Eigen::Matrix<bool, 4, 1> Hard_Contact;
-    Eigen::Matrix<bool, 4, 1> Slip;
+    Eigen::Matrix<bool, 2, 1> Contact;
+    Eigen::Matrix<bool, 2, 1> Hard_Contact;
+    Eigen::Matrix<bool, 2, 1> Slip;
 
     int contact_leg_num;
 

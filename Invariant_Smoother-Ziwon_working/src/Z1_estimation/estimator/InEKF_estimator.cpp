@@ -232,8 +232,8 @@ void InEKFilter::Initialize(double _dt, Eigen::Matrix<double,12,1> cov_val_setti
 
 
 
-// Inputs are 30x1 sensor measurement vector and 4x1 contact state vector
-void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Matrix<bool,4,1> &Contact_i)
+// Inputs are 30x1 sensor measurement vector and 2x1 contact state vector
+void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Matrix<bool,2,1> &Contact_i)
 {
 
 
@@ -241,21 +241,21 @@ void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Ma
     if(textfile_flag)
     {
 
-        int j = time_count + 1;
+        int j = time_count + 1; // figure out why +1 leave like this for now
 
         // IMU data from CSV (gyro_x, gyro_y, gyro_z, acc_x, acc_y, acc_z)
         IMU_Gyro[frame_count] << csvData.gyro_x[j], csvData.gyro_y[j], csvData.gyro_z[j];
         IMU_Acc[frame_count] << csvData.acc_x[j], csvData.acc_y[j], csvData.acc_z[j];
 
         // Populate ENCODER with 61 configuration values for Pinocchio FK
-        // q[0:7] → baseJoint_0 (position + quaternion) - from base state
-        ENCODER[frame_count](0) = csvData.pos_x[j];
-        ENCODER[frame_count](1) = csvData.pos_y[j];
-        ENCODER[frame_count](2) = csvData.pos_z[j];
-        ENCODER[frame_count](3) = csvData.quat_w[j];
-        ENCODER[frame_count](4) = csvData.quat_i[j];
-        ENCODER[frame_count](5) = csvData.quat_j[j];
-        ENCODER[frame_count](6) = csvData.quat_k[j];
+        // q[0:7] → baseJoint_0 (position + quaternion) - set to identity (0,0,0,0,0,0,1)
+        ENCODER[frame_count](0) = 0.0;
+        ENCODER[frame_count](1) = 0.0;
+        ENCODER[frame_count](2) = 0.0;
+        ENCODER[frame_count](3) = 0.0;
+        ENCODER[frame_count](4) = 0.0;
+        ENCODER[frame_count](5) = 0.0;
+        ENCODER[frame_count](6) = 1.0;
         
         // q[7:10] → Left hip (roll, yaw, pitch)
         ENCODER[frame_count](7) = csvData.left_hip_roll[j];
@@ -349,14 +349,14 @@ void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Ma
 
         // ENCODERDOT - populate with velocity data (55 velocity DOFs)
         // For now, using available joint velocities from CSV
-        // Base velocities (linear)
-        ENCODERDOT[frame_count](0) = csvData.vel_x[j];
-        ENCODERDOT[frame_count](1) = csvData.vel_y[j];
-        ENCODERDOT[frame_count](2) = csvData.vel_z[j];
-        // Base angular velocities
-        ENCODERDOT[frame_count](3) = csvData.r_rate[j];
-        ENCODERDOT[frame_count](4) = csvData.p_rate[j];
-        ENCODERDOT[frame_count](5) = csvData.y_rate[j];
+        // Base velocities (linear) - set to zero (base should not move)
+        ENCODERDOT[frame_count](0) = 0.0;
+        ENCODERDOT[frame_count](1) = 0.0;
+        ENCODERDOT[frame_count](2) = 0.0;
+        // Base angular velocities - set to zero (base should not move)
+        ENCODERDOT[frame_count](3) = 0.0;
+        ENCODERDOT[frame_count](4) = 0.0;
+        ENCODERDOT[frame_count](5) = 0.0;
         
         // Left leg joint velocities
         ENCODERDOT[frame_count](6) = csvData.left_hip_roll_vel[j];
@@ -465,19 +465,15 @@ void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Ma
 //        }
 //        //robot.slip_threshold = contact_dv_mean*2;
 
-        // Compute forward kinematics and Jacobians for all legs at once
-        Eigen::Matrix<double, 12, 1> all_foot_positions = robot.Forward_Kinematics_All_Legs(ENCODER[1]);
-        Eigen::Matrix<double, 12, 12> all_jacobians = robot.Jacobian_All_Legs(ENCODER[1]);
+        // Compute forward kinematics and joint Jacobians
+        robot.Forward_Kinematics(ENCODER[1], ENCODERDOT[1]);
+        robot.compute_joint_jacobians();
         
         for (int k=0; k<robot.leg_no; k++) {
 
-            // Extract 3x3 Jacobian block and 3x1 foot position for this leg
-            Eigen::Matrix<double, 3, 3> J_leg = all_jacobians.block<3, 3>(3*k, 3*k);
-            Eigen::Vector3d foot_pos = all_foot_positions.segment<3>(3*k);
-            
             d_v[1].block(3*k,0,3,1) = Velocity_s[1]
-                                      + Rotation_s[1]*J_leg*ENCODERDOT[1].block<3,1>(3*k,0)
-                                      + Rotation_s[1]*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[1] - Bias_Gyro_s[1])*foot_pos;
+                                      + Rotation_s[1]*robot.get_foot_velocity(k+1)
+                                      + Rotation_s[1]*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[1] - Bias_Gyro_s[1])*robot.get_foot_position(k+1);
 
             HARD_CONTACT_t[1](k)  = CONTACT_t[1](k);
 
@@ -485,6 +481,8 @@ void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Ma
                 (d_v[1].block(3 * k, 0, 3, 1).norm() > robot.slip_threshold)) {
                 SLIP_t[1](k) = true;
             }
+
+//            HARD_CONTACT_t[1](k)  = CONTACT_t[1](k)-SLIP_t[1](k);
         }
 
 
@@ -514,7 +512,7 @@ void InEKFilter::Propagate_Correct()
         std::
     vector<pair<int,bool> > contacts;
 
-        for (int i=0; i<4; i++) {
+        for (int i=0; i<robot.leg_no; i++) {
             int id = i;
             bool indicator = HARD_CONTACT_t[frame_count](i);
 
@@ -524,9 +522,6 @@ void InEKFilter::Propagate_Correct()
     //cout<<"HC "<<HARD_CONTACT_t[frame_count]<<endl;
     filter.setContacts(contacts);
 
-    // Compute FK and Jacobian for all legs at once
-    Eigen::Matrix<double, 12, 1> all_foot_positions_fc = robot.Forward_Kinematics_All_Legs(ENCODER[frame_count]);
-    Eigen::Matrix<double, 12, 12> all_jacobians_fc = robot.Jacobian_All_Legs(ENCODER[frame_count]);
 
     int id;
     Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
@@ -534,15 +529,28 @@ void InEKFilter::Propagate_Correct()
     inekf::vectorKinematics measured_kinematics;
     Eigen::Matrix3d Covariance_Encoder_leg = robot.cov_enc_const * Eigen::Matrix3d::Identity();
 
+// Compute forward kinematics and joint Jacobians
+    robot.Forward_Kinematics(ENCODER[frame_count], ENCODERDOT[frame_count]);
+    robot.compute_joint_jacobians();
+
     // Build measured kinematics from batch results
-    for (int k=0; k<4; k++) {
+    for (int k=0; k<robot.leg_no; k++) {
         id = k;
         pose.block<3,3>(0,0) = Eigen::Matrix3d::Identity();
-        pose.block<3,1>(0,3) = all_foot_positions_fc.segment<3>(3*k); // Extract foot position for this leg
+        pose.block<3,1>(0,3) = robot.get_foot_position(k+1);
         
         // Extract Jacobian for this leg and compute measurement covariance
-        Eigen::Matrix3d FK_Jacobian = all_jacobians_fc.block<3, 3>(3*k, 3*k);
-        covariance.block(3,3, 3,3) = FK_Jacobian * Covariance_Encoder_leg * FK_Jacobian.transpose();
+        Eigen::MatrixXd FK_Jacobian_full = robot.get_foot_jacobian(k+1);
+        // Take top 3 rows (position) and remove first 6 columns (base)
+        Eigen::MatrixXd FK_Jacobian = FK_Jacobian_full.block(0, 6, 3, FK_Jacobian_full.cols() - 6);
+        // check size and implementation later
+        
+        // Compute diagonal covariance from norm squared of Jacobian rows
+        Eigen::Vector3d jac_norm_sq;
+        for (int axis = 0; axis < 3; axis++) {
+            jac_norm_sq(axis) = FK_Jacobian.row(axis).squaredNorm();
+        }
+        covariance.block(3,3, 3,3) = jac_norm_sq.asDiagonal() * robot.cov_enc_const;
 
         inekf::Kinematics frame(id, pose, covariance);
         measured_kinematics.push_back(frame);
@@ -550,24 +558,21 @@ void InEKFilter::Propagate_Correct()
     // Correct state using kinematic measurements
 
     bool flag = true; // should be false for loop below to work properly
-    if(time_count%10==5){ // correct every 10th step from 5, 15, 25, ..etc
-        flag = true;
-    }
+    // if(time_count%10==5){ // correct every 10th step from 5, 15, 25, ..etc
+    //     flag = true;
+    // }
 
     filter.CorrectKinematics(measured_kinematics, flag);
 
-    // Compute FK and Jacobian for all legs at once
-    Eigen::Matrix<double, 12, 1> all_foot_positions = robot.Forward_Kinematics_All_Legs(ENCODER[1]);
-    Eigen::Matrix<double, 12, 12> all_jacobians = robot.Jacobian_All_Legs(ENCODER[1]);
+        // Compute forward kinematics and joint Jacobians
+        robot.Forward_Kinematics(ENCODER[1], ENCODERDOT[1]);
+        robot.compute_joint_jacobians();
     
     for (int k=0; k<robot.leg_no; k++){
-        // Extract 3x3 Jacobian block and 3x1 foot position for this leg
-        Eigen::Matrix<double, 3, 3> J_leg = all_jacobians.block<3, 3>(3*k, 3*k);
-        Eigen::Vector3d foot_pos = all_foot_positions.segment<3>(3*k);
         
         d_v[1].block(3*k,0,3,1) = filter.getState().getVelocity()
-                + filter.getState().getRotation()*J_leg*ENCODERDOT[1].block<3,1>(3*k,0)
-                + filter.getState().getRotation()*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[1] - filter.getState().getGyroscopeBias())*foot_pos;
+                + filter.getState().getRotation()*robot.get_foot_velocity(k+1)
+                + filter.getState().getRotation()*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[1] - filter.getState().getGyroscopeBias())*robot.get_foot_position(k+1);
 
 
         //Test Junny
@@ -636,12 +641,12 @@ void InEKFilter::SAVE_onestep_Z1(int cnt){
     {
         if(textfile_flag){
             //Sending True States----------------------------------------------------------------------------
-            int j=time_count + 1;
+            int j=time_count + 1; // 3rd one here
 
-            Eigen::Matrix3d temp_R;
-            temp_R << GroundTruth[j+gt_sd][0],GroundTruth[j+gt_sd][1],GroundTruth[j+gt_sd][2]
-                    ,GroundTruth[j+gt_sd][3],GroundTruth[j+gt_sd][4],GroundTruth[j+gt_sd][5]
-                    ,GroundTruth[j+gt_sd][6],GroundTruth[j+gt_sd][7],GroundTruth[j+gt_sd][8];
+            // Build rotation matrix from CSV quaternion data
+            Eigen::Vector4d quat_true;
+            quat_true << csvData.quat_w[j+gt_sd], csvData.quat_i[j+gt_sd], csvData.quat_j[j+gt_sd], csvData.quat_k[j+gt_sd];
+            Eigen::Matrix3d temp_R = BasicFunctions_Estimator::Quaternion_to_Rotation_Matrix(quat_true);
 
             Eigen::Vector3d temp_eul = BasicFunctions_Estimator::Rotation_to_EulerZYX(temp_R);
 
@@ -649,7 +654,7 @@ void InEKFilter::SAVE_onestep_Z1(int cnt){
             {
                 for(int k=0;k<3;k++)
                 {
-                    SAVE_Z1[idx_TRUE_Rotation+i*3+k][cnt] = GroundTruth[j+gt_sd][3*i+k];
+                    SAVE_Z1[idx_TRUE_Rotation+i*3+k][cnt] = temp_R(i,k);
                 }
             }
 
@@ -658,24 +663,22 @@ void InEKFilter::SAVE_onestep_Z1(int cnt){
             Eigen::Matrix<double,3,1> dv_true;
             Eigen::Matrix3d R_true;
 
-            // Compute FK and Jacobian for all legs at once
-            Eigen::Matrix<double, 12, 1> all_foot_positions = robot.Forward_Kinematics_All_Legs(ENCODER[frame_count]);
-            Eigen::Matrix<double, 12, 12> all_jacobians = robot.Jacobian_All_Legs(ENCODER[frame_count]);
+            // Compute forward kinematics and joint Jacobians
+            robot.Forward_Kinematics(ENCODER[frame_count], ENCODERDOT[frame_count]);
+            robot.compute_joint_jacobians();
 
             for(int i=0;i<robot.leg_no;i++){
 
-                v_true << GroundTruth[time_count+1][9], GroundTruth[time_count+1][10], GroundTruth[time_count+1][11];
-                R_true << GroundTruth[time_count+1][0], GroundTruth[time_count+1][1], GroundTruth[time_count+1][2],
-                        GroundTruth[time_count+1][3], GroundTruth[time_count+1][4], GroundTruth[time_count+1][5],
-                        GroundTruth[time_count+1][6], GroundTruth[time_count+1][7], GroundTruth[time_count+1][8];
-
-                // Extract 3x3 Jacobian block and 3x1 foot position for this leg
-                Eigen::Matrix<double, 3, 3> J_leg = all_jacobians.block<3, 3>(3*i, 3*i);
-                Eigen::Vector3d foot_pos = all_foot_positions.segment<3>(3*i);
+                v_true << csvData.vel_x[j], csvData.vel_y[j], csvData.vel_z[j];
+                
+                // Build R_true from CSV quaternion data (same as temp_R)
+                Eigen::Vector4d quat_true_loop;
+                quat_true_loop << csvData.quat_w[j], csvData.quat_i[j], csvData.quat_j[j], csvData.quat_k[j];
+                R_true = BasicFunctions_Estimator::Quaternion_to_Rotation_Matrix(quat_true_loop);
                 
                 dv_true = v_true
-                          + R_true * J_leg*ENCODERDOT[frame_count].block(3*i,0, 3,1)
-                          + R_true * BasicFunctions_Estimator::Hat_so3(IMU_Gyro[frame_count])*foot_pos;
+                          + R_true * robot.get_foot_velocity(i+1)
+                          + R_true * BasicFunctions_Estimator::Hat_so3(IMU_Gyro[frame_count])*robot.get_foot_position(i+1);
 
 
                 for(int k=0; k<3; k++){
@@ -690,22 +693,37 @@ void InEKFilter::SAVE_onestep_Z1(int cnt){
 
 
 
-            for(int i=0;i<3;i++)
-            {
-                SAVE_Z1[idx_TRUE_Position+i][cnt] = GroundTruth[j+gt_sd][12+i];
-                SAVE_Z1[idx_TRUE_Velocity+i][cnt] = GroundTruth[j+gt_sd][9+i];
-                SAVE_Z1[idx_TRUE_Bias_Gyro+i][cnt] =0;
-                SAVE_Z1[idx_TRUE_Bias_Acc+i][cnt] = 0;
-                SAVE_Z1[idx_TRUE_rpy+i][cnt] = temp_eul(i);
-            }
+            // Save position from CSV
+            SAVE_Z1[idx_TRUE_Position+0][cnt] = csvData.pos_x[j+gt_sd];
+            SAVE_Z1[idx_TRUE_Position+1][cnt] = csvData.pos_y[j+gt_sd];
+            SAVE_Z1[idx_TRUE_Position+2][cnt] = csvData.pos_z[j+gt_sd];
+            
+            // Save velocity from CSV
+            SAVE_Z1[idx_TRUE_Velocity+0][cnt] = csvData.vel_x[j+gt_sd];
+            SAVE_Z1[idx_TRUE_Velocity+1][cnt] = csvData.vel_y[j+gt_sd];
+            SAVE_Z1[idx_TRUE_Velocity+2][cnt] = csvData.vel_z[j+gt_sd];
+            
+            // Save biases (set to zero as before)
+            SAVE_Z1[idx_TRUE_Bias_Gyro+0][cnt] = 0;
+            SAVE_Z1[idx_TRUE_Bias_Gyro+1][cnt] = 0;
+            SAVE_Z1[idx_TRUE_Bias_Gyro+2][cnt] = 0;
+            SAVE_Z1[idx_TRUE_Bias_Acc+0][cnt] = 0;
+            SAVE_Z1[idx_TRUE_Bias_Acc+1][cnt] = 0;
+            SAVE_Z1[idx_TRUE_Bias_Acc+2][cnt] = 0;
+            
+            // Save RPY
+            SAVE_Z1[idx_TRUE_rpy+0][cnt] = temp_eul(0);
+            SAVE_Z1[idx_TRUE_rpy+1][cnt] = temp_eul(1);
+            SAVE_Z1[idx_TRUE_rpy+2][cnt] = temp_eul(2);
 
 
-            for(int i=0;i<robot.leg_no;i++)
-            {
-                SAVE_Z1[idx_TRUE_Contact+i][cnt] = GroundTruth[j+gt_sd][19+i];
-                SAVE_Z1[idx_TRUE_Slip+i][cnt] = SLIP_t[frame_count](i);
-                SAVE_Z1[idx_TRUE_Hard_Contact+i][cnt] = HARD_CONTACT_t[frame_count](i);
-            }
+            // Save contact states from CSV
+            SAVE_Z1[idx_TRUE_Contact+0][cnt] = csvData.lfoot_contact[j+gt_sd];
+            SAVE_Z1[idx_TRUE_Contact+1][cnt] = csvData.rfoot_contact[j+gt_sd];
+            SAVE_Z1[idx_TRUE_Slip+0][cnt] = SLIP_t[frame_count](0);
+            SAVE_Z1[idx_TRUE_Slip+1][cnt] = SLIP_t[frame_count](1);
+            SAVE_Z1[idx_TRUE_Hard_Contact+0][cnt] = HARD_CONTACT_t[frame_count](0);
+            SAVE_Z1[idx_TRUE_Hard_Contact+1][cnt] = HARD_CONTACT_t[frame_count](1);
 
         }else{
 
@@ -816,11 +834,11 @@ void InEKFilter::do_SAVE_Z1_all(std::string cov_info){
     cout<<"*** SAVE_Z1 DONE ***"<<endl;
     //    cout<<"!!"<<endl;
 
-    // Print a short summary of the column categories written to the result file
-    cout << "Saved categories in file (column groups in order): "
-         << "TRUE_Rotation(9), TRUE_Velocity(3), TRUE_Position(3), TRUE_dv(12), TRUE_Bias_Gyro(3), TRUE_Bias_Acc(3), TRUE_Contact(4), TRUE_Slip(4), TRUE_Hard_Contact(4), TRUE_rpy(3), "
-         << "EST_Rotation(9), EST_Velocity(3), EST_Position(3), EST_dv(12), EST_Bias_Gyro(3), EST_Bias_Acc(3), EST_Contact(4), EST_Slip(4), EST_Hard_Contact(4), EST_rpy(3), "
-         << "ITERATION_No(1), BACKPPGN_No(1), TIME_PER_STEP(1), COST(4), JAC_STD(1)" << endl;
+    // // Print a short summary of the column categories written to the result file
+    // cout << "Saved categories in file (column groups in order): "
+    //      << "TRUE_Rotation(9), TRUE_Velocity(3), TRUE_Position(3), TRUE_dv(12), TRUE_Bias_Gyro(3), TRUE_Bias_Acc(3), TRUE_Contact(4), TRUE_Slip(4), TRUE_Hard_Contact(4), TRUE_rpy(3), "
+    //      << "EST_Rotation(9), EST_Velocity(3), EST_Position(3), EST_dv(12), EST_Bias_Gyro(3), EST_Bias_Acc(3), EST_Contact(4), EST_Slip(4), EST_Hard_Contact(4), EST_rpy(3), "
+    //      << "ITERATION_No(1), BACKPPGN_No(1), TIME_PER_STEP(1), COST(4), JAC_STD(1)" << endl;
 
 }
 
@@ -829,7 +847,7 @@ void InEKFilter::do_SAVE_Z1_all(std::string cov_info){
 
 
 // Inputs are 30x1 sensor measurement vector and 4x1 contact state vector
-void InEKFilter::Onestep(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Matrix<bool,4,1> &Contact_i,ROBOT_STATES &state_){
+void InEKFilter::Onestep(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Matrix<bool,2,1> &Contact_i,ROBOT_STATES &state_){
 
     //std::cout<<endl<<endl<<"Now step "<<time_count<<" starts!"<<endl;
     clock_t start, finish;
