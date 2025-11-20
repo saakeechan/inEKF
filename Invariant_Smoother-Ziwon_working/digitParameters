@@ -184,5 +184,60 @@ All Frame Indices:
   Frame[81]: right-hand_fixed               (parent joint: right-elbow)
   Frame[82]: right-hand                     (parent joint: right-elbow)
   
-  
+  ============================================================
+Joint Name Mapping (nq vs nv indices):
+============================================================
+Joint ID   Joint Name                     nq_idx          nv_idx          nq_size    nv_size   
+----------------------------------------------------------------------------------------------------
+0          universe                       -1              -1              1          1         
+1          baseJoint_0                    0               0               7          6         
+2          left-hip-roll                  7               6               1          1         
+3          left-hip-yaw                   8               7               1          1         
+4          left-hip-pitch                 9               8               1          1         
+5          left-achilles-rod              10              9               4          3         
+6          left-knee                      14              12              1          1         
+7          left-shin                      15              13              1          1         
+8          left-tarsus                    16              14              1          1         
+9          left-heel-spring               17              15              1          1         
+10         left-toe-A                     18              16              1          1         
+11         left-toe-A-rod                 19              17              4          3         
+12         left-toe-B                     23              20              1          1         
+13         left-toe-B-rod                 24              21              4          3         
+14         left-toe-pitch                 28              24              1          1         
+15         left-toe-roll                  29              25              1          1         
+16         left-shoulder-roll             30              26              1          1         
+17         left-shoulder-pitch            31              27              1          1         
+18         left-shoulder-yaw              32              28              1          1         
+19         left-elbow                     33              29              1          1         
+20         right-hip-roll                 34              30              1          1         
+21         right-hip-yaw                  35              31              1          1         
+22         right-hip-pitch                36              32              1          1         
+23         right-achilles-rod             37              33              4          3         
+24         right-knee                     41              36              1          1         
+25         right-shin                     42              37              1          1         
+26         right-tarsus                   43              38              1          1         
+27         right-heel-spring              44              39              1          1         
+28         right-toe-A                    45              40              1          1         
+29         right-toe-A-rod                46              41              4          3         
+30         right-toe-B                    50              44              1          1         
+31         right-toe-B-rod                51              45              4          3         
+32         right-toe-pitch                55              48              1          1         
+33         right-toe-roll                 56              49              1          1         
+34         right-shoulder-roll            57              50              1          1         
+35         right-shoulder-pitch           58              51              1          1         
+36         right-shoulder-yaw             59              52              1          1         
+37         right-elbow                    60              53              1          1         
+============================================================
+
+  Frame 31 is: left-foot_fixed
+Frame 0: Jacobian vx (first row) of frame 31:
+[ 0.99288977  0.11894304  0.00473689  0.10813241 -0.87710862 -0.64126319
+ -0.10770135  0.49405124 -0.78813975  0.          0.          0.
+  0.68451412  0.60830056  0.27748785  0.          0.          0.
+  0.          0.          0.          0.          0.          0.
+ -0.03979685 -0.21323045  0.          0.          0.          0.
+  0.          0.          0.          0.          0.          0.
+  0.          0.          0.          0.          0.          0.
+  0.          0.          0.          0.          0.          0.
+  0.          0.          0.          0.          0.          0.        ]
   

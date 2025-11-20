@@ -137,6 +137,7 @@ Eigen::MatrixXd Robot_Model_Digit::get_foot_jacobian(int i_leg) const {
     }
     
     // Compute frame Jacobian in World frame
+    // Add comments
     // This is efficient because Forward_Kinematics() already computed the kinematics
     Eigen::MatrixXd J_full = Eigen::MatrixXd::Zero(6, pin_model.nv);
     pinocchio::getFrameJacobian(

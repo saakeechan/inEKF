@@ -247,6 +247,9 @@ void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Ma
         IMU_Gyro[frame_count] << csvData.gyro_x[j], csvData.gyro_y[j], csvData.gyro_z[j];
         IMU_Acc[frame_count] << csvData.acc_x[j], csvData.acc_y[j], csvData.acc_z[j];
 
+
+
+
         // Populate ENCODER with 61 configuration values for Pinocchio FK
         // q[0:7] → baseJoint_0 (position + quaternion) - set to identity (0,0,0,0,0,0,1)
         ENCODER[frame_count](0) = 0.0;
@@ -256,6 +259,8 @@ void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Ma
         ENCODER[frame_count](4) = 0.0;
         ENCODER[frame_count](5) = 0.0;
         ENCODER[frame_count](6) = 1.0;
+
+        // Augment base position and rotation to Encoder for FK (Create a variable for just digit encoders and then populate larger vector internally)
         
         // q[7:10] → Left hip (roll, yaw, pitch)
         ENCODER[frame_count](7) = csvData.left_hip_roll[j];
@@ -464,10 +469,10 @@ void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Ma
 ////            HARD_CONTACT_t[1](k)  = CONTACT_t[1](k)-SLIP_t[1](k);
 //        }
 //        //robot.slip_threshold = contact_dv_mean*2;
-
+        std::cout << "Frame count in new measurement is one" << std::endl;
         // Compute forward kinematics and joint Jacobians
-        robot.Forward_Kinematics(ENCODER[1], ENCODERDOT[1]);
-        robot.compute_joint_jacobians();
+        // robot.Forward_Kinematics(ENCODER[1], ENCODERDOT[1]);
+        // robot.compute_joint_jacobians();
         
         for (int k=0; k<robot.leg_no; k++) {
 
@@ -529,9 +534,10 @@ void InEKFilter::Propagate_Correct()
     inekf::vectorKinematics measured_kinematics;
     Eigen::Matrix3d Covariance_Encoder_leg = robot.cov_enc_const * Eigen::Matrix3d::Identity();
 
+    std::cout << "Frame count in propagate_correct first place: " << frame_count << std::endl;
 // Compute forward kinematics and joint Jacobians
-    robot.Forward_Kinematics(ENCODER[frame_count], ENCODERDOT[frame_count]);
-    robot.compute_joint_jacobians();
+    // robot.Forward_Kinematics(ENCODER[frame_count], ENCODERDOT[frame_count]);
+    // robot.compute_joint_jacobians();
 
     // Build measured kinematics from batch results
     for (int k=0; k<robot.leg_no; k++) {
@@ -564,9 +570,16 @@ void InEKFilter::Propagate_Correct()
 
     filter.CorrectKinematics(measured_kinematics, flag);
 
+
+    std::cout << "Frame count in propagate_correct second place is 1" << std::endl;
         // Compute forward kinematics and joint Jacobians
+        // auto start_fk = std::chrono::high_resolution_clock::now();
         robot.Forward_Kinematics(ENCODER[1], ENCODERDOT[1]);
         robot.compute_joint_jacobians();
+        // auto end_fk = std::chrono::high_resolution_clock::now();
+        // std::chrono::duration<double> elapsed_fk = end_fk - start_fk;
+        // std::cout << "FK time: " << std::fixed << std::setprecision(8) << elapsed_fk.count() << std::endl;
+        // std::exit(0);
     
     for (int k=0; k<robot.leg_no; k++){
         
@@ -663,9 +676,10 @@ void InEKFilter::SAVE_onestep_Z1(int cnt){
             Eigen::Matrix<double,3,1> dv_true;
             Eigen::Matrix3d R_true;
 
+            std::cout << "Frame count for true state saving: " << frame_count << std::endl;
             // Compute forward kinematics and joint Jacobians
-            robot.Forward_Kinematics(ENCODER[frame_count], ENCODERDOT[frame_count]);
-            robot.compute_joint_jacobians();
+            // robot.Forward_Kinematics(ENCODER[frame_count], ENCODERDOT[frame_count]);
+            // robot.compute_joint_jacobians();
 
             for(int i=0;i<robot.leg_no;i++){
 

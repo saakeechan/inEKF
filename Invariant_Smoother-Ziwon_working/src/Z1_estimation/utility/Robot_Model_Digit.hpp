@@ -137,11 +137,6 @@ public:
     /////////////////////////////////     Kinematics Functions (Pinocchio)  ///////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////
 
-    // Main kinematics function: computes frame translations and Jacobians for both feet
-    // Input: q_leg - full joint configuration vector for the robot
-    // Output: Updates pin_data with forward kinematics results
-    //         Access results via pin_data.oMf[frame_id] for positions
-    //         Call get_foot_position() and get_foot_jacobian() to retrieve computed values
     void Forward_Kinematics(const Eigen::VectorXd &q_leg, const Eigen::VectorXd &q_dot_leg) const;
     
     // Retrieve foot position after calling Forward_Kinematics
@@ -152,9 +147,6 @@ public:
 
     Eigen::Vector3d get_foot_velocity(int i_leg) const;
 
-    // Compute joint Jacobians for the current configuration
-    // Call this after Forward_Kinematics to prepare for efficient Jacobian queries
-    // Uses the configuration already stored in pin_data from Forward_Kinematics
     void compute_joint_jacobians() const;
 
 

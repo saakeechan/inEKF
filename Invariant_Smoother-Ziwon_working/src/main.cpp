@@ -268,15 +268,23 @@ int main() {
                 //robot.define(REAL_ROBOT);
                 estimator_IEKF.Initialize(dt, Estimator_Covariances, initial_condition);
 
-
-                for (int time = 0; time < time_length; time++) {
+                std::vector<double> step_times;
+                
+                for (int time = 0; time < 8; time++) {
                     auto start = std::chrono::high_resolution_clock::now();
                     estimator_IEKF.Onestep(Sensor_, Contact_, state_);
                     auto end = std::chrono::high_resolution_clock::now();
                     std::chrono::duration<double> elapsed = end - start;
-                    std::cout << "Time step " << time << " took " << std::fixed << std::setprecision(8) << elapsed.count() << " seconds" << std::endl;
-                    std::exit(0);
+                    step_times.push_back(elapsed.count());
                 }
+                
+                // Print all timing results
+                for (int i = 0; i < step_times.size(); i++) {
+                    std::cout << "iter " << i << " = " << std::fixed 
+                              << std::setprecision(8) << step_times[i] << std::endl;
+                }
+                
+                std::exit(0);
 
                 estimator_IEKF.do_SAVE_Z1_all(cov_info);
                 cout << "Reached after estimator_IEKF.do_SAVE_Z1_all(cov_info)" << endl;
