@@ -3,7 +3,7 @@
 clear; close all; clc;
 
 % --- Go to result folder ---
-cd result/
+cd result
 
 % --- File information ---
 slip = 0.3;
@@ -55,11 +55,13 @@ for k = start:1:finish - 1
     v_rel_true(k, 1:3) = (R_true' * v_true)';
     v_rel_est(k, 1:3)  = (R_est' * v_est)';
 
-    % Rotation error metrics
-    rot_error(k, 1:3)  = rotm2eul(R_true' * R_est);
-    phi_error(k, 1:3)  = logm_vec(R_est) - logm_vec(R_true);
-    Hrpy_error(k, 1:3) = Rotation_to_Euler(R_est) - Rotation_to_Euler(R_true);
+    % % Rotation error metrics
+    % rot_error(k, 1:3)  = rotm2eul(R_true' * R_est);
+    % phi_error(k, 1:3)  = logm_vec(R_est) - logm_vec(R_true);
+    % Hrpy_error(k, 1:3) = Rotation_to_Euler(R_est) - Rotation_to_Euler(R_true);
 end
+
+
 
 % --- Contact point velocities (foot 1–4) ---
 d1_v = sqrt(result1.Var64(1:finish - 1).^2 + result1.Var65(1:finish - 1).^2 + result1.Var66(1:finish - 1).^2);
@@ -85,6 +87,7 @@ for i = start:1:finish - 1
         bar_height_minus(1, idx) = -1;
     end
 end
+
 
 
 

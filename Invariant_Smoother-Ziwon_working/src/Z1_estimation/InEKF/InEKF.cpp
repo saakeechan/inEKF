@@ -12,11 +12,12 @@
  **/
 
 #include "InEKF.h"
-#include "Z1_estimator.hpp"
+#include "../utility/BasicFunctions_Estimator.hpp"
 
 namespace inekf {
 
 using namespace std;
+using namespace Eigen;
 
 void removeRowAndColumn(Eigen::MatrixXd& M, int index);
 

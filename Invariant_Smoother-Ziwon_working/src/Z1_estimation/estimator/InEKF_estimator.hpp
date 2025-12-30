@@ -7,9 +7,6 @@
 #define SRC_InEKF_estimator_HPP
 
 // Libraries
-//#include <thread>
-//#include <mutex>
-//#include <queue>
 #include <eigen3/Eigen/Dense>
 #include <eigen3/Eigen/Geometry>
 
@@ -17,11 +14,6 @@
 #include <fstream>
 
 
-
-// Parameters
-#include "Z1_Parameters.hpp"
-
-#include "RobotState_Smoother.hpp"
 
 // CustomBasics
 
@@ -31,15 +23,36 @@
 #include "DigitCSVData.hpp"
 
 
-
-
-// Dynamics
-//#include "../utility/rbdl_test.hpp"
-//#include "../utility/raisim_test.hpp"
-
-
 using namespace Eigen;
 using namespace std;
+
+// Robot State Type Definition
+typedef struct _ROBOT_STATES_
+{
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    Eigen::Matrix3d Rotation;
+    Eigen::Vector3d Velocity;
+    Eigen::Vector3d Position;
+
+    Eigen::Matrix<double, 6, 1> d;
+    Eigen::Matrix<double, 6, 1> d_v;
+
+    Eigen::Vector3d Bias_Gyro;
+    Eigen::Vector3d Bias_Acc;
+
+    Eigen::Matrix<bool, 2, 1> Contact;
+    Eigen::Matrix<bool, 2, 1> Hard_Contact;
+    Eigen::Matrix<bool, 2, 1> Slip;
+
+    int contact_leg_num;
+
+    int state_size;
+    int state_idx;
+    int para_size;
+    int para_idx;
+
+}ROBOT_STATES;
 
 class InEKFilter {
 
@@ -129,7 +142,7 @@ int NUM_OF_TRASH_DATA = 1;
     double SAVE_Z1 [SAVEMAX][SAVEMAXCNT];
     int SAVE_cnt = 0;
 
-    int idx_TRUE_Rotation           = 0; // Hardcoded values for 4 legs here too
+    int idx_TRUE_Rotation           = 0;
     int idx_TRUE_Velocity           = idx_TRUE_Rotation + 9;
     int idx_TRUE_Position           = idx_TRUE_Velocity + 3;
     int idx_TRUE_dv                  = idx_TRUE_Position + 3;
