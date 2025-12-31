@@ -12,11 +12,11 @@
  **/
 
 #include <iostream>
-#include <fstream>
+// #include <fstream>
 #include <string>
-#include <cstdlib>
+// #include <cstdlib>
 #include <eigen3/Eigen/Dense>
-#include <boost/algorithm/string.hpp>
+// #include <boost/algorithm/string.hpp>
 #include <vector>
 #include "InEKF_estimator.hpp"
 
@@ -25,6 +25,7 @@
 
 using std::cout;  
 using std::endl;
+
 //using namespace inekf;
 
 
@@ -37,14 +38,6 @@ void InEKFilter::LoadCSVData(const std::string& csv_filename) {
     std::cout << "Loaded CSV data with " << csvData.timestamp.size() << " rows." << std::endl;
     textfile_flag  = true;
 }
-
-
-
-
-// Assign covariances for contact points and see if they exceed slip threshold 
-// or keep it variable based on residual velocity between encoders and IMU
-// Ask why foot covariance is self confirming!!
-// Have a good conversation with Ziwon about this
 
 std::vector<double> InEKFilter::Variable_Contact_Cov(int time){ // time is either 0 or 1 cause sliding window of 2
 
@@ -115,12 +108,11 @@ void InEKFilter::Initialize(double _dt, Eigen::Matrix<double,12,1> cov_val_setti
     robot.dt = _dt;
 
     dt = robot.dt;
-    gravity << 0,0, -9.80665;
+    gravity << 0,0, -9.806659;
 
 
         // // hardcoded is 1e-3, but initialized in main cpp is 10^-10....
         // std::cout << "robot.cov_prior_orientation_const: " << robot.cov_prior_orientation_const << std::endl;
-
 
     std::string mode;
     if(variable_contact_cov_mode == true){
