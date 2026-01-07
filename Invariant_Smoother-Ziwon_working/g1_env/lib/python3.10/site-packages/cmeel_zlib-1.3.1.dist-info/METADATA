@@ -1,0 +1,18 @@
+Metadata-Version: 2.4
+Name: cmeel-zlib
+Version: 1.3.1
+Summary: cmeel distribution for zlib
+Requires-Python: >= 3.8
+License-Expression: Zlib
+Home-page: https://github.com/cmake-wheel/cmeel-zlib
+Project-URL: Repository, https://github.com/cmake-wheel/cmeel-zlib.git
+Project-URL: Upstream, https://zlib.net/
+Requires-Dist: cmeel
+Description-Content-Type: text/markdown
+
+# CMeel zlib
+
+[![PyPI version](https://badge.fury.io/py/cmeel-zlib.svg)](https://pypi.org/project/cmeel-zlib)
+[![Release](https://github.com/cmake-wheel/cmeel-zlib/actions/workflows/release.yml/badge.svg)](https://github.com/cmake-wheel/cmeel-zlib/actions/workflows/release.yml)
+
+[zlib](https://zlib.net/) distribution for cmeel packages.

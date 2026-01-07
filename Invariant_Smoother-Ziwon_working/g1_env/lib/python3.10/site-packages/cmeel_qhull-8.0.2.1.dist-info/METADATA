@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: cmeel-qhull
+Version: 8.0.2.1
+Summary: cmeel distribution for qhull: Convex hull, Delaunay triangulation, Voronoi diagrams, Halfspace intersection
+Requires-Python: >= 3.8
+License-File: qhull/COPYING.txt
+Home-page: https://github.com/cmake-wheel/cmeel-qhull
+Requires-Dist: cmeel
+Description-Content-Type: text/markdown
+
+# CMeel qhull
+
+[![PyPI version](https://badge.fury.io/py/cmeel-qhull.svg)](https://pypi.org/project/cmeel-qhull)
+[![Release](https://github.com/cmake-wheel/cmeel-qhull/actions/workflows/release.yml/badge.svg)](https://github.com/cmake-wheel/cmeel-qhull/actions/workflows/release.yml)
+[![Build Status](https://api.cirrus-ci.com/github/cmake-wheel/cmeel-qhull.svg)](https://cirrus-ci.com/github/cmake-wheel/cmeel-qhull)
+
+[qhull](https://github.com/qhull/qhull) distribution for cmeel packages.

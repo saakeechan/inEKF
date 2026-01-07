@@ -12,39 +12,27 @@
  **/
 
 #include <iostream>
-// #include <fstream>
 #include <string>
-// #include <cstdlib>
 #include <eigen3/Eigen/Dense>
-// #include <boost/algorithm/string.hpp>
 #include <vector>
 #include "InEKF_estimator.hpp"
-
-#define DT_MIN 1e-6
-#define DT_MAX 1
 
 using std::cout;  
 using std::endl;
 
-//using namespace inekf;
-
-
-
-
 // This is just reading of the sensor data file and ground truth data file
 
 void InEKFilter::LoadCSVData(const std::string& csv_filename) {
-    csvData = ParseDigitCSV(csv_filename);
+    csvData = ParseRobotCSV(csv_filename);
     std::cout << "Loaded CSV data with " << csvData.timestamp.size() << " rows." << std::endl;
     textfile_flag  = true;
 }
 
-std::vector<double> InEKFilter::Variable_Contact_Cov(int time){ // time is either 0 or 1 cause sliding window of 2
+std::vector<double> InEKFilter::Variable_Contact_Cov(int time){ // time is either 0 or 1 cause sliding window of 2 for filter
 
     std::vector<double> contact_cov_array;
-    contact_cov_array.clear(); // Redundant if you ask me
 
-    for(int k=0; k<robot.leg_no; k++){
+    for(int k=0; k<robot.NUM_LEGS; k++){
 
         double contact_cov = robot.cov_contact_const;
 
@@ -94,7 +82,7 @@ std::vector<double> InEKFilter::Variable_Contact_Cov(int time){ // time is eithe
 
 
 
-void InEKFilter::Initialize(double _dt, Eigen::Matrix<double,12,1> cov_val_setting, Eigen::Matrix<double, 16, 1> initial_condition)
+void InEKFilter::Initialize(double _dt, Eigen::Matrix<double,12,1> cov_val_setting, Eigen::Matrix<double, 16, 1> initial_condition, int sliding_window_size)
 {
 
     //  ---- Initialize invariant extended Kalman filter ----- //
@@ -104,10 +92,31 @@ void InEKFilter::Initialize(double _dt, Eigen::Matrix<double,12,1> cov_val_setti
     sliding_window_flag = false;
     frame_count = 0;
     time_count = 0;
+    
+    // Set sliding window size and allocate buffers
+    SLIDING_WINDOW_SIZE = sliding_window_size;
+    
+    // Resize all sliding window vectors
+    Position_s.resize(SLIDING_WINDOW_SIZE);
+    Rotation_s.resize(SLIDING_WINDOW_SIZE);
+    Velocity_s.resize(SLIDING_WINDOW_SIZE);
+    d_v.resize(SLIDING_WINDOW_SIZE);
+    Bias_Acc_s.resize(SLIDING_WINDOW_SIZE);
+    Bias_Gyro_s.resize(SLIDING_WINDOW_SIZE);
+    Bias_s.resize(SLIDING_WINDOW_SIZE);
+    HARD_CONTACT_t.resize(SLIDING_WINDOW_SIZE);
+    CONTACT_t.resize(SLIDING_WINDOW_SIZE);
+    SLIP_t.resize(SLIDING_WINDOW_SIZE);
+    IMU_Gyro.resize(SLIDING_WINDOW_SIZE);
+    IMU_Acc.resize(SLIDING_WINDOW_SIZE);
+    ENCODER.resize(SLIDING_WINDOW_SIZE);
+    ENCODERDOT.resize(SLIDING_WINDOW_SIZE);
+    
+    std::cout << "Sliding window size set to: " << SLIDING_WINDOW_SIZE << std::endl;
+    
     robot.Covariance_Reset(cov_val_setting); // Set covariance of the 12x1 vector input
-    robot.dt = _dt;
 
-    dt = robot.dt;
+    dt = _dt;
     gravity << 0,0, -9.806659;
 
 
@@ -120,8 +129,6 @@ void InEKFilter::Initialize(double _dt, Eigen::Matrix<double,12,1> cov_val_setti
     }else if(slip_rejection_mode == true){
         mode="(SR" + BasicFunctions_Estimator::to_string_n_signficant_figures(slip_threshold,2) + ")";
     }
-    // print mode info
-    // e.g. InEKF(SR0.5)H(adj)(0_0_0_0_0_0_0_0_0_0_0_0)
 
     estimator_info = mode+"H(adj)";
     initial_info = "(" + BasicFunctions_Estimator::to_string_n_figures_under_0(initial_condition[0], 2) + "_" + BasicFunctions_Estimator::to_string_n_figures_under_0(initial_condition[1], 2) + "_"
@@ -197,7 +204,7 @@ void InEKFilter::Initialize(double _dt, Eigen::Matrix<double,12,1> cov_val_setti
 
 
     imu_measurement = Eigen::Matrix<double,6,1>::Zero();
-    imu_measurement_prev = Eigen::Matrix<double,6,1>::Zero(); // its 
+    imu_measurement_prev = Eigen::Matrix<double,6,1>::Zero();
 
     // Initialize state covariance
     inekf::NoiseParams noise_params;
@@ -217,18 +224,23 @@ void InEKFilter::Initialize(double _dt, Eigen::Matrix<double,12,1> cov_val_setti
    cout << "Robot's state is initialized to: \n";
    cout << filter.getState() << endl;
    // Theta is bias of sensors 6x1 vector
-
-//    cout << R0 << endl;
-//    cout << "Initial position (x,y,z): " << p0.transpose() << endl;
-//    cout << "Initial velocity (x,y,z): " << v0.transpose() << endl;
-
 }
 
 
 
 // Inputs are 30x1 sensor measurement vector and 2x1 contact state vector
-void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Matrix<bool,2,1> &Contact_i)
+void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Vector<bool,Robot_Model::NUM_LEGS> &Contact_i)
 {
+    // ========================================================================
+    // ROBOT-SPECIFIC ENCODER ASSIGNMENT
+    // This section assigns encoder and encoder velocity data from CSV to 
+    // the appropriate indices for Pinocchio FK.
+    // 
+    // When creating a new robot model:
+    // 1. Implement assign_encoder_from_csv() in your Robot_Model_XXX class
+    // 2. Implement assign_encoderdot_from_csv() in your Robot_Model_XXX class
+    // 3. These methods should map CSV data to correct joint indices per your URDF/MJCF
+    // ========================================================================
 
 
     //sensor measurement reading
@@ -239,171 +251,13 @@ void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Ma
 
         int j = time_count;
 
-
         // IMU data from CSV (gyro_x, gyro_y, gyro_z, acc_x, acc_y, acc_z)
         IMU_Gyro[frame_count] << csvData.gyro_x[j], csvData.gyro_y[j], csvData.gyro_z[j];
         IMU_Acc[frame_count] << csvData.acc_x[j], csvData.acc_y[j], csvData.acc_z[j];
 
-
-
-
-
-        // Populate ENCODER with 61 configuration values for Pinocchio FK
-        // q[0:7] → baseJoint_0 (position + quaternion) - set to identity (0,0,0,0,0,0,1)
-        ENCODER[frame_count](0) = 0.0;
-        ENCODER[frame_count](1) = 0.0;
-        ENCODER[frame_count](2) = 0.0;
-        ENCODER[frame_count](3) = 0.0;
-        ENCODER[frame_count](4) = 0.0;
-        ENCODER[frame_count](5) = 0.0;
-        ENCODER[frame_count](6) = 1.0;
-
-        // Augment base position and rotation to Encoder for FK (Create a variable for just digit encoders and then populate larger vector internally)
-        
-        // q[7:10] → Left hip (roll, yaw, pitch)
-        ENCODER[frame_count](7) = csvData.left_hip_roll[j];
-        ENCODER[frame_count](8) = csvData.left_hip_yaw[j];
-        ENCODER[frame_count](9) = csvData.left_hip_pitch[j];
-        
-        // q[10:14] → left-achilles-rod (spherical joint) - set to zeros
-        ENCODER[frame_count](10) = 0.0;
-        ENCODER[frame_count](11) = 0.0;
-        ENCODER[frame_count](12) = 0.0;
-        ENCODER[frame_count](13) = 0.0;
-        
-        // q[14:18] → Left knee, shin, tarsus, heel-spring
-        ENCODER[frame_count](14) = csvData.left_knee[j];
-        ENCODER[frame_count](15) = csvData.left_shin[j];
-        ENCODER[frame_count](16) = csvData.left_tarsus[j];
-        ENCODER[frame_count](17) = csvData.left_heel_spring[j];
-        
-        // q[18:19] → left-toe-A
-        ENCODER[frame_count](18) = csvData.left_toe_A[j];
-        
-        // q[19:23] → left-toe-A-rod (spherical joint) - set to zeros
-        ENCODER[frame_count](19) = 0.0;
-        ENCODER[frame_count](20) = 0.0;
-        ENCODER[frame_count](21) = 0.0;
-        ENCODER[frame_count](22) = 0.0;
-        
-        // q[23] → left-toe-B
-        ENCODER[frame_count](23) = csvData.left_toe_B[j];
-        
-        // q[24:28] → left-toe-B-rod (spherical joint) - set to zeros
-        ENCODER[frame_count](24) = 0.0;
-        ENCODER[frame_count](25) = 0.0;
-        ENCODER[frame_count](26) = 0.0;
-        ENCODER[frame_count](27) = 0.0;
-        
-        // q[28:30] → left toe pitch and roll
-        ENCODER[frame_count](28) = csvData.left_toe_pitch[j];
-        ENCODER[frame_count](29) = csvData.left_toe_roll[j];
-        
-        // q[30:34] → Left arm (shoulder roll, pitch, yaw, elbow) - set to zeros for now
-        ENCODER[frame_count](30) = 0.0; // csvData.left_shoulder_roll[j];
-        ENCODER[frame_count](31) = 0.0; // csvData.left_shoulder_pitch[j];
-        ENCODER[frame_count](32) = 0.0; // csvData.left_shoulder_yaw[j];
-        ENCODER[frame_count](33) = 0.0; // csvData.left_elbow[j];
-        
-        // q[34:37] → Right hip (roll, yaw, pitch)
-        ENCODER[frame_count](34) = csvData.right_hip_roll[j];
-        ENCODER[frame_count](35) = csvData.right_hip_yaw[j];
-        ENCODER[frame_count](36) = csvData.right_hip_pitch[j];
-        
-        // q[37:41] → right-achilles-rod (spherical joint) - set to zeros
-        ENCODER[frame_count](37) = 0.0;
-        ENCODER[frame_count](38) = 0.0;
-        ENCODER[frame_count](39) = 0.0;
-        ENCODER[frame_count](40) = 0.0;
-        
-        // q[41:45] → Right knee, shin, tarsus, heel-spring
-        ENCODER[frame_count](41) = csvData.right_knee[j];
-        ENCODER[frame_count](42) = csvData.right_shin[j];
-        ENCODER[frame_count](43) = csvData.right_tarsus[j];
-        ENCODER[frame_count](44) = csvData.right_heel_spring[j];
-        
-        // q[45] → right-toe-A
-        ENCODER[frame_count](45) = csvData.right_toe_A[j];
-        
-        // q[46:50] → right-toe-A-rod (spherical joint) - set to zeros
-        ENCODER[frame_count](46) = 0.0;
-        ENCODER[frame_count](47) = 0.0;
-        ENCODER[frame_count](48) = 0.0;
-        ENCODER[frame_count](49) = 0.0;
-        
-        // q[50] → right-toe-B
-        ENCODER[frame_count](50) = csvData.right_toe_B[j];
-        
-        // q[51:55] → right-toe-B-rod (spherical joint) - set to zeros
-        ENCODER[frame_count](51) = 0.0;
-        ENCODER[frame_count](52) = 0.0;
-        ENCODER[frame_count](53) = 0.0;
-        ENCODER[frame_count](54) = 0.0;
-        
-        // q[55:57] → right toe pitch and roll
-        ENCODER[frame_count](55) = csvData.right_toe_pitch[j];
-        ENCODER[frame_count](56) = csvData.right_toe_roll[j];
-        
-        // q[57:61] → Right arm (shoulder roll, pitch, yaw, elbow) - set to zeros for now
-        ENCODER[frame_count](57) = 0.0; // csvData.right_shoulder_roll[j];
-        ENCODER[frame_count](58) = 0.0; // csvData.right_shoulder_pitch[j];
-        ENCODER[frame_count](59) = 0.0; // csvData.right_shoulder_yaw[j];
-        ENCODER[frame_count](60) = 0.0; // csvData.right_elbow[j];
-
-        // ENCODERDOT - populate with velocity data (55 velocity DOFs)
-        // For now, using available joint velocities from CSV
-        // Base velocities (linear) - set to zero (base should not move)
-        ENCODERDOT[frame_count](0) = 0.0;
-        ENCODERDOT[frame_count](1) = 0.0;
-        ENCODERDOT[frame_count](2) = 0.0;
-        // Base angular velocities - set to zero (base should not move)
-        ENCODERDOT[frame_count](3) = 0.0;
-        ENCODERDOT[frame_count](4) = 0.0;
-        ENCODERDOT[frame_count](5) = 0.0;
-        
-        // Left leg joint velocities
-        ENCODERDOT[frame_count](6) = csvData.left_hip_roll_vel[j];
-        ENCODERDOT[frame_count](7) = csvData.left_hip_yaw_vel[j];
-        ENCODERDOT[frame_count](8) = csvData.left_hip_pitch_vel[j];
-        ENCODERDOT[frame_count](9) = 0.0; // achilles-rod
-        ENCODERDOT[frame_count](10) = csvData.left_knee_vel[j];
-        ENCODERDOT[frame_count](11) = csvData.left_shin_vel[j];
-        ENCODERDOT[frame_count](12) = csvData.left_tarsus_vel[j];
-        ENCODERDOT[frame_count](13) = csvData.left_heel_spring_vel[j];
-        ENCODERDOT[frame_count](14) = csvData.left_toe_A_vel[j];
-        ENCODERDOT[frame_count](15) = 0.0; // toe-A-rod
-        ENCODERDOT[frame_count](16) = csvData.left_toe_B_vel[j];
-        ENCODERDOT[frame_count](17) = 0.0; // toe-B-rod
-        ENCODERDOT[frame_count](18) = csvData.left_toe_pitch_vel[j];
-        ENCODERDOT[frame_count](19) = csvData.left_toe_roll_vel[j];
-        
-        // Left arm velocities - set to zeros
-        ENCODERDOT[frame_count](20) = 0.0;
-        ENCODERDOT[frame_count](21) = 0.0;
-        ENCODERDOT[frame_count](22) = 0.0;
-        ENCODERDOT[frame_count](23) = 0.0;
-        
-        // Right leg joint velocities
-        ENCODERDOT[frame_count](24) = csvData.right_hip_roll_vel[j];
-        ENCODERDOT[frame_count](25) = csvData.right_hip_yaw_vel[j];
-        ENCODERDOT[frame_count](26) = csvData.right_hip_pitch_vel[j];
-        ENCODERDOT[frame_count](27) = 0.0; // achilles-rod
-        ENCODERDOT[frame_count](28) = csvData.right_knee_vel[j];
-        ENCODERDOT[frame_count](29) = csvData.right_shin_vel[j];
-        ENCODERDOT[frame_count](30) = csvData.right_tarsus_vel[j];
-        ENCODERDOT[frame_count](31) = csvData.right_heel_spring_vel[j];
-        ENCODERDOT[frame_count](32) = csvData.right_toe_A_vel[j];
-        ENCODERDOT[frame_count](33) = 0.0; // toe-A-rod
-        ENCODERDOT[frame_count](34) = csvData.right_toe_B_vel[j];
-        ENCODERDOT[frame_count](35) = 0.0; // toe-B-rod
-        ENCODERDOT[frame_count](36) = csvData.right_toe_pitch_vel[j];
-        ENCODERDOT[frame_count](37) = csvData.right_toe_roll_vel[j];
-        
-        // Right arm velocities - set to zeros
-        ENCODERDOT[frame_count](38) = 0.0;
-        ENCODERDOT[frame_count](39) = 0.0;
-        ENCODERDOT[frame_count](40) = 0.0;
-        ENCODERDOT[frame_count](41) = 0.0;
+        // Use robot-specific encoder assignment methods
+        robot.assign_encoder_from_csv(ENCODER[frame_count], csvData, j);
+        robot.assign_encoderdot_from_csv(ENCODERDOT[frame_count], csvData, j);
 
         // Contact states for 2 legs (left and right foot)
         CONTACT_t[frame_count] << csvData.lfoot_contact[j], csvData.rfoot_contact[j];
@@ -435,7 +289,7 @@ void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Ma
 
     if ( frame_count==0 ){
 
-        for (int k=0; k<robot.leg_no; k++){
+        for (int k=0; k<robot.NUM_LEGS; k++){
             SLIP_t[0](k) = false;
             HARD_CONTACT_t[0](k)  = CONTACT_t[0](k)-SLIP_t[0](k); // Actual hard contacts are contact - slip (what is this logic?)(true - false = true, true - true = false)
         }
@@ -450,42 +304,9 @@ void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Ma
         Velocity_s[1] = filter.getState().getVelocity() + (Rotation_s[1]*(imu_measurement.block(3,0, 3,1)-filter.getState().getAccelerometerBias()) + gravity)*dt;
         // Velocity update with accel bias correction and gravity
 
-
-//        double contact_dv_mean = 0;
-//        int count = 0;
-//
-//        for (int k=0; k<4; k++){
-//
-//            d_v[1].block(3*k,0,3,1) = Velocity_s[1]
-//                    + Rotation_s[1]*robot.Jacobian_Leg(ENCODER[1].block<3,1>(3*k,0), k+1)*ENCODERDOT[1].block<3,1>(3*k,0)
-//                    + Rotation_s[1]*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[1] - Bias_Gyro_s[1])*robot.Forward_Kinematics_Leg(ENCODER[1].block<3,1>(3*k,0), k+1);
-//
-//            HARD_CONTACT_t[1](k)  = CONTACT_t[1](k);
-//
-//            if ( slip_rejection_mode == true && CONTACT_t[1](k) == true &&
-//                 !SLIP_t[1](k) ){
-//                contact_dv_mean += (d_v[0].block(3*k,0, 3,1).norm() - contact_dv_mean)/(count+1);
-//                count++;
-//            }
-//
-////            HARD_CONTACT_t[1](k)  = CONTACT_t[1](k)-SLIP_t[1](k);
-//        }
-//        //robot.slip_threshold = contact_dv_mean*2;
-        // std::cout << "Frame count in new measurement is 1" << std::endl;
-        // // Compute forward kinematics and joint Jacobians
-        // robot.Forward_Kinematics(ENCODER[1], ENCODERDOT[1]);
-        // robot.compute_joint_jacobians();
-
-        // why am i computing dv only when frame_count == 1? cause we do have dv at frame_count == 0 right after initialization?;
-        
-
-
-
-
-
     }
 
-        for (int k=0; k<robot.leg_no; k++) {
+        for (int k=0; k<robot.NUM_LEGS; k++) {
 
         d_v[1].block(3*k,0,3,1) = Velocity_s[1]
                                     + Rotation_s[1]*robot.get_foot_velocity(k+1)
@@ -525,7 +346,7 @@ void InEKFilter::Propagate_Correct()
         std::
     vector<pair<int,bool> > contacts;
 
-        for (int i=0; i<robot.leg_no; i++) {
+        for (int i=0; i<robot.NUM_LEGS; i++) {
             int id = i;
             bool indicator = HARD_CONTACT_t[frame_count](i);
 
@@ -540,14 +361,11 @@ void InEKFilter::Propagate_Correct()
     Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
     Eigen::Matrix<double,6,6> covariance;
     inekf::vectorKinematics measured_kinematics;
-    Eigen::Matrix3d Covariance_Encoder_leg = robot.cov_enc_const * Eigen::Matrix3d::Identity();
-
-    // std::cout << "Frame count in propagate_correct first place: " << frame_count << std::endl;
     
 
 
     // Build measured kinematics from batch results
-    for (int k=0; k<robot.leg_no; k++) {
+    for (int k=0; k<robot.NUM_LEGS; k++) {
         id = k;
         pose.block<3,3>(0,0) = Eigen::Matrix3d::Identity();
         pose.block<3,1>(0,3) = robot.get_foot_position(k+1);
@@ -570,31 +388,11 @@ void InEKFilter::Propagate_Correct()
     }
     // Correct state using kinematic measurements
 
-    bool flag = true; // should be false for loop below to work properly
-    // if(time_count%10==5){ // correct every 10th step from 5, 15, 25, ..etc
-    //     flag = true;
-    // }
-
-    filter.CorrectKinematics(measured_kinematics, flag);
-
-
-    // std::cout << "Frame count in propagate_correct end: " << frame_count << std::endl;
-
-    // std::cout << "d_v[0]: \n" << d_v[0] << std::endl;
-    // std::cout << "d_v[1]: \n" << d_v[1] << std::endl;
-
-
-        // This is a big one below cause when frame_count == 0 in the beginning, how can we access ENCODER[1], ENCODERDOT[1], IMU_Gyro[1]?
-        // Changed all 1 values to frame_count for indexing
-
-        // for (int k=0; k<robot.leg_no; k++){
-        // d_v[1].block(3*k,0,3,1) = filter.getState().getVelocity()
-                // + filter.getState().getRotation()*robot.Jacobian_Leg(ENCODER[1].block<3,1>(3*k,0), k+1)*ENCODERDOT[1].block<3,1>(3*k,0)
-                // + filter.getState().getRotation()*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[1] - filter.getState().getGyroscopeBias())*robot.Forward_Kinematics_Leg(ENCODER[1].block<3,1>(3*k,0), k+1);
+    filter.CorrectKinematics(measured_kinematics, true);
     
     if (frame_count != 0){ 
 
-        for (int k=0; k<robot.leg_no; k++){
+        for (int k=0; k<robot.NUM_LEGS; k++){
             
             d_v[frame_count].block(3*k,0,3,1) = filter.getState().getVelocity()
                     + filter.getState().getRotation()*robot.get_foot_velocity(k+1)
@@ -610,13 +408,7 @@ void InEKFilter::Propagate_Correct()
             HARD_CONTACT_t[frame_count](k)  = CONTACT_t[frame_count](k);
 
         }
-    }   
-
-
-
-
-
-    //cout << filter.getState().getX() << endl;
+    }
 
 }
 
@@ -654,8 +446,6 @@ void InEKFilter::send_states(ROBOT_STATES &state_){
         state_.Slip = SLIP_t[frame_count-1];
         state_.d_v = d_v[frame_count-1];
     }
-
-    // std::cout << "Estimated Gyro Bias: " << state_.Bias_Gyro.transpose() << ", Accel Bias: " << state_.Bias_Acc.transpose() << std::endl;
 }
 
 
@@ -685,10 +475,10 @@ void InEKFilter::SAVE_onestep_Z1(int cnt){
 
 
             Eigen::Vector3d v_true;
-            Eigen::Matrix<double,3,1> dv_true;
+            Eigen::Vector<double,3> dv_true;
             Eigen::Matrix3d R_true;
 
-            for(int i=0;i<robot.leg_no;i++){
+            for(int i=0;i<robot.NUM_LEGS;i++){
 
                 v_true << csvData.vel_x[j], csvData.vel_y[j], csvData.vel_z[j];
                 
@@ -703,12 +493,6 @@ void InEKFilter::SAVE_onestep_Z1(int cnt){
 
 
                 for(int k=0; k<3; k++){
-
-                    // if(cnt>=WINDOW_SIZE) {
-
-                    //     SAVE_Z1[idx_ESTIMATED_dv + 3 * i + k][cnt] = d_v[frame_count](3*i + k);
-                    //     SAVE_Z1[idx_TRUE_dv + 3 * i + k][cnt] = dv_true(k);
-                    // }
 
                     SAVE_Z1[idx_ESTIMATED_dv + 3 * i + k][cnt] = d_v[frame_count](3*i + k);
                     SAVE_Z1[idx_TRUE_dv + 3 * i + k][cnt] = dv_true(k);
@@ -729,9 +513,9 @@ void InEKFilter::SAVE_onestep_Z1(int cnt){
 
 
             // Save contact states
-            for(int i=0;i<robot.leg_no;i++)
+            for(int i=0;i<robot.NUM_LEGS;i++)
             {
-                SAVE_Z1[idx_TRUE_Contact+i][cnt] = (i == 0) ? csvData.lfoot_contact[j+gt_sd] : csvData.rfoot_contact[j+gt_sd];
+                SAVE_Z1[idx_TRUE_Contact+i][cnt] = (i == 0) ? csvData.lfoot_contact[j+gt_sd] : csvData.rfoot_contact[j+gt_sd]; // change later
                 SAVE_Z1[idx_TRUE_Slip+i][cnt] = SLIP_t[frame_count](i);
                 SAVE_Z1[idx_TRUE_Hard_Contact+i][cnt] = HARD_CONTACT_t[frame_count](i);
             }
@@ -743,7 +527,7 @@ void InEKFilter::SAVE_onestep_Z1(int cnt){
 
 
 
-        for(int i=0;i<robot.leg_no;i++)
+        for(int i=0;i<robot.NUM_LEGS;i++)
         {
             SAVE_Z1[idx_ESTIMATED_Contact+i][cnt] = CONTACT_t[frame_count](i);
             SAVE_Z1[idx_ESTIMATED_Slip+i][cnt] = SLIP_t[frame_count](i);
@@ -771,64 +555,12 @@ void InEKFilter::SAVE_onestep_Z1(int cnt){
             }
         }
 
-        // {
-        //     Eigen::Vector3d bg = filter.getState().getGyroscopeBias();
-        //     Eigen::Vector3d ba = filter.getState().getAccelerometerBias();
-        //     std::cout << "time " << cnt << " Bias_Gyro: " << bg.transpose()
-        //               << " Bias_Acc: " << ba.transpose() << std::endl;
-        // }
-
-
-        // // Print all saved values with labels for debugging
-        // std::cout << "\n=== SAVE_Z1 Values at cnt=" << cnt << " ===" << std::endl;
-        // std::cout << "TRUE Position: [" << SAVE_Z1[idx_TRUE_Position+0][cnt] << ", " 
-        //           << SAVE_Z1[idx_TRUE_Position+1][cnt] << ", " << SAVE_Z1[idx_TRUE_Position+2][cnt] << "]" << std::endl;
-        // std::cout << "TRUE Velocity: [" << SAVE_Z1[idx_TRUE_Velocity+0][cnt] << ", " 
-        //           << SAVE_Z1[idx_TRUE_Velocity+1][cnt] << ", " << SAVE_Z1[idx_TRUE_Velocity+2][cnt] << "]" << std::endl;
-        // std::cout << "TRUE Bias_Gyro: [" << SAVE_Z1[idx_TRUE_Bias_Gyro+0][cnt] << ", " 
-        //           << SAVE_Z1[idx_TRUE_Bias_Gyro+1][cnt] << ", " << SAVE_Z1[idx_TRUE_Bias_Gyro+2][cnt] << "]" << std::endl;
-        // std::cout << "TRUE Bias_Acc: [" << SAVE_Z1[idx_TRUE_Bias_Acc+0][cnt] << ", " 
-        //           << SAVE_Z1[idx_TRUE_Bias_Acc+1][cnt] << ", " << SAVE_Z1[idx_TRUE_Bias_Acc+2][cnt] << "]" << std::endl;
-        // std::cout << "TRUE RPY: [" << SAVE_Z1[idx_TRUE_rpy+0][cnt] << ", " 
-        //           << SAVE_Z1[idx_TRUE_rpy+1][cnt] << ", " << SAVE_Z1[idx_TRUE_rpy+2][cnt] << "]" << std::endl;
-        
-        // std::cout << "\nESTIMATED Position: [" << SAVE_Z1[idx_ESTIMATED_Position+0][cnt] << ", " 
-        //           << SAVE_Z1[idx_ESTIMATED_Position+1][cnt] << ", " << SAVE_Z1[idx_ESTIMATED_Position+2][cnt] << "]" << std::endl;
-        // std::cout << "ESTIMATED Velocity: [" << SAVE_Z1[idx_ESTIMATED_Velocity+0][cnt] << ", " 
-        //           << SAVE_Z1[idx_ESTIMATED_Velocity+1][cnt] << ", " << SAVE_Z1[idx_ESTIMATED_Velocity+2][cnt] << "]" << std::endl;
-        // std::cout << "ESTIMATED Bias_Gyro: [" << SAVE_Z1[idx_ESTIMATED_Bias_Gyro+0][cnt] << ", " 
-        //           << SAVE_Z1[idx_ESTIMATED_Bias_Gyro+1][cnt] << ", " << SAVE_Z1[idx_ESTIMATED_Bias_Gyro+2][cnt] << "]" << std::endl;
-        // std::cout << "ESTIMATED Bias_Acc: [" << SAVE_Z1[idx_ESTIMATED_Bias_Acc+0][cnt] << ", " 
-        //           << SAVE_Z1[idx_ESTIMATED_Bias_Acc+1][cnt] << ", " << SAVE_Z1[idx_ESTIMATED_Bias_Acc+2][cnt] << "]" << std::endl;
-        // std::cout << "ESTIMATED RPY: [" << SAVE_Z1[idx_ESTIMATED_rpy+0][cnt] << ", " 
-        //           << SAVE_Z1[idx_ESTIMATED_rpy+1][cnt] << ", " << SAVE_Z1[idx_ESTIMATED_rpy+2][cnt] << "]" << std::endl;
-        
-        // std::cout << "\nContact States:" << std::endl;
-        // for(int i=0; i<robot.leg_no; i++) {
-        //     std::cout << "  Leg " << i << " - Contact: " << SAVE_Z1[idx_ESTIMATED_Contact+i][cnt] 
-        //               << ", Slip: " << SAVE_Z1[idx_ESTIMATED_Slip+i][cnt] 
-        //               << ", Hard_Contact: " << SAVE_Z1[idx_ESTIMATED_Hard_Contact+i][cnt] << std::endl;
-        // }
-        // std::cout << "================================\n" << std::endl;
-
-
-
-
-
     }
     else
     {
         cnt = SAVEMAXCNT-1;
-        //        overcnt = true;
         cout<<"over Max SAVE_cnt!!"<<endl;
     }
-
-
-
-
-
-
-
 }
 
 // where previous data is moved to index 0 and new data is moved to index 1
@@ -854,9 +586,6 @@ void InEKFilter::do_SAVE_Z1_all(std::string cov_info){
     FILE* ffp = NULL;
     std::string str("../result/pinnochio_inekf/");
 
-
-    std::ostringstream strs,strs2,strs3;
-
     str = str + estimator_info +"_"+ cov_info + "_" + initial_info + "_" + file_info + "x" + std::to_string(time_count) + "_1.txt";
 
 
@@ -872,10 +601,6 @@ void InEKFilter::do_SAVE_Z1_all(std::string cov_info){
         }
 
         fprintf(ffp,"\n");
-        if(i/10000==0)
-        {
-            //cout<<"saving... "<<i+1<<" / "<<time_count<<endl;
-        }
     }
 
     fclose(ffp);
@@ -916,7 +641,7 @@ void InEKFilter::do_SAVE_Z1_all(std::string cov_info){
 
 
 // Inputs are 30x1 sensor measurement vector and 4x1 contact state vector
-void InEKFilter::Onestep(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Matrix<bool,2,1> &Contact_i,ROBOT_STATES &state_){
+void InEKFilter::Onestep(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Vector<bool,Robot_Model::NUM_LEGS> &Contact_i,ROBOT_STATES &state_){
 
     //std::cout<<endl<<endl<<"Now step "<<time_count<<" starts!"<<endl;
     clock_t start, finish;

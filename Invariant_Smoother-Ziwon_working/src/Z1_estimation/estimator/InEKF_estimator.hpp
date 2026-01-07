@@ -10,9 +10,13 @@
 #include <eigen3/Eigen/Dense>
 #include "../InEKF/InEKF.h"
 #include "../utility/BasicFunctions_Estimator.hpp"
-#include "../utility/Robot_Model_Digit.hpp"
-#include "DigitCSVData.hpp"
 
+// ----------------------------
+// Include robot configuration (automatically includes correct robot model)
+// To use a different robot, edit ../utility/RobotConfig.hpp
+#include "../utility/RobotConfig.hpp"
+
+// ----------------------------
 
 using namespace Eigen;
 using namespace std;
@@ -26,15 +30,15 @@ typedef struct _ROBOT_STATES_
     Eigen::Vector3d Velocity;
     Eigen::Vector3d Position;
 
-    Eigen::Matrix<double, 6, 1> d;
-    Eigen::Matrix<double, 6, 1> d_v;
+    Eigen::Vector<double, Robot_Model::NUM_LEGS*3> d;
+    Eigen::Vector<double, Robot_Model::NUM_LEGS*3> d_v;
 
     Eigen::Vector3d Bias_Gyro;
     Eigen::Vector3d Bias_Acc;
 
-    Eigen::Matrix<bool, 2, 1> Contact;
-    Eigen::Matrix<bool, 2, 1> Hard_Contact;
-    Eigen::Matrix<bool, 2, 1> Slip;
+    Eigen::Vector<bool, Robot_Model::NUM_LEGS> Contact;
+    Eigen::Vector<bool, Robot_Model::NUM_LEGS> Hard_Contact;
+    Eigen::Vector<bool, Robot_Model::NUM_LEGS> Slip;
 
     int contact_leg_num;
 
@@ -51,9 +55,9 @@ class InEKFilter {
 public:
     //functions
     void LoadCSVData(const std::string& csv_filename);
-    void Initialize(double _dt, Eigen::Matrix<double,12,1> cov_val_setting, Eigen::Matrix<double, 16, 1> initial_condition);
+    void Initialize(double _dt, Eigen::Vector<double,12> cov_val_setting, Eigen::Vector<double, 16> initial_condition, int sliding_window_size = 2);
 
-    void new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Matrix<bool,2,1> &Contact_i);
+    void new_measurement(Eigen::Vector<double,30> &Sensor_i, Eigen::Vector<bool,Robot_Model::NUM_LEGS> &Contact_i);
 
     void Propagate_Correct();
     std::vector<double> Variable_Contact_Cov(int time);
@@ -63,22 +67,23 @@ public:
 
     void SAVE_onestep_Z1(int cnt);
 
-    void Onestep(Eigen::Matrix<double,30,1> &Sensor_i, Eigen::Matrix<bool,2,1> &Contact_i,ROBOT_STATES &state_);
+    void Onestep(Eigen::Vector<double,30> &Sensor_i, Eigen::Vector<bool,Robot_Model::NUM_LEGS> &Contact_i,ROBOT_STATES &state_);
 
     void do_SAVE_Z1_all(std::string cov_info);
 
 
-int NUM_OF_TRASH_DATA = 1;
+    int NUM_OF_TRASH_DATA = 0; // default (change in main.cpp if you have trash data)
 
 
     //Necessary classes & variables
-    Robot_Model_Digit robot; // This is where robot model is defined. Should change this when we redfine with pinnochio
+    Robot_Model robot; // This is where robot model is defined
 
     bool sliding_window_flag=false;
     int frame_count=0;
     int time_count=0;
+    int SLIDING_WINDOW_SIZE = 2; // Runtime configurable (set in Initialize)
 
-    double dt = robot.dt; // From Robot_Model_mini_cheetah
+    double dt;
     Vector3d gravity;
 
 
@@ -88,45 +93,38 @@ int NUM_OF_TRASH_DATA = 1;
     const static int MAX_FILE_COUNT =140000;
     // double SensorData       [MAX_FILE_COUNT][30];
     // double GroundTruth      [MAX_FILE_COUNT][27];
-    const static int max_time = MAX_FILE_COUNT-1;
-    int row_index = 0; // row index
-    int column_index = 0; // column index
 
 
     //Inner variable
     inekf::InEKF filter;
 
-    Eigen::Matrix<double,6,1> imu_measurement;
-    Eigen::Matrix<double,6,1> imu_measurement_prev;
-    // Estimated State Values Window Buffer
-    Vector3d                   Position_s       [2];
-    Matrix3d                   Rotation_s       [2];
-    Vector3d                   Velocity_s       [2];
-    Eigen::Matrix<double,6,1> d_v              [2];
+    Eigen::Vector<double,6> imu_measurement;
+    Eigen::Vector<double,6> imu_measurement_prev;
+    
+    // Estimated State Values Window Buffer (dynamically allocated based on SLIDING_WINDOW_SIZE)
+    std::vector<Vector3d>                   Position_s;
+    std::vector<Matrix3d>                   Rotation_s;
+    std::vector<Vector3d>                   Velocity_s;
+    std::vector<Eigen::Vector<double,Robot_Model::NUM_LEGS*3>>    d_v;
 
-    Vector3d                   Bias_Acc_s       [2];
-    Vector3d                   Bias_Gyro_s      [2];
-    Matrix<double, 6,1>        Bias_s           [2];
+    std::vector<Vector3d>                   Bias_Acc_s;
+    std::vector<Vector3d>                   Bias_Gyro_s;
+    std::vector<Eigen::Vector<double, 6>>   Bias_s;
 
+    // True Values and measurement Buffer (dynamically allocated based on SLIDING_WINDOW_SIZE)
+    std::vector<Eigen::Vector<bool, Robot_Model::NUM_LEGS>>     HARD_CONTACT_t;
+    std::vector<Eigen::Vector<bool, Robot_Model::NUM_LEGS>>     CONTACT_t;
+    std::vector<Eigen::Vector<bool, Robot_Model::NUM_LEGS>>     SLIP_t;
 
-    // True Values and measurement Buffer
-    Eigen::Matrix<bool, 2,1>   HARD_CONTACT_t  [2];
-    Eigen::Matrix<bool, 2,1>   CONTACT_t       [2];
-    Eigen::Matrix<bool, 2,1>   SLIP_t          [2];
-
-    Eigen::Matrix<double, 3,1>         IMU_Gyro         [2];
-    Eigen::Matrix<double, 3,1>         IMU_Acc          [2];
-    Eigen::Matrix<double,61,1>         ENCODER          [2];
-    Eigen::Matrix<double,54,1>         ENCODERDOT       [2];
-
-
+    std::vector<Eigen::Vector3d>            IMU_Gyro;
+    std::vector<Eigen::Vector3d>            IMU_Acc;
+    std::vector<Eigen::Vector<double,Robot_Model::ENCODER_SIZE>>   ENCODER;
+    std::vector<Eigen::Vector<double,Robot_Model::ENCODERDOT_SIZE>>   ENCODERDOT;
 
     //SAVE PARAMETER
     std::string estimator_info;
     std::string file_info;
     std::string initial_info;
-    std::string time_size;
-    std::string est_size;
 
     const static int SAVEMAX = 100;
     const static int SAVEMAXCNT = MAX_FILE_COUNT;
@@ -137,29 +135,28 @@ int NUM_OF_TRASH_DATA = 1;
     int idx_TRUE_Velocity           = idx_TRUE_Rotation + 9;
     int idx_TRUE_Position           = idx_TRUE_Velocity + 3;
     int idx_TRUE_dv                  = idx_TRUE_Position + 3;
-    int idx_TRUE_Bias_Gyro          = idx_TRUE_dv + 6;
+    int idx_TRUE_Bias_Gyro          = idx_TRUE_dv + Robot_Model::NUM_LEGS*3;
     int idx_TRUE_Bias_Acc           = idx_TRUE_Bias_Gyro + 3;
     int idx_TRUE_Contact            = idx_TRUE_Bias_Acc + 3;
-    int idx_TRUE_Slip               = idx_TRUE_Contact + 2;
-    int idx_TRUE_Hard_Contact       = idx_TRUE_Slip+ 2;
-    int idx_TRUE_rpy                = idx_TRUE_Hard_Contact + 2;
+    int idx_TRUE_Slip               = idx_TRUE_Contact + Robot_Model::NUM_LEGS;
+    int idx_TRUE_Hard_Contact       = idx_TRUE_Slip+ Robot_Model::NUM_LEGS;
+    int idx_TRUE_rpy                = idx_TRUE_Hard_Contact + Robot_Model::NUM_LEGS;
 
     int idx_ESTIMATED_Rotation      = idx_TRUE_rpy + 3;
     int idx_ESTIMATED_Velocity      = idx_ESTIMATED_Rotation + 9;
     int idx_ESTIMATED_Position      = idx_ESTIMATED_Velocity + 3;
     int idx_ESTIMATED_dv             = idx_ESTIMATED_Position + 3;
-    int idx_ESTIMATED_Bias_Gyro     = idx_ESTIMATED_dv + 6;
+    int idx_ESTIMATED_Bias_Gyro     = idx_ESTIMATED_dv + Robot_Model::NUM_LEGS*3;
     int idx_ESTIMATED_Bias_Acc      = idx_ESTIMATED_Bias_Gyro + 3;
     int idx_ESTIMATED_Contact       = idx_ESTIMATED_Bias_Acc + 3;
-    int idx_ESTIMATED_Slip          = idx_ESTIMATED_Contact + 2;
-    int idx_ESTIMATED_Hard_Contact  = idx_ESTIMATED_Slip + 2;
-    int idx_ESTIMATED_rpy           = idx_ESTIMATED_Hard_Contact + 2;
+    int idx_ESTIMATED_Slip          = idx_ESTIMATED_Contact + Robot_Model::NUM_LEGS;
+    int idx_ESTIMATED_Hard_Contact  = idx_ESTIMATED_Slip + Robot_Model::NUM_LEGS;
+    int idx_ESTIMATED_rpy           = idx_ESTIMATED_Hard_Contact + Robot_Model::NUM_LEGS;
     int idx_end                     = idx_ESTIMATED_rpy + 3;
-
 
     //Parameters
     bool textfile_flag = false;
-    DigitCSVData csvData;
+    RobotCSVData csvData; // Robot-specific CSV data type
 
     bool slip_rejection_mode = false;
     double slip_threshold=0.0;
@@ -168,15 +165,11 @@ int NUM_OF_TRASH_DATA = 1;
     double cov_amplifier = 2;
 
 
-    // //not used
-    // int Max_Iteration = 100;
-    // double Optimization_Epsilon = 1e-3;
-
-
 private:
-
 
 };
 
 
 #endif //SRC_InEKF_estimator_HPP
+
+// variables for number of legs, sliding window size for potential smoother, joint indices for different robots, 

@@ -1,0 +1,18 @@
+Metadata-Version: 2.4
+Name: cmeel-console-bridge
+Version: 1.0.2.3
+Summary: cmeel distribution for console-bridge, A ROS-independent package for logging that seamlessly pipes into rosconsole/rosout for ROS-dependent packages.
+Requires-Python: >= 3.8
+License-Expression: Zlib
+Home-page: https://github.com/cmake-wheel/cmeel-console-bridge
+Project-URL: Upstream, https://github.com/ros/console_bridge
+Requires-Dist: cmeel
+Description-Content-Type: text/markdown
+
+# CMeel console-bridge
+
+[![PyPI version](https://badge.fury.io/py/cmeel-console-bridge.svg)](https://pypi.org/project/cmeel-console-bridge)
+[![Release](https://github.com/cmake-wheel/cmeel-console-bridge/actions/workflows/release.yml/badge.svg)](https://github.com/cmake-wheel/cmeel-console-bridge/actions/workflows/release.yml)
+[![Build Status](https://api.cirrus-ci.com/github/cmake-wheel/cmeel-console-bridge.svg)](https://cirrus-ci.com/github/cmake-wheel/cmeel-console-bridge)
+
+[console-bridge](https://github.com/ros/console_bridge) distribution for cmeel packages.

@@ -1,0 +1,18 @@
+Metadata-Version: 2.4
+Name: cmeel-tinyxml2
+Version: 10.0.0
+Summary: cmeel distribution for TinyXML-2
+Requires-Python: >= 3.8
+License-Expression: Zlib
+Home-page: https://github.com/cmake-wheel/cmeel-tinyxml2
+Project-URL: Repository, https://github.com/cmake-wheel/cmeel-tinyxml2.git
+Project-URL: Upstream, http://leethomason.github.io/tinyxml2/
+Requires-Dist: cmeel
+Description-Content-Type: text/markdown
+
+# CMeel TinyXML-2
+
+[![PyPI version](https://badge.fury.io/py/cmeel-tinyxml2.svg)](https://pypi.org/project/cmeel-tinyxml2)
+[![Release](https://github.com/cmake-wheel/cmeel-tinyxml2/actions/workflows/release.yml/badge.svg)](https://github.com/cmake-wheel/cmeel-tinyxml2/actions/workflows/release.yml)
+
+[TinyXML-2](http://leethomason.github.io/tinyxml2/) distribution for cmeel packages.

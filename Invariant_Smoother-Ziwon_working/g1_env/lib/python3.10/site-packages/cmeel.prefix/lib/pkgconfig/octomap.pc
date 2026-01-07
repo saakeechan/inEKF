@@ -1,0 +1,10 @@
+prefix=${pcfiledir}/../..
+libdir=${pcfiledir}/../../lib
+includedir=${pcfiledir}/../../include
+
+Name: octomap
+Description: octomap
+Requires: 
+Version: 1.10.0
+Libs: -L${libdir}  -loctomap -loctomath
+Cflags: -I${includedir} 

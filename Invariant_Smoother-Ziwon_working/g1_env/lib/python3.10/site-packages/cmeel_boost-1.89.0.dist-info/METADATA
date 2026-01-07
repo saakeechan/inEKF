@@ -1,0 +1,21 @@
+Metadata-Version: 2.4
+Name: cmeel-boost
+Version: 1.89.0
+Summary: cmeel distribution for boost, which provides free peer-reviewed portable C++ source libraries.
+Requires-Python: >= 3.9
+License-Expression: BSL-1.0
+Home-page: https://github.com/cmake-wheel/cmeel-boost
+Project-URL: Repository, https://github.com/cmake-wheel/cmeel-boost.git
+Project-URL: Upstream, https://www.boost.org/
+Requires-Dist: cmeel
+Requires-Dist: numpy >=2.0, <2.1 ; python_version >= '3.9.0' and python_version < '3.10.0'
+Requires-Dist: numpy >=2.2, <2.3 ; python_version >= '3.10.0' and python_version < '3.11.0'
+Requires-Dist: numpy >=2.3, <2.4 ; python_version >= '3.11.0'
+Description-Content-Type: text/markdown
+
+# CMeel Boost
+
+[![PyPI version](https://badge.fury.io/py/cmeel-boost.svg)](https://pypi.org/project/cmeel-boost)
+[![Release](https://github.com/cmake-wheel/cmeel-boost/actions/workflows/release.yml/badge.svg)](https://github.com/cmake-wheel/cmeel-boost/actions/workflows/release.yml)
+
+[Boost](https://www.boost.org/) distribution for cmeel packages.

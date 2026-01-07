@@ -1,17 +1,13 @@
 
 #include <iostream>
-// #include <fstream>
 #include <string>
-// #include <cstdlib>
 
 #include <cmath> // for std::pow
 #include <chrono> // for timing
 
 #include <eigen3/Eigen/Dense>
-// #include <eigen3/Eigen/Geometry>
 #include <vector>
 #include "InEKF_estimator.hpp"
-// #include <sstream>
 #include <iomanip>
 
 
@@ -19,6 +15,27 @@ using std::cout;
 using std::endl;
 
 InEKFilter estimator_IEKF;
+
+// ============================================================================
+// MAIN CONFIGURATION - Users should only need to modify this section
+// ============================================================================
+
+// ROBOT SELECTION:
+// To switch robots, edit src/Z1_estimation/utility/RobotConfig.hpp
+// and uncomment the desired robot (e.g., USE_ROBOT_DIGIT, USE_ROBOT_MINI_CHEETAH)
+// Current robot: Digit
+
+// SLIDING WINDOW SIZE:
+// This controls the buffer size for the smoother/filter
+// Set this at runtime when calling Initialize() - default is 2
+constexpr int SLIDING_WINDOW_SIZE = 2;
+
+// EXPERIMENT PARAMETERS:
+// Configure your experiment parameters below
+
+// ============================================================================
+// END OF MAIN CONFIGURATION
+// ============================================================================
 
 /// @brief 
 /// @return 
@@ -34,9 +51,10 @@ int main() {
     double cov_amplifier = 5; // this is multiplied to contact covariance when VCC is true
 
 
-    Eigen::Matrix<double, 12, 1> Estimator_Covariances; // Initialize Estimator Covariances which is a 12x1 vector
+    Eigen::Vector<double, 12> Estimator_Covariances; // Initialize Estimator Covariances which is a 12x1 vector
     //gyro, acc, slip, contact, encoder, bias gyro, 
     //bias acc, prior ori, prior vel, prior pos, prior bias gyro, prior bias acc
+
     // Slip covariance is the covariance used when we detect slip and we blow up the contact covariance
     // Contact covariance is the nominal contact covariance
 
@@ -52,9 +70,9 @@ int main() {
             pow(10, pri_ori_exp), pow(10, pri_vel_exp), pow(10, pri_pos_exp), //prior ori, vel, pos, contact
             pow(10, pri_bg_exp), pow(10, pri_ba_exp); //prior bias gyro, acc
 
-    Eigen::Matrix<double, 16, 1> initial_condition;
+    Eigen::Vector<double, 16> initial_condition;
     initial_condition << 0.0, 0.0, 0.0, // Px,Py,Pz
-            0.0, 0.0, 0.0, 0.0, // roll, pitch, yaw, (No meaning) (indices 3 4 5 correspond to roll pitch yaw)
+            0.0, 0.0, 0.0, 0.0, // (indices 3 4 5 correspond to roll pitch yaw)
             0.0, 0.0, 0.0,     //Vx, Vy, Vz
             0.0, 0.0, 0.0,     //bgx, bgy, bgz
             0.0, 0.0, 0.0;    //bax, bay, baz
@@ -72,14 +90,12 @@ int main() {
     // print example cov_info : (5.0-1.0-1.0-4.0-8.0 -10.0 -100.0-10.0)
     // What happened to the other covariances? They are not included in the string
     //
-    Eigen::Matrix<double, 30, 1> Sensor_; // Initialize Sensor_ which is a 30x1 vector
+    Eigen::Vector<double, 30> Sensor_; // Initialize Sensor_ which is a 30x1 vector
     Sensor_.setZero();
-    Eigen::Matrix<bool, 2, 1> Contact_; // Initialize Contact_ which is a 2x1 boolean vector covering both legs
+    Eigen::Vector<bool, Robot_Model::NUM_LEGS> Contact_; // Initialize Contact_ which is a NUM_LEGS boolean vector
     Contact_.setZero();
-    ROBOT_STATES state_; // Initialize state_ which is a struct defined in RobotState_Smoother.hpp
-    // 3*5 + 3*contact_leg_num(4) + 3*contact_leg_num(4)(vel) = max 39
+    ROBOT_STATES state_;
 
-    estimator_IEKF.robot.leg_no = 2;
 
     estimator_IEKF.NUM_OF_TRASH_DATA = starting_point;
     estimator_IEKF.LoadCSVData(file_name);
@@ -89,7 +105,7 @@ int main() {
     estimator_IEKF.cov_amplifier = cov_amplifier;
 
     //robot.define(REAL_ROBOT);
-    estimator_IEKF.Initialize(dt, Estimator_Covariances, initial_condition);
+    estimator_IEKF.Initialize(dt, Estimator_Covariances, initial_condition, SLIDING_WINDOW_SIZE);
 
     std::vector<double> step_times;
                 

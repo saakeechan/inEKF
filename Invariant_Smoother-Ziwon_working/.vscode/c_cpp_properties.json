@@ -7,7 +7,6 @@
                 "${workspaceFolder}/src",
                 "${workspaceFolder}/src/Z1_estimation",
                 "${workspaceFolder}/src/Z1_estimation/estimator",
-                "${workspaceFolder}/src/Z1_estimation/factor",
                 "${workspaceFolder}/src/Z1_estimation/utility",
                 "${workspaceFolder}/src/Z1_estimation/InEKF",
                 "/usr/include/eigen3",
