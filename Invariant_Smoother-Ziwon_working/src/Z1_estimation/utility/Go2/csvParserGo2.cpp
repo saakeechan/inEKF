@@ -13,19 +13,6 @@
 #include <vector>
 #include <string>
 
-namespace {
-// Helper function to split a line by delimiter
-std::vector<std::string> split(const std::string& s, char delimiter) {
-    std::vector<std::string> tokens;
-    std::string token;
-    std::istringstream tokenStream(s);
-    while (std::getline(tokenStream, token, delimiter)) {
-        tokens.push_back(token);
-    }
-    return tokens;
-}
-} // anonymous namespace
-
 Go2CSVData ParseGo2CSV(const std::string& csv_filename) {
     Go2CSVData data;
     
