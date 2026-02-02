@@ -1,10 +1,10 @@
 //
 // Created by Saaketh 01/05/26
-// Digit-Specific Robot Model with Pinocchio
+// G1-Specific Robot Model with Pinocchio
 //
 
-#ifndef SRC_ROBOT_MODEL_DIGIT_HPP
-#define SRC_ROBOT_MODEL_DIGIT_HPP
+#ifndef SRC_ROBOT_MODEL_G1_HPP
+#define SRC_ROBOT_MODEL_G1_HPP
 
 #include <cmath>
 #include <cassert>
@@ -29,43 +29,41 @@ using std::cout;
 using std::endl;
 
 // Forward declaration
-struct DigitCSVData;
+struct G1CSVData;
 
-class Robot_Model_Digit{
+class Robot_Model_G1{
 
 public:
-    Robot_Model_Digit();
-    ~Robot_Model_Digit();
+    Robot_Model_G1();
+    ~Robot_Model_G1();
     
     // ========================================================================
-    // DIGIT-SPECIFIC CONFIGURATION
+    // G1-SPECIFIC CONFIGURATION
     // ========================================================================
     
-    // Number of legs (2 for biped Digit)
+    // Number of legs (2 for biped G1)
     static constexpr int NUM_LEGS = 2;
     
-    // Number of contact points (same as NUM_LEGS for Digit)
+    // Number of contact points (same as NUM_LEGS for G1)
     static constexpr int NUM_CONTACTS = NUM_LEGS;
     
     // Robot model file path
-    std::string robot_model_path = "../digit_mujoco-main/src/digit_mujoco/models/flat/digit-v3-flat.xml";
+    std::string robot_model_path = "../unitree_ros/robots/g1_description/g1_29dof_mode_15.urdf";
 
-    // Contact point frame IDs for Digit: Left foot=31, Right foot=71
-    std::vector<int> contact_point_frame_ids = {31, 71};
+    // Contact point frame IDs for G1: Left foot=16 (left_ankle_roll_link), Right foot=32 (right_ankle_roll_link)
+    std::vector<int> contact_point_frame_ids = {16, 32};
     
-    // Encoder configuration for Digit robot:
-    // - nq (configuration dimension) = 61
-    //   Includes: 7 for base (3 position + 4 quaternion) + 54 joint positions
-    // - nv (velocity dimension) = 54  
-    //   Includes: 6 for base (3 linear + 3 angular) + 48 joint velocities
-    // These match the Pinocchio model dimensions loaded from the MJCF file
-    static constexpr int ENCODER_SIZE = 61;     // nq - configuration space dimension
-    static constexpr int ENCODERDOT_SIZE = 54;  // nv - velocity space dimension
+    // Encoder configuration for G1 robot:
+    // - nq (configuration dimension) = 29
+    // - nv (velocity dimension) = 29 
+    // These match the Pinocchio model dimensions loaded from the URDF file
+    static constexpr int ENCODER_SIZE = 29;     // nq - configuration space dimension
+    static constexpr int ENCODERDOT_SIZE = 29;  // nv - velocity space dimension
 
-    // have to make this dynamic
+    // have to make this dynamic maybe
     
     // ========================================================================
-    // END DIGIT-SPECIFIC CONFIGURATION
+    // END G1-SPECIFIC CONFIGURATION
     // ========================================================================
     
     // Pinocchio model and data
@@ -147,19 +145,22 @@ public:
     void compute_joint_jacobians() const;
 
     // ========================================================================
-    // DIGIT-SPECIFIC ENCODER ASSIGNMENT
+    // G1-SPECIFIC ENCODER ASSIGNMENT
     // Maps CSV data to Pinocchio configuration/velocity vectors
     // ========================================================================
     
-    // Assign encoder values from CSV data for Digit robot
-    void assign_encoder_from_csv(Eigen::Vector<double, ENCODER_SIZE>& encoder, const DigitCSVData& csvData, int time_index) const;
+    // Assign encoder values from CSV data for G1 robot
+    void assign_encoder_from_csv(Eigen::Vector<double, ENCODER_SIZE>& encoder, const G1CSVData& csvData, int time_index) const;
     
-    // Assign encoder velocity values from CSV data for Digit robot
-    void assign_encoderdot_from_csv(Eigen::Vector<double, ENCODERDOT_SIZE>& encoderdot, const DigitCSVData& csvData, int time_index) const;
+    // Assign encoder velocity values from CSV data for G1 robot
+    void assign_encoderdot_from_csv(Eigen::Vector<double, ENCODERDOT_SIZE>& encoderdot, const G1CSVData& csvData, int time_index) const;
+    
+    // Assign contact states from CSV data for G1 robot
+    void assign_contact_from_csv(Eigen::Vector<bool, NUM_LEGS>& contact, const G1CSVData& csvData, int time_index) const;
 
 private:
 
 };
 
 
-#endif //SRC_ROBOT_MODEL_DIGIT_HPP
+#endif //SRC_ROBOT_MODEL_G1_HPP

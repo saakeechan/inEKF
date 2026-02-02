@@ -1,10 +1,10 @@
 //
 // Created by Saaketh 01/05/26
-// G1-Specific Robot Model with Pinocchio
+// Go2-Specific Robot Model with Pinocchio
 //
 
-#ifndef SRC_ROBOT_MODEL_G1_HPP
-#define SRC_ROBOT_MODEL_G1_HPP
+#ifndef SRC_ROBOT_MODEL_Go2_HPP
+#define SRC_ROBOT_MODEL_Go2_HPP
 
 #include <cmath>
 #include <cassert>
@@ -29,41 +29,39 @@ using std::cout;
 using std::endl;
 
 // Forward declaration
-struct G1CSVData;
+struct Go2CSVData;
 
-class Robot_Model_G1{
+class Robot_Model_Go2{
 
 public:
-    Robot_Model_G1();
-    ~Robot_Model_G1();
+    Robot_Model_Go2();
+    ~Robot_Model_Go2();
     
     // ========================================================================
-    // G1-SPECIFIC CONFIGURATION
+    // Go2-SPECIFIC CONFIGURATION
     // ========================================================================
     
-    // Number of legs (2 for biped G1)
-    static constexpr int NUM_LEGS = 2;
+    // Number of legs (4 for quadruped Go2)
+    static constexpr int NUM_LEGS = 4;
     
-    // Number of contact points (same as NUM_LEGS for G1)
+    // Number of contact points (same as NUM_LEGS for Go2)
     static constexpr int NUM_CONTACTS = NUM_LEGS;
     
     // Robot model file path
-    std::string robot_model_path = "../unitree_ros/robots/g1_description/g1_29dof_mode_15.urdf";
+    std::string robot_model_path = "../unitree_ros/robots/go2_description/urdf/go2_description.urdf";
 
-    // Contact point frame IDs for G1: Left foot=16 (left_ankle_roll_link), Right foot=32 (right_ankle_roll_link)
-    std::vector<int> contact_point_frame_ids = {16, 32};
+    // Contact point frame IDs for Go2: Left foot=16 (left_ankle_roll_link), Right foot=32 (right_ankle_roll_link)
+    std::vector<int> contact_point_frame_ids = {15, 35, 59, 79};
     
-    // Encoder configuration for G1 robot:
-    // - nq (configuration dimension) = 29
-    // - nv (velocity dimension) = 29 
+    // Encoder configuration for Go2 robot:
+    // - nq (configuration dimension) = 12
+    // - nv (velocity dimension) = 12 
     // These match the Pinocchio model dimensions loaded from the URDF file
-    static constexpr int ENCODER_SIZE = 29;     // nq - configuration space dimension
-    static constexpr int ENCODERDOT_SIZE = 29;  // nv - velocity space dimension
+    static constexpr int ENCODER_SIZE = 12;     // nq - configuration space dimension
+    static constexpr int ENCODERDOT_SIZE = 12;  // nv - velocity space dimension
 
-    // have to make this dynamic maybe
-    
     // ========================================================================
-    // END G1-SPECIFIC CONFIGURATION
+    // END Go2-SPECIFIC CONFIGURATION
     // ========================================================================
     
     // Pinocchio model and data
@@ -145,19 +143,22 @@ public:
     void compute_joint_jacobians() const;
 
     // ========================================================================
-    // G1-SPECIFIC ENCODER ASSIGNMENT
+    // Go2-SPECIFIC ENCODER ASSIGNMENT
     // Maps CSV data to Pinocchio configuration/velocity vectors
     // ========================================================================
     
-    // Assign encoder values from CSV data for G1 robot
-    void assign_encoder_from_csv(Eigen::Vector<double, ENCODER_SIZE>& encoder, const G1CSVData& csvData, int time_index) const;
+    // Assign encoder values from CSV data for Go2 robot
+    void assign_encoder_from_csv(Eigen::Vector<double, ENCODER_SIZE>& encoder, const Go2CSVData& csvData, int time_index) const;
     
-    // Assign encoder velocity values from CSV data for G1 robot
-    void assign_encoderdot_from_csv(Eigen::Vector<double, ENCODERDOT_SIZE>& encoderdot, const G1CSVData& csvData, int time_index) const;
+    // Assign encoder velocity values from CSV data for Go2 robot
+    void assign_encoderdot_from_csv(Eigen::Vector<double, ENCODERDOT_SIZE>& encoderdot, const Go2CSVData& csvData, int time_index) const;
+    
+    // Assign contact states from CSV data for Go2 robot
+    void assign_contact_from_csv(Eigen::Vector<bool, NUM_LEGS>& contact, const Go2CSVData& csvData, int time_index) const;
 
 private:
 
 };
 
 
-#endif //SRC_ROBOT_MODEL_G1_HPP
+#endif //SRC_ROBOT_MODEL_Go2_HPP

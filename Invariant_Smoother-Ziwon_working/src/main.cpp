@@ -9,6 +9,7 @@
 #include <vector>
 #include "InEKF_estimator.hpp"
 #include <iomanip>
+#include "RobotModel.hpp"
 
 
 using std::cout;
@@ -16,68 +17,60 @@ using std::endl;
 
 InEKFilter estimator_IEKF;
 
-// ============================================================================
-// MAIN CONFIGURATION - Users should only need to modify this section
-// ============================================================================
-
-// ROBOT SELECTION:
-// To switch robots, edit src/Z1_estimation/utility/RobotConfig.hpp
-// and uncomment the desired robot (e.g., USE_ROBOT_DIGIT, USE_ROBOT_MINI_CHEETAH)
-// Current robot: Digit
-
-// SLIDING WINDOW SIZE:
-// This controls the buffer size for the smoother/filter
-// Set this at runtime when calling Initialize() - default is 2
-constexpr int SLIDING_WINDOW_SIZE = 2;
-
-// EXPERIMENT PARAMETERS:
-// Configure your experiment parameters below
-
-// ============================================================================
-// END OF MAIN CONFIGURATION
-// ============================================================================
-
 /// @brief 
 /// @return 
 int main() {
 
+    // ------------------------------------------------------------
+    // USER CONFIGURABLE PARAMETERS
+
+    std::string robot_config_path = "../config/digit_config.yaml";
+
+    int SLIDING_WINDOW_SIZE = 2;
+
     double dt = 0.005;
-    int starting_point = 0;
+    int CSV_Starting_Point = 0; // number of initial data points to skip in CSV
+
+    // CSV data file path and length
     std::string file_name = "../digit_cropped_data.csv";
-    int time_length = 977;
-    bool SR = true;
-    double slip_thr = 0.3;
-    bool VCC = false; // variable contact covariance mode
+    int time_length = 976; // total number of data points to process from the CSV file
+
+    bool SR = true; // slip rejection mode
+    double slip_thr = 0.3; // slip threshold in m/s
+    bool VCC = false; // variable contact covariance mode 
     double cov_amplifier = 5; // this is multiplied to contact covariance when VCC is true
 
-
-    Eigen::Vector<double, 12> Estimator_Covariances; // Initialize Estimator Covariances which is a 12x1 vector
-    //gyro, acc, slip, contact, encoder, bias gyro, 
-    //bias acc, prior ori, prior vel, prior pos, prior bias gyro, prior bias acc
 
     // Slip covariance is the covariance used when we detect slip and we blow up the contact covariance
     // Contact covariance is the nominal contact covariance
 
+    Eigen::Vector<double, 12> Estimator_Covariances; // Initialize Estimator Covariances which is a 12x1 vector
+    //gyro, acc, slip, contact, encoder, bias gyro, bias acc,
+    //prior ori, prior vel, prior pos, prior bias gyro, prior bias acc
 
     double gyro_exp = -5, acc_exp = -1, slip_exp = -1, contact_exp = -4, encoder_exp = -8; // for paper
     double bg_exp = -10, ba_exp = -7;
-    double pri_ori_exp = -5, pri_vel_exp = -10, pri_pos_exp = -10;
+    double pri_ori_exp = -10, pri_vel_exp = -10, pri_pos_exp = -10;
     double pri_bg_exp = -10, pri_ba_exp = -10;
-
-
-    Estimator_Covariances << pow(10, gyro_exp), pow(10, acc_exp), pow(10, slip_exp), pow(10, contact_exp), pow(10,encoder_exp), //gyro, acc, contact, encoder
-            pow(10, bg_exp), pow(10, ba_exp), //bias gyro, bias acc
-            pow(10, pri_ori_exp), pow(10, pri_vel_exp), pow(10, pri_pos_exp), //prior ori, vel, pos, contact
-            pow(10, pri_bg_exp), pow(10, pri_ba_exp); //prior bias gyro, acc
 
     Eigen::Vector<double, 16> initial_condition;
     initial_condition << 0.0, 0.0, 0.0, // Px,Py,Pz
             0.0, 0.0, 0.0, 0.0, // (indices 3 4 5 correspond to roll pitch yaw)
-            0.0, 0.0, 0.0,     //Vx, Vy, Vz
+            0.5, 0.0, 0.0,     //Vx, Vy, Vz
             0.0, 0.0, 0.0,     //bgx, bgy, bgz
             0.0, 0.0, 0.0;    //bax, bay, baz
 
-    std::string cov_info;
+
+    // ------------------------------------------------------------
+
+
+
+    Estimator_Covariances << pow(10, gyro_exp), pow(10, acc_exp), pow(10, slip_exp), pow(10, contact_exp), pow(10,encoder_exp), //gyro, acc, contact, encoder
+    pow(10, bg_exp), pow(10, ba_exp), //bias gyro, bias acc
+    pow(10, pri_ori_exp), pow(10, pri_vel_exp), pow(10, pri_pos_exp), //prior ori, vel, pos, contact
+    pow(10, pri_bg_exp), pow(10, pri_ba_exp); //prior bias gyro, acc
+
+    std::string cov_info; // Do we really need this string? FIX STRUCTURE BADLY
     cov_info = "(" + BasicFunctions_Estimator::to_string_n_signficant_figures(gyro_exp, 2) +
                BasicFunctions_Estimator::to_string_n_signficant_figures(acc_exp, 2) +
                BasicFunctions_Estimator::to_string_n_signficant_figures(slip_exp, 2) +
@@ -89,22 +82,23 @@ int main() {
 
     // print example cov_info : (5.0-1.0-1.0-4.0-8.0 -10.0 -100.0-10.0)
     // What happened to the other covariances? They are not included in the string
-    //
+
+    estimator_IEKF.load_robot_config(robot_config_path); // Load robot configuration
+    std::cout << "Robot model loaded successfully." << std::endl;
+
     Eigen::Vector<double, 30> Sensor_; // Initialize Sensor_ which is a 30x1 vector
     Sensor_.setZero();
-    Eigen::Vector<bool, Robot_Model::NUM_LEGS> Contact_; // Initialize Contact_ which is a NUM_LEGS boolean vector
-    Contact_.setZero();
+    std::vector<bool> Contact_(estimator_IEKF.robot.num_legs, false); // Initialize Contact_ - dynamic size based on robot config
     ROBOT_STATES state_;
 
 
-    estimator_IEKF.NUM_OF_TRASH_DATA = starting_point;
-    estimator_IEKF.LoadCSVData(file_name);
+    estimator_IEKF.CSV_Skip_Data = CSV_Starting_Point;
+    estimator_IEKF.LoadCSVData(file_name); // Should not call this if doing sensor data. Calling this activates CSV reading part of the code
     estimator_IEKF.slip_rejection_mode = SR;
     estimator_IEKF.slip_threshold = slip_thr; // This is slip threshold number. Is it in m/s? Find units
     estimator_IEKF.variable_contact_cov_mode = VCC;
     estimator_IEKF.cov_amplifier = cov_amplifier;
 
-    //robot.define(REAL_ROBOT);
     estimator_IEKF.Initialize(dt, Estimator_Covariances, initial_condition, SLIDING_WINDOW_SIZE);
 
     std::vector<double> step_times;
@@ -138,8 +132,8 @@ int main() {
     std::cout << "  Total time:            " << std::fixed 
               << std::setprecision(8) << total_time << " s" << std::endl;
 
-    estimator_IEKF.do_SAVE_Z1_all(cov_info);
-    cout << "Reached after estimator_IEKF.do_SAVE_Z1_all(cov_info)" << endl;
+    estimator_IEKF.writeSavedData(cov_info);
+    cout << "Reached after estimator_IEKF.writeSavedData(cov_info)" << endl;
 
     return 0;
 }

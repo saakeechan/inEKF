@@ -8,9 +8,9 @@ cd result/pinnochio_inekf
 % --- File information ---
 slip = 0.3;
 SRmode = sprintf('(SR%.1f)', slip);
-cov = '-5-1-1-4-8 -10 -5-10';
-initial = '0.00_0.00_0.00_0.10_0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00';
-data = 'x977_';
+cov = '-5-1-1-4-8 -10 -10-10';
+initial = '0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.50_0.00_0.00_0.00_0.00';
+data = 'x976_';
 index = 1;
 
 % --- Construct filename and full path ---
