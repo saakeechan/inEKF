@@ -1,0 +1,70 @@
+# G1 Robot Configuration File
+# Created: 2026-01-06
+# This file contains all robot-specific parameters for the G1 biped robot
+
+# ============================================================================
+# ROBOT IDENTIFICATION
+# ============================================================================
+robot_name: "G1"
+
+# ============================================================================
+# ROBOT MODEL CONFIGURATION
+# ============================================================================
+model:
+  # Path to robot model file
+  model_path: "../G1_mujoco-main/src/G1_mujoco/models/flat/G1-v3-flat.xml"
+  
+  # Model format: "urdf" or "mjcf"
+  format: "mjcf"
+
+# ============================================================================
+# ROBOT STRUCTURE
+# ============================================================================
+structure:
+  # Number of legs/contact points
+  num_legs: 2
+  
+  # Contact point frame IDs in the Pinocchio model - size should match num of legs
+  # For G1: Left foot=16, Right foot=32 - open up a visualization tool to verify
+  contact_frame_ids: [16, 32]
+
+# ============================================================================
+# IMU2BD OFFSET
+# ============================================================================
+# IMU to body frame offset [x, y, z] in meters - investigate exact relationship later
+imu_to_body: [0.0, 0.0, 0.0]
+
+# ============================================================================
+# COVARIANCE PARAMETERS for the Robot
+# ============================================================================
+covariance:
+  # Sensor noise covariances
+  gyro: 1.0e-4
+  accelerometer: 1.0e-2
+  encoder: 1.0e-4
+  
+  # Contact estimation covariances
+  contact: 1.0e-6
+  slip: 1.0e-3
+  
+  # Bias covariances
+  bias_gyro: 1.0e-6
+  bias_accelerometer: 1.0e-6
+  
+  # Prior covariances
+  prior_orientation: 1.0e-3
+  prior_velocity: 1.0e-3
+  prior_position: 1.0e-3
+  prior_bias_gyro: 1.0e-6
+  prior_bias_accelerometer: 1.0e-6
+
+# ============================================================================
+# ENCODER MAPPING
+# ============================================================================
+# Indices of encoder and encoderdot that receive actual TextFile data or sensor data (non-zero assignments)
+# Got to put some work into finding these indices for your robot
+
+TextFile_encoder_indices: [7, 8, 9, 14, 15, 16, 17, 18, 23, 28, 29, 34, 35, 36, 41, 42, 43, 44, 45, 50, 55, 56]
+TextFile_encoderdot_indices: [6, 7, 8, 10, 11, 12, 13, 14, 16, 18, 19, 24, 25, 26, 28, 29, 30, 31, 32, 34, 36, 37]
+
+  

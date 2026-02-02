@@ -1,0 +1,2 @@
+/usr/bin/ar qc ../../DigitControlPybind/bin/libwalking_trajectory_lib.a  CMakeFiles/walking_trajectory_lib.dir/DigitControlPybind/src/include/digit_controller/src/walking_trajectory.cpp.o CMakeFiles/walking_trajectory_lib.dir/DigitControlPybind/src/include/digit_controller/src/digit_state.cpp.o
+/usr/bin/ranlib ../../DigitControlPybind/bin/libwalking_trajectory_lib.a

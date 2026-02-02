@@ -1,0 +1,2 @@
+/usr/bin/ar qc ../../DigitControlPybind/bin/libdomain_control_lib.a  CMakeFiles/domain_control_lib.dir/DigitControlPybind/src/include/digit_controller/src/domain_control.cpp.o
+/usr/bin/ranlib ../../DigitControlPybind/bin/libdomain_control_lib.a

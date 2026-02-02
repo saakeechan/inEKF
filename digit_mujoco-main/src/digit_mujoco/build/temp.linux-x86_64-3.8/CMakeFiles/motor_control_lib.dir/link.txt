@@ -1,0 +1,2 @@
+/usr/bin/ar qc ../../DigitControlPybind/bin/libmotor_control_lib.a  CMakeFiles/motor_control_lib.dir/DigitControlPybind/src/include/digit_controller/src/motor_control.cpp.o
+/usr/bin/ranlib ../../DigitControlPybind/bin/libmotor_control_lib.a

@@ -1,0 +1,2 @@
+/usr/bin/ar qc ../../DigitControlPybind/bin/libjoint_filter_lib.a  CMakeFiles/joint_filter_lib.dir/DigitControlPybind/src/include/digit_controller/src/filter.cpp.o
+/usr/bin/ranlib ../../DigitControlPybind/bin/libjoint_filter_lib.a

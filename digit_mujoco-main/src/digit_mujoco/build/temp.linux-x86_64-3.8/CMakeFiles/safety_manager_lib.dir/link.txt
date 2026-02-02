@@ -1,0 +1,2 @@
+/usr/bin/ar qc ../../DigitControlPybind/bin/libsafety_manager_lib.a  CMakeFiles/safety_manager_lib.dir/DigitControlPybind/src/include/digit_controller/src/safety_manager.cpp.o
+/usr/bin/ranlib ../../DigitControlPybind/bin/libsafety_manager_lib.a

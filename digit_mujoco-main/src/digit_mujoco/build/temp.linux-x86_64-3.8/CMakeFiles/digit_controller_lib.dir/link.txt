@@ -1,0 +1,2 @@
+/usr/bin/ar qc ../../DigitControlPybind/bin/libdigit_controller_lib.a  CMakeFiles/digit_controller_lib.dir/DigitControlPybind/src/include/digit_controller/src/digit_controller.cpp.o
+/usr/bin/ranlib ../../DigitControlPybind/bin/libdigit_controller_lib.a
