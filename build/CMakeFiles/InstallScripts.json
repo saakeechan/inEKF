@@ -1,7 +1,7 @@
 {
 	"InstallScripts" : 
 	[
-		"/home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/build/cmake_install.cmake"
+		"/home/saakee/Research/Saaketh_INEKF/build/cmake_install.cmake"
 	],
 	"Parallel" : false
 }

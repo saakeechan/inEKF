@@ -61,7 +61,7 @@ rule CUSTOM_COMMAND
 # Rule for re-running cmake.
 
 rule RERUN_CMAKE
-  command = /usr/bin/cmake --regenerate-during-build -S/home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working -B/home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/build
+  command = /usr/bin/cmake --regenerate-during-build -S/home/saakee/Research/Saaketh_INEKF -B/home/saakee/Research/Saaketh_INEKF/build
   description = Re-running CMake...
   generator = 1
 

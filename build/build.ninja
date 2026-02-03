@@ -39,7 +39,7 @@ include CMakeFiles/rules.ninja
 #############################################
 # Logical path to working directory; prefix for absolute paths.
 
-cmake_ninja_workdir = /home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/build/
+cmake_ninja_workdir = /home/saakee/Research/Saaketh_INEKF/build/
 # =============================================================================
 # Object build statements for SHARED_LIBRARY target lib_INEKF_Estimator
 
@@ -49,12 +49,12 @@ cmake_ninja_workdir = /home/saakee/Research/SaakethReplicaZiwon/Invariant_Smooth
 
 build cmake_object_order_depends_target_lib_INEKF_Estimator: phony || .
 
-build CMakeFiles/lib_INEKF_Estimator.dir/Unity/unity_0_cxx.cxx.o: CXX_COMPILER__lib_INEKF_Estimator_unscanned_Release /home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/build/CMakeFiles/lib_INEKF_Estimator.dir/Unity/unity_0_cxx.cxx || cmake_object_order_depends_target_lib_INEKF_Estimator
+build CMakeFiles/lib_INEKF_Estimator.dir/Unity/unity_0_cxx.cxx.o: CXX_COMPILER__lib_INEKF_Estimator_unscanned_Release /home/saakee/Research/Saaketh_INEKF/build/CMakeFiles/lib_INEKF_Estimator.dir/Unity/unity_0_cxx.cxx || cmake_object_order_depends_target_lib_INEKF_Estimator
   CONFIG = Release
   DEFINES = -Dlib_INEKF_Estimator_EXPORTS
   DEP_FILE = CMakeFiles/lib_INEKF_Estimator.dir/Unity/unity_0_cxx.cxx.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++14 -fPIC -O3
-  INCLUDES = -I/usr/include/eigen3 -I/opt/openrobots/lib/pkgconfig/../../include -I/opt/openrobots/include -I/home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working -I/home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/src -I/home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/src/Z1_estimation -I/home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/src/Z1_estimation/estimator -I/home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/src/Z1_estimation/utility -I/home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/src/Z1_estimation/InEKF
+  INCLUDES = -I/usr/include/eigen3 -I/opt/openrobots/lib/pkgconfig/../../include -I/opt/openrobots/include -I/home/saakee/Research/Saaketh_INEKF -I/home/saakee/Research/Saaketh_INEKF/src -I/home/saakee/Research/Saaketh_INEKF/src/estimator -I/home/saakee/Research/Saaketh_INEKF/src/utility -I/home/saakee/Research/Saaketh_INEKF/src/InEKF
   LAUNCHER = ccache 
   OBJECT_DIR = CMakeFiles/lib_INEKF_Estimator.dir
   OBJECT_FILE_DIR = CMakeFiles/lib_INEKF_Estimator.dir/Unity
@@ -92,11 +92,11 @@ build liblib_INEKF_Estimator.so: CXX_SHARED_LIBRARY_LINKER__lib_INEKF_Estimator_
 
 build cmake_object_order_depends_target_INEKF_Estimator_Test: phony || cmake_object_order_depends_target_lib_INEKF_Estimator
 
-build CMakeFiles/INEKF_Estimator_Test.dir/Unity/unity_0_cxx.cxx.o: CXX_COMPILER__INEKF_Estimator_Test_unscanned_Release /home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/build/CMakeFiles/INEKF_Estimator_Test.dir/Unity/unity_0_cxx.cxx || cmake_object_order_depends_target_INEKF_Estimator_Test
+build CMakeFiles/INEKF_Estimator_Test.dir/Unity/unity_0_cxx.cxx.o: CXX_COMPILER__INEKF_Estimator_Test_unscanned_Release /home/saakee/Research/Saaketh_INEKF/build/CMakeFiles/INEKF_Estimator_Test.dir/Unity/unity_0_cxx.cxx || cmake_object_order_depends_target_INEKF_Estimator_Test
   CONFIG = Release
   DEP_FILE = CMakeFiles/INEKF_Estimator_Test.dir/Unity/unity_0_cxx.cxx.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++14
-  INCLUDES = -I/usr/include/eigen3 -I/opt/openrobots/lib/pkgconfig/../../include -I/opt/openrobots/include -I/home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working -I/home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/src -I/home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/src/Z1_estimation -I/home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/src/Z1_estimation/estimator -I/home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/src/Z1_estimation/utility -I/home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/src/Z1_estimation/InEKF
+  INCLUDES = -I/usr/include/eigen3 -I/opt/openrobots/lib/pkgconfig/../../include -I/opt/openrobots/include -I/home/saakee/Research/Saaketh_INEKF -I/home/saakee/Research/Saaketh_INEKF/src -I/home/saakee/Research/Saaketh_INEKF/src/estimator -I/home/saakee/Research/Saaketh_INEKF/src/utility -I/home/saakee/Research/Saaketh_INEKF/src/InEKF
   LAUNCHER = ccache 
   OBJECT_DIR = CMakeFiles/INEKF_Estimator_Test.dir
   OBJECT_FILE_DIR = CMakeFiles/INEKF_Estimator_Test.dir/Unity
@@ -113,7 +113,7 @@ build CMakeFiles/INEKF_Estimator_Test.dir/Unity/unity_0_cxx.cxx.o: CXX_COMPILER_
 build INEKF_Estimator_Test: CXX_EXECUTABLE_LINKER__INEKF_Estimator_Test_Release CMakeFiles/INEKF_Estimator_Test.dir/Unity/unity_0_cxx.cxx.o | liblib_INEKF_Estimator.so /usr/lib/x86_64-linux-gnu/libyaml-cpp.so.0.7.0 || liblib_INEKF_Estimator.so
   CONFIG = Release
   FLAGS = -O3 -DNDEBUG
-  LINK_LIBRARIES = -Wl,-rpath,/opt/openrobots/lib/pkgconfig/../../lib:/opt/openrobots/lib:/usr/lib/x86_64-linux-gnu/pkgconfig/../../../lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/usr/local/lib:/home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/build  liblib_INEKF_Estimator.so  -lpinocchio_default  -lpinocchio_parsers  -lpinocchio_casadi  -lboost_filesystem  -lboost_serialization  -lboost_system  -lurdfdom_sensor  -lurdfdom_model_state  -lurdfdom_model  -lurdfdom_world  -lconsole_bridge  -lcasadi  /usr/lib/x86_64-linux-gnu/libyaml-cpp.so.0.7.0
+  LINK_LIBRARIES = -Wl,-rpath,/opt/openrobots/lib/pkgconfig/../../lib:/opt/openrobots/lib:/usr/lib/x86_64-linux-gnu/pkgconfig/../../../lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/usr/local/lib:/home/saakee/Research/Saaketh_INEKF/build  liblib_INEKF_Estimator.so  -lpinocchio_default  -lpinocchio_parsers  -lpinocchio_casadi  -lboost_filesystem  -lboost_serialization  -lboost_system  -lurdfdom_sensor  -lurdfdom_model_state  -lurdfdom_model  -lurdfdom_world  -lconsole_bridge  -lcasadi  /usr/lib/x86_64-linux-gnu/libyaml-cpp.so.0.7.0
   LINK_PATH = -L/opt/openrobots/lib/pkgconfig/../../lib   -L/opt/openrobots/lib   -L/usr/local/lib
   OBJECT_DIR = CMakeFiles/INEKF_Estimator_Test.dir
   POST_BUILD = :
@@ -127,7 +127,7 @@ build INEKF_Estimator_Test: CXX_EXECUTABLE_LINKER__INEKF_Estimator_Test_Release 
 # Utility command for edit_cache
 
 build CMakeFiles/edit_cache.util: CUSTOM_COMMAND
-  COMMAND = cd /home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/build && /usr/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
+  COMMAND = cd /home/saakee/Research/Saaketh_INEKF/build && /usr/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
   DESC = No interactive CMake dialog available...
   restat = 1
 
@@ -138,7 +138,7 @@ build edit_cache: phony CMakeFiles/edit_cache.util
 # Utility command for rebuild_cache
 
 build CMakeFiles/rebuild_cache.util: CUSTOM_COMMAND
-  COMMAND = cd /home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/build && /usr/bin/cmake --regenerate-during-build -S/home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working -B/home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/build
+  COMMAND = cd /home/saakee/Research/Saaketh_INEKF/build && /usr/bin/cmake --regenerate-during-build -S/home/saakee/Research/Saaketh_INEKF -B/home/saakee/Research/Saaketh_INEKF/build
   DESC = Running CMake to regenerate build system...
   pool = console
   restat = 1
@@ -156,7 +156,7 @@ build lib_INEKF_Estimator: phony liblib_INEKF_Estimator.so
 # =============================================================================
 
 #############################################
-# Folder: /home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/build
+# Folder: /home/saakee/Research/Saaketh_INEKF/build
 
 build all: phony liblib_INEKF_Estimator.so INEKF_Estimator_Test
 
@@ -167,14 +167,14 @@ build all: phony liblib_INEKF_Estimator.so INEKF_Estimator_Test
 #############################################
 # Re-run CMake if any of its inputs changed.
 
-build build.ninja /home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/build/cmake_install.cmake: RERUN_CMAKE | /home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/CMakeLists.txt /usr/lib/x86_64-linux-gnu/cmake/yaml-cpp/yaml-cpp-config-version.cmake /usr/lib/x86_64-linux-gnu/cmake/yaml-cpp/yaml-cpp-config.cmake /usr/lib/x86_64-linux-gnu/cmake/yaml-cpp/yaml-cpp-targets-none.cmake /usr/lib/x86_64-linux-gnu/cmake/yaml-cpp/yaml-cpp-targets.cmake /usr/share/cmake-4.2/Modules/CMakeCXXInformation.cmake /usr/share/cmake-4.2/Modules/CMakeCommonLanguageInclude.cmake /usr/share/cmake-4.2/Modules/CMakeGenericSystem.cmake /usr/share/cmake-4.2/Modules/CMakeInitializeConfigs.cmake /usr/share/cmake-4.2/Modules/CMakeLanguageInformation.cmake /usr/share/cmake-4.2/Modules/CMakeSystemSpecificInformation.cmake /usr/share/cmake-4.2/Modules/CMakeSystemSpecificInitialize.cmake /usr/share/cmake-4.2/Modules/Compiler/CMakeCommonCompilerMacros.cmake /usr/share/cmake-4.2/Modules/Compiler/GNU-CXX.cmake /usr/share/cmake-4.2/Modules/Compiler/GNU.cmake /usr/share/cmake-4.2/Modules/FindPackageHandleStandardArgs.cmake /usr/share/cmake-4.2/Modules/FindPackageMessage.cmake /usr/share/cmake-4.2/Modules/FindPkgConfig.cmake /usr/share/cmake-4.2/Modules/Internal/CMakeCXXLinkerInformation.cmake /usr/share/cmake-4.2/Modules/Internal/CMakeCommonLinkerInformation.cmake /usr/share/cmake-4.2/Modules/Linker/GNU-CXX.cmake /usr/share/cmake-4.2/Modules/Linker/GNU.cmake /usr/share/cmake-4.2/Modules/Platform/Linker/GNU.cmake /usr/share/cmake-4.2/Modules/Platform/Linker/Linux-GNU-CXX.cmake /usr/share/cmake-4.2/Modules/Platform/Linker/Linux-GNU.cmake /usr/share/cmake-4.2/Modules/Platform/Linux-GNU-CXX.cmake /usr/share/cmake-4.2/Modules/Platform/Linux-GNU.cmake /usr/share/cmake-4.2/Modules/Platform/Linux-Initialize.cmake /usr/share/cmake-4.2/Modules/Platform/Linux.cmake /usr/share/cmake-4.2/Modules/Platform/UnixPaths.cmake /usr/share/eigen3/cmake/Eigen3Config.cmake /usr/share/eigen3/cmake/Eigen3ConfigVersion.cmake /usr/share/eigen3/cmake/Eigen3Targets.cmake CMakeCache.txt CMakeFiles/4.2.1/CMakeCXXCompiler.cmake CMakeFiles/4.2.1/CMakeSystem.cmake
+build build.ninja /home/saakee/Research/Saaketh_INEKF/build/cmake_install.cmake: RERUN_CMAKE | /home/saakee/Research/Saaketh_INEKF/CMakeLists.txt /usr/lib/x86_64-linux-gnu/cmake/yaml-cpp/yaml-cpp-config-version.cmake /usr/lib/x86_64-linux-gnu/cmake/yaml-cpp/yaml-cpp-config.cmake /usr/lib/x86_64-linux-gnu/cmake/yaml-cpp/yaml-cpp-targets-none.cmake /usr/lib/x86_64-linux-gnu/cmake/yaml-cpp/yaml-cpp-targets.cmake /usr/share/cmake-4.2/Modules/CMakeCXXInformation.cmake /usr/share/cmake-4.2/Modules/CMakeCommonLanguageInclude.cmake /usr/share/cmake-4.2/Modules/CMakeGenericSystem.cmake /usr/share/cmake-4.2/Modules/CMakeInitializeConfigs.cmake /usr/share/cmake-4.2/Modules/CMakeLanguageInformation.cmake /usr/share/cmake-4.2/Modules/CMakeSystemSpecificInformation.cmake /usr/share/cmake-4.2/Modules/CMakeSystemSpecificInitialize.cmake /usr/share/cmake-4.2/Modules/Compiler/CMakeCommonCompilerMacros.cmake /usr/share/cmake-4.2/Modules/Compiler/GNU-CXX.cmake /usr/share/cmake-4.2/Modules/Compiler/GNU.cmake /usr/share/cmake-4.2/Modules/FindPackageHandleStandardArgs.cmake /usr/share/cmake-4.2/Modules/FindPackageMessage.cmake /usr/share/cmake-4.2/Modules/FindPkgConfig.cmake /usr/share/cmake-4.2/Modules/Internal/CMakeCXXLinkerInformation.cmake /usr/share/cmake-4.2/Modules/Internal/CMakeCommonLinkerInformation.cmake /usr/share/cmake-4.2/Modules/Linker/GNU-CXX.cmake /usr/share/cmake-4.2/Modules/Linker/GNU.cmake /usr/share/cmake-4.2/Modules/Platform/Linker/GNU.cmake /usr/share/cmake-4.2/Modules/Platform/Linker/Linux-GNU-CXX.cmake /usr/share/cmake-4.2/Modules/Platform/Linker/Linux-GNU.cmake /usr/share/cmake-4.2/Modules/Platform/Linux-GNU-CXX.cmake /usr/share/cmake-4.2/Modules/Platform/Linux-GNU.cmake /usr/share/cmake-4.2/Modules/Platform/Linux-Initialize.cmake /usr/share/cmake-4.2/Modules/Platform/Linux.cmake /usr/share/cmake-4.2/Modules/Platform/UnixPaths.cmake /usr/share/eigen3/cmake/Eigen3Config.cmake /usr/share/eigen3/cmake/Eigen3ConfigVersion.cmake /usr/share/eigen3/cmake/Eigen3Targets.cmake CMakeCache.txt CMakeFiles/4.2.1/CMakeCXXCompiler.cmake CMakeFiles/4.2.1/CMakeSystem.cmake
   pool = console
 
 
 #############################################
 # A missing CMake input file is not an error.
 
-build /home/saakee/Research/SaakethReplicaZiwon/Invariant_Smoother-Ziwon_working/CMakeLists.txt /usr/lib/x86_64-linux-gnu/cmake/yaml-cpp/yaml-cpp-config-version.cmake /usr/lib/x86_64-linux-gnu/cmake/yaml-cpp/yaml-cpp-config.cmake /usr/lib/x86_64-linux-gnu/cmake/yaml-cpp/yaml-cpp-targets-none.cmake /usr/lib/x86_64-linux-gnu/cmake/yaml-cpp/yaml-cpp-targets.cmake /usr/share/cmake-4.2/Modules/CMakeCXXInformation.cmake /usr/share/cmake-4.2/Modules/CMakeCommonLanguageInclude.cmake /usr/share/cmake-4.2/Modules/CMakeGenericSystem.cmake /usr/share/cmake-4.2/Modules/CMakeInitializeConfigs.cmake /usr/share/cmake-4.2/Modules/CMakeLanguageInformation.cmake /usr/share/cmake-4.2/Modules/CMakeSystemSpecificInformation.cmake /usr/share/cmake-4.2/Modules/CMakeSystemSpecificInitialize.cmake /usr/share/cmake-4.2/Modules/Compiler/CMakeCommonCompilerMacros.cmake /usr/share/cmake-4.2/Modules/Compiler/GNU-CXX.cmake /usr/share/cmake-4.2/Modules/Compiler/GNU.cmake /usr/share/cmake-4.2/Modules/FindPackageHandleStandardArgs.cmake /usr/share/cmake-4.2/Modules/FindPackageMessage.cmake /usr/share/cmake-4.2/Modules/FindPkgConfig.cmake /usr/share/cmake-4.2/Modules/Internal/CMakeCXXLinkerInformation.cmake /usr/share/cmake-4.2/Modules/Internal/CMakeCommonLinkerInformation.cmake /usr/share/cmake-4.2/Modules/Linker/GNU-CXX.cmake /usr/share/cmake-4.2/Modules/Linker/GNU.cmake /usr/share/cmake-4.2/Modules/Platform/Linker/GNU.cmake /usr/share/cmake-4.2/Modules/Platform/Linker/Linux-GNU-CXX.cmake /usr/share/cmake-4.2/Modules/Platform/Linker/Linux-GNU.cmake /usr/share/cmake-4.2/Modules/Platform/Linux-GNU-CXX.cmake /usr/share/cmake-4.2/Modules/Platform/Linux-GNU.cmake /usr/share/cmake-4.2/Modules/Platform/Linux-Initialize.cmake /usr/share/cmake-4.2/Modules/Platform/Linux.cmake /usr/share/cmake-4.2/Modules/Platform/UnixPaths.cmake /usr/share/eigen3/cmake/Eigen3Config.cmake /usr/share/eigen3/cmake/Eigen3ConfigVersion.cmake /usr/share/eigen3/cmake/Eigen3Targets.cmake CMakeCache.txt CMakeFiles/4.2.1/CMakeCXXCompiler.cmake CMakeFiles/4.2.1/CMakeSystem.cmake: phony
+build /home/saakee/Research/Saaketh_INEKF/CMakeLists.txt /usr/lib/x86_64-linux-gnu/cmake/yaml-cpp/yaml-cpp-config-version.cmake /usr/lib/x86_64-linux-gnu/cmake/yaml-cpp/yaml-cpp-config.cmake /usr/lib/x86_64-linux-gnu/cmake/yaml-cpp/yaml-cpp-targets-none.cmake /usr/lib/x86_64-linux-gnu/cmake/yaml-cpp/yaml-cpp-targets.cmake /usr/share/cmake-4.2/Modules/CMakeCXXInformation.cmake /usr/share/cmake-4.2/Modules/CMakeCommonLanguageInclude.cmake /usr/share/cmake-4.2/Modules/CMakeGenericSystem.cmake /usr/share/cmake-4.2/Modules/CMakeInitializeConfigs.cmake /usr/share/cmake-4.2/Modules/CMakeLanguageInformation.cmake /usr/share/cmake-4.2/Modules/CMakeSystemSpecificInformation.cmake /usr/share/cmake-4.2/Modules/CMakeSystemSpecificInitialize.cmake /usr/share/cmake-4.2/Modules/Compiler/CMakeCommonCompilerMacros.cmake /usr/share/cmake-4.2/Modules/Compiler/GNU-CXX.cmake /usr/share/cmake-4.2/Modules/Compiler/GNU.cmake /usr/share/cmake-4.2/Modules/FindPackageHandleStandardArgs.cmake /usr/share/cmake-4.2/Modules/FindPackageMessage.cmake /usr/share/cmake-4.2/Modules/FindPkgConfig.cmake /usr/share/cmake-4.2/Modules/Internal/CMakeCXXLinkerInformation.cmake /usr/share/cmake-4.2/Modules/Internal/CMakeCommonLinkerInformation.cmake /usr/share/cmake-4.2/Modules/Linker/GNU-CXX.cmake /usr/share/cmake-4.2/Modules/Linker/GNU.cmake /usr/share/cmake-4.2/Modules/Platform/Linker/GNU.cmake /usr/share/cmake-4.2/Modules/Platform/Linker/Linux-GNU-CXX.cmake /usr/share/cmake-4.2/Modules/Platform/Linker/Linux-GNU.cmake /usr/share/cmake-4.2/Modules/Platform/Linux-GNU-CXX.cmake /usr/share/cmake-4.2/Modules/Platform/Linux-GNU.cmake /usr/share/cmake-4.2/Modules/Platform/Linux-Initialize.cmake /usr/share/cmake-4.2/Modules/Platform/Linux.cmake /usr/share/cmake-4.2/Modules/Platform/UnixPaths.cmake /usr/share/eigen3/cmake/Eigen3Config.cmake /usr/share/eigen3/cmake/Eigen3ConfigVersion.cmake /usr/share/eigen3/cmake/Eigen3Targets.cmake CMakeCache.txt CMakeFiles/4.2.1/CMakeCXXCompiler.cmake CMakeFiles/4.2.1/CMakeSystem.cmake: phony
 
 
 #############################################
