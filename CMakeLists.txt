@@ -74,10 +74,9 @@ include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${EIGEN3_DIR}
         src
-        src/Z1_estimation
-        src/Z1_estimation/estimator
-        src/Z1_estimation/utility
-        src/Z1_estimation/InEKF
+        src/estimator
+        src/utility
+        src/InEKF
 )
 
 
@@ -85,12 +84,12 @@ include_directories(
 # Robot selection is done via RobotConfig.hpp
 
 file(GLOB_RECURSE INEKF_Estimator_src
-    src/Z1_estimation/estimator/InEKF_estimator.cpp
-    src/Z1_estimation/estimator/*.hpp
-    src/Z1_estimation/csvParser*.cpp
-    src/Z1_estimation/*.hpp
-    src/Z1_estimation/InEKF/*.cpp
-    src/Z1_estimation/utility/*.cpp) # maybe streamline this later
+    src/estimator/InEKF_estimator.cpp
+    src/estimator/*.hpp
+    src/csvParser*.cpp
+    src/*.hpp
+    src/InEKF/*.cpp
+    src/utility/*.cpp) # maybe streamline this later
 
 
 add_library(lib_INEKF_Estimator SHARED ${INEKF_Estimator_src})
@@ -125,5 +124,38 @@ set_target_properties(${TARGET} PROPERTIES
 
 target_link_libraries(${TARGET} lib_INEKF_Estimator)
 
+
+# # ============================================================
+# # Python bindings with pybind11
+# # ============================================================
+
+# # Check if pybind11 is available
+# find_package(pybind11 QUIET)
+
+# if(pybind11_FOUND)
+#     message(STATUS "Found pybind11, building Python bindings")
+    
+#     # Create Python module
+#     pybind11_add_module(inekf_estimator src/python_bindings.cpp)
+    
+#     # Link against the main library
+#     target_link_libraries(inekf_estimator PRIVATE lib_INEKF_Estimator)
+    
+#     # Set RPATH for Python module
+#     set_target_properties(inekf_estimator PROPERTIES
+#         BUILD_RPATH "${PINOCCHIO_LIBRARY_DIRS}"
+#         INSTALL_RPATH "${PINOCCHIO_LIBRARY_DIRS}"
+#     )
+    
+#     # Optimization for Python module
+#     target_compile_options(inekf_estimator PRIVATE -O3)
+    
+#     message(STATUS "Python module 'inekf_estimator' will be built")
+#     message(STATUS "After building, copy the .so file to your Python path or PYTHONPATH")
+    
+# else()
+#     message(WARNING "pybind11 not found. Python bindings will not be built.")
+#     message(STATUS "To install pybind11: pip3 install pybind11[global]")
+# endif()
 
 

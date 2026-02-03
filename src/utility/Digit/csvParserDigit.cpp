@@ -7,19 +7,19 @@
  * See CSV_PARSER_USAGE.md for detailed usage documentation
  */
 
-#include "DigitCSVData.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <string>
 #include <vector>
 #include <cstdlib>
+#include "csvParserDigit.hpp"
 
 using namespace std;
 
-DigitCSVData ParseDigitCSV(const std::string& csv_filename) {
+DigitDataStruct ParseDigitCSV(const std::string& csv_filename) {
     
-    DigitCSVData data;
+    DigitDataStruct data;
     std::ifstream file(csv_filename);
     
     if (!file.is_open()) {

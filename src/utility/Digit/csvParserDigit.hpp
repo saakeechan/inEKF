@@ -1,24 +1,14 @@
-/**
- * DigitCSVData.hpp
- * 
- * Standalone header file containing the DigitCSVData structure
- * for parsing Digit robot CSV data files.
- * 
- * This header can be included independently without requiring
- * the full InEKF_estimator.hpp dependencies.
- */
+#ifndef CSV_PARSER_DIGIT_HPP
+#define CSV_PARSER_DIGIT_HPP
 
-#ifndef DIGIT_CSV_DATA_HPP
-#define DIGIT_CSV_DATA_HPP
-
-#include <vector>
 #include <string>
+#include <vector>
 #include <cstddef>
 #include <eigen3/Eigen/Dense>
 
 // Structure to hold parsed Digit robot CSV data
 // Matches all 201 columns from digit_cropped_data.csv
-struct DigitCSVData {
+struct DigitDataStruct{
     std::vector<double> timestamp;
     
     // Base position (columns 1-3)
@@ -180,74 +170,13 @@ struct DigitCSVData {
     
     // Number of rows loaded
     size_t num_rows = 0;
-    
-    // Get active encoder positions for a specific row (22 values matching csv_encoder_indices)
-    Eigen::VectorXd get_active_encoders(size_t row_idx) const {
-        Eigen::VectorXd csv_active_encoders(22);
-        csv_active_encoders[0] = left_hip_roll[row_idx];
-        csv_active_encoders[1] = left_hip_yaw[row_idx];
-        csv_active_encoders[2] = left_hip_pitch[row_idx];
-        csv_active_encoders[3] = left_knee[row_idx];
-        csv_active_encoders[4] = left_shin[row_idx];
-        csv_active_encoders[5] = left_tarsus[row_idx];
-        csv_active_encoders[6] = left_heel_spring[row_idx];
-        csv_active_encoders[7] = left_toe_A[row_idx];
-        csv_active_encoders[8] = left_toe_B[row_idx];
-        csv_active_encoders[9] = left_toe_pitch[row_idx];
-        csv_active_encoders[10] = left_toe_roll[row_idx];
-        csv_active_encoders[11] = right_hip_roll[row_idx];
-        csv_active_encoders[12] = right_hip_yaw[row_idx];
-        csv_active_encoders[13] = right_hip_pitch[row_idx];
-        csv_active_encoders[14] = right_knee[row_idx];
-        csv_active_encoders[15] = right_shin[row_idx];
-        csv_active_encoders[16] = right_tarsus[row_idx];
-        csv_active_encoders[17] = right_heel_spring[row_idx];
-        csv_active_encoders[18] = right_toe_A[row_idx];
-        csv_active_encoders[19] = right_toe_B[row_idx];
-        csv_active_encoders[20] = right_toe_pitch[row_idx];
-        csv_active_encoders[21] = right_toe_roll[row_idx];
-        return csv_active_encoders;
-    }
-    
-    // Get active encoder velocities for a specific row (22 values matching csv_encoderdot_indices)
-    Eigen::VectorXd get_active_encoderdots(size_t row_idx) const {
-        Eigen::VectorXd csv_active_encoderdots(22);
-        csv_active_encoderdots[0] = left_hip_roll_vel[row_idx];
-        csv_active_encoderdots[1] = left_hip_yaw_vel[row_idx];
-        csv_active_encoderdots[2] = left_hip_pitch_vel[row_idx];
-        csv_active_encoderdots[3] = left_knee_vel[row_idx];
-        csv_active_encoderdots[4] = left_shin_vel[row_idx];
-        csv_active_encoderdots[5] = left_tarsus_vel[row_idx];
-        csv_active_encoderdots[6] = left_heel_spring_vel[row_idx];
-        csv_active_encoderdots[7] = left_toe_A_vel[row_idx];
-        csv_active_encoderdots[8] = left_toe_B_vel[row_idx];
-        csv_active_encoderdots[9] = left_toe_pitch_vel[row_idx];
-        csv_active_encoderdots[10] = left_toe_roll_vel[row_idx];
-        csv_active_encoderdots[11] = right_hip_roll_vel[row_idx];
-        csv_active_encoderdots[12] = right_hip_yaw_vel[row_idx];
-        csv_active_encoderdots[13] = right_hip_pitch_vel[row_idx];
-        csv_active_encoderdots[14] = right_knee_vel[row_idx];
-        csv_active_encoderdots[15] = right_shin_vel[row_idx];
-        csv_active_encoderdots[16] = right_tarsus_vel[row_idx];
-        csv_active_encoderdots[17] = right_heel_spring_vel[row_idx];
-        csv_active_encoderdots[18] = right_toe_A_vel[row_idx];
-        csv_active_encoderdots[19] = right_toe_B_vel[row_idx];
-        csv_active_encoderdots[20] = right_toe_pitch_vel[row_idx];
-        csv_active_encoderdots[21] = right_toe_roll_vel[row_idx];
-        return csv_active_encoderdots;
-    }
-    
-    // Get contact state for a specific row (2 values: left foot, right foot)
-    std::vector<bool> get_contact_state(size_t row_idx) const {
-        std::vector<bool> contact_state(2);
-        // Contact data is binary: 1.0 = contact, 0.0 = no contact
-        contact_state[0] = (lfoot_contact[row_idx]);  // Left foot contact
-        contact_state[1] = (rfoot_contact[row_idx]);  // Right foot contact
-        return contact_state;
-    }
 };
 
-// Function declaration for the CSV parser
-DigitCSVData ParseDigitCSV(const std::string& csv_filename);
+/**
+ * Parse CSV file containing Digit robot sensor data
+ * @param csv_filename Path to the CSV file
+ * @return DigitDataStruct structure containing parsed data
+ */
+DigitDataStruct ParseDigitCSV(const std::string& csv_filename);
 
-#endif // DIGIT_CSV_DATA_HPP
+#endif // CSV_PARSER_DIGIT_HPP

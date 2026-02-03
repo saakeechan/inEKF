@@ -11,8 +11,8 @@
 // Include robot model
 #include "../utility/RobotModel.hpp"
 
-// Include TextFile data types - HAVE TO CHANGE TO A UNIVERSAL TEXTFILE FILE READER LATER
-#include "../utility/Digit/DigitCSVData.hpp"
+// Include CSV data parser
+#include "../utility/TextFileDataStruct.hpp"
 
 // ----------------------------
 
@@ -28,7 +28,7 @@ typedef struct _ROBOT_STATES_ // I dont even need this maybe..send_States is not
     Eigen::Vector3d Velocity;
     Eigen::Vector3d Position;
 
-    Eigen::VectorXd d;        // Dynamic size, set at runtime based on num_legs
+    // Eigen::VectorXd d;        // Dynamic size, set at runtime based on num_legs
     Eigen::VectorXd d_v;      // Dynamic size, set at runtime based on num_legs
 
     Eigen::Vector3d Bias_Gyro;
@@ -38,12 +38,12 @@ typedef struct _ROBOT_STATES_ // I dont even need this maybe..send_States is not
     std::vector<bool> Hard_Contact;  // Dynamic size
     std::vector<bool> Slip;          // Dynamic size
 
-    int contact_leg_num; // delete everything below this later
+    // int contact_leg_num; // delete everything below this later
 
-    int state_size;
-    int state_idx;
-    int para_size;
-    int para_idx;
+    // int state_size;
+    // int state_idx;
+    // int para_size;
+    // int para_idx;
 
 }ROBOT_STATES;
 
@@ -60,7 +60,7 @@ public:
 
     void Initialize(double _dt, Eigen::Vector<double,12> cov_val_setting, Eigen::Vector<double, 16> initial_condition, int sliding_window_size = 2); // default sliding window size = 2 (filter)
 
-    void new_measurement(Eigen::Vector<double,30> &Sensor_i, std::vector<bool> &Contact_i);
+    void new_measurement(Eigen::MatrixXd &Sensor_i, std::vector<bool> &Contact_i);
 
     void Propagate_and_Correct();
     std::vector<double> Variable_Contact_Cov(int time);
@@ -70,7 +70,8 @@ public:
 
     void SAVE_onestep(int save_index);
 
-    void Onestep(Eigen::Vector<double,30> &Sensor_i, std::vector<bool> &Contact_i,ROBOT_STATES &state_);
+    void Onestep(Eigen::MatrixXd &Sensor_i, std::vector<bool> &Contact_i, ROBOT_STATES &state_);
+
 
     void writeSavedData(std::string cov_info);
 
@@ -150,7 +151,7 @@ public:
 
     //Parameters
     bool textfile_flag = false;
-    DigitCSVData TextFileData; // TextFile data type - using Digit format for now
+    TextFileDataStruct TextFileData; // Universal TextFile data type - robot agnostic
 
     bool slip_rejection_mode = false;
     double slip_threshold=0.0;

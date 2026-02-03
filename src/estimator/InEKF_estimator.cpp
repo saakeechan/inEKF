@@ -17,7 +17,7 @@
 #include <eigen3/Eigen/Dense>
 #include <vector>
 #include "InEKF_estimator.hpp"
-#include "../utility/Digit/csvParserDigit.hpp"
+#include "../utility/TextFileDataStruct.hpp"
 
 using std::cout;  
 using std::endl;
@@ -25,10 +25,9 @@ using std::endl;
 // This is just reading of the sensor data file and ground truth data file
 
 void InEKFilter::LoadTextFileData(const std::string& textfile_filename) {
-    // Load TextFile data using digit parser
-    TextFileData = ParseDigitCSV(textfile_filename);
+    TextFileData.loadFromParser(textfile_filename);
     std::cout << "Loaded TextFile data with " << TextFileData.timestamp.size() << " rows." << std::endl;
-    textfile_flag  = true;
+    textfile_flag = true;
 }
 
 std::vector<double> InEKFilter::Variable_Contact_Cov(int frame_count){ // time is either 0 or 1 cause sliding window of 2 for filter; fix this for smoother later
@@ -247,7 +246,7 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
 
 
 // Inputs are 30x1 sensor measurement vector and dynamic contact state vector
-void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, std::vector<bool> &Contact_i)
+void InEKFilter::new_measurement(Eigen::MatrixXd &Sensor_i, std::vector<bool> &Contact_i)
 {
     // ========================================================================
     // ROBOT-SPECIFIC ENCODER ASSIGNMENT
@@ -272,11 +271,11 @@ void InEKFilter::new_measurement(Eigen::Matrix<double,30,1> &Sensor_i, std::vect
         IMU_Acc[frame_count] << TextFileData.acc_x[j], TextFileData.acc_y[j], TextFileData.acc_z[j];
 
         // Map TextFile data to encoder vectors using robot-specific indices
-        robot.map_TextFile_to_encoders(TextFileData.get_active_encoders(j), ENCODER[frame_count], "encoder");
-        robot.map_TextFile_to_encoders(TextFileData.get_active_encoderdots(j), ENCODERDOT[frame_count], "encoderdot");
+        robot.map_TextFile_to_encoders(TextFileData.encoders[j], ENCODER[frame_count], "encoder");
+        robot.map_TextFile_to_encoders(TextFileData.encoderdots[j], ENCODERDOT[frame_count], "encoderdot");
 
         // Get contact state from TextFile
-        CONTACT_t[frame_count] = TextFileData.get_contact_state(j);
+        CONTACT_t[frame_count] = TextFileData.contact_state[j];
 
 
         imu_measurement << IMU_Gyro[frame_count], IMU_Acc[frame_count]; // Consolidate IMU measurement because propagate function needs it
@@ -423,40 +422,41 @@ void InEKFilter::Propagate_and_Correct()
 }
 
 
-// // void InEKFilter::send_states(ROBOT_STATES &state_){ // don't even know if I need this function
+void InEKFilter::send_states(ROBOT_STATES &state_){ 
 
 
-//     //Sending Estimated States----------------------------------------------------------------------------
+    //Sending Estimated States----------------------------------------------------------------------------
 
-//     Eigen::Vector3d W_pos_imu2bd = filter.getState().getRotation() * robot.IMU2BD;
+    Eigen::Vector3d W_pos_imu2bd = filter.getState().getRotation() * robot.IMU2BD;
 
-//     state_.Position = filter.getState().getPosition() + W_pos_imu2bd;
+    state_.Position = filter.getState().getPosition() + W_pos_imu2bd;
 
-//     Eigen::Vector3d w_gyro;
-//     w_gyro = filter.getState().getRotation()*(IMU_Gyro[1] - filter.getState().getGyroscopeBias());
-
-
-//     state_.Velocity = filter.getState().getVelocity() + w_gyro.cross(W_pos_imu2bd);
-//     state_.Bias_Gyro = filter.getState().getGyroscopeBias();
-//     state_.Bias_Acc = filter.getState().getAccelerometerBias();
-//     state_.Rotation= filter.getState().getRotation();
+    Eigen::Vector3d w_gyro;
+    w_gyro = filter.getState().getRotation()*(IMU_Gyro[1] - filter.getState().getGyroscopeBias());
 
 
-//     if(frame_count == 0)
-//     {
-//         state_.Hard_Contact = HARD_CONTACT_t[frame_count];
-//         state_.Contact = CONTACT_t[frame_count];
-//         state_.Slip = SLIP_t[frame_count];
-//         state_.d_v = d_v[frame_count];
-//     }
-//     else
-//     {
-//         state_.Hard_Contact = HARD_CONTACT_t[frame_count-1];
-//         state_.Contact = CONTACT_t[frame_count-1];
-//         state_.Slip = SLIP_t[frame_count-1];
-//         state_.d_v = d_v[frame_count-1]; // create a small class/struct called contact states to send all 3 contact, slip, hard contact together
-//     }
-// }
+    state_.Velocity = filter.getState().getVelocity() + w_gyro.cross(W_pos_imu2bd);
+    state_.Bias_Gyro = filter.getState().getGyroscopeBias();
+    state_.Bias_Acc = filter.getState().getAccelerometerBias();
+    state_.Rotation= filter.getState().getRotation();
+
+
+    if(frame_count == 0)
+    {
+        state_.Hard_Contact = HARD_CONTACT_t[frame_count];
+        state_.Contact = CONTACT_t[frame_count];
+        state_.Slip = SLIP_t[frame_count];
+        state_.d_v = d_v[frame_count];
+    }
+    else
+    {
+        state_.Hard_Contact = HARD_CONTACT_t[frame_count-1];
+        state_.Contact = CONTACT_t[frame_count-1];
+        state_.Slip = SLIP_t[frame_count-1];
+        state_.d_v = d_v[frame_count-1]; // create a small class/struct called contact states to send all 3 contact, slip, hard contact together
+        // Why are we subtracting 1 frame?
+    }
+}
 
 
 
@@ -523,7 +523,7 @@ void InEKFilter::SAVE_onestep(int save_index){
 
 
             // Save contact states
-            std::vector<bool> temp_contact = TextFileData.get_contact_state(j);
+            std::vector<bool> temp_contact = TextFileData.contact_state[j];
             
             for(int i=0;i<robot.num_legs;i++)
             {
@@ -646,17 +646,23 @@ void InEKFilter::writeSavedData(std::string cov_info){
 
 
 // Inputs are 30x1 sensor measurement vector and 4x1 contact state vector
-void InEKFilter::Onestep(Eigen::Matrix<double,30,1> &Sensor_i, std::vector<bool> &Contact_i,ROBOT_STATES &state_){
+void InEKFilter::Onestep(Eigen::MatrixXd &Sensor_i, std::vector<bool> &Contact_i,ROBOT_STATES &state_){
 
     new_measurement(Sensor_i, Contact_i); // read in new measurement and calculate rotation, velocity updates and slip states
 
 
     Propagate_and_Correct();
 
-    // send_states(state_); Can delete this function later if not needed
 
+    if (!textfile_flag)
+    {
+        send_states(state_); // send estimated states
+    }
+    else 
+    {
+        SAVE_onestep(time_count); // save estimated and true states to SAVE_MATRIX
+    }
 
-    SAVE_onestep(time_count);
 
     if(filter.getState().getVelocity().norm()>10 && dt!=0){
        cout<<"Diverged!! from time "<<time_count<<endl;

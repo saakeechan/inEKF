@@ -12,10 +12,6 @@ RobotModel::RobotModel() {
     // Initialize default values
     IMU2BD.setZero();
     
-    // // Will be set after loading robot model
-    // encoder_size = 0;
-    // encoderdot_size = 0;
-    
     // Initialize covariance constants with defaults
     cov_gyro_const = 1e-4;
     cov_acc_const = 1e-2;
@@ -29,12 +25,6 @@ RobotModel::RobotModel() {
     cov_prior_position_const = 1e-3;
     cov_prior_bias_gyro_const = 1e-6;
     cov_prior_bias_acc_const = 1e-6;
-    
-    // // Initialize contact parameters - Look later and judge whether to keep them here or move them somewhere else
-    // variable_contact_cov_mode = false;
-    // cov_amplifier = 0.5;
-    // slip_rejection_mode = false;
-    // slip_threshold = 0.02;
 }
 
 RobotModel::~RobotModel() {
@@ -216,6 +206,8 @@ void RobotModel::load_robot_model(const std::string& xml_path, const std::vector
             std::cout << "]" << std::endl;
         } else {
             std::cerr << "Warning: No contact frame IDs provided" << std::endl;
+            std::exit(EXIT_FAILURE); 
+
         }
         
     } catch (const std::exception& e) {
@@ -277,7 +269,7 @@ void RobotModel::SetCovariances(Eigen::Matrix<double,12,1> cov_val_setting) {
 void RobotModel::Forward_Kinematics(const Eigen::VectorXd &q_leg, const Eigen::VectorXd &q_dot_leg) const {
     if (foot_frame_ids.empty()) {
         std::cerr << "Error: Pinocchio not initialized properly" << std::endl;
-        return;
+        std::exit(EXIT_FAILURE);
     }
     
     // Compute forward kinematics - updates all joint and frame placements
@@ -290,13 +282,13 @@ void RobotModel::Forward_Kinematics(const Eigen::VectorXd &q_leg, const Eigen::V
 Eigen::Vector3d RobotModel::get_foot_position(int i_leg) const {
     if (foot_frame_ids.empty()) {
         std::cerr << "Error: Pinocchio not initialized properly" << std::endl;
-        return Eigen::Vector3d::Zero();
+        std::exit(EXIT_FAILURE);
     }
     
     if (i_leg < 1 || i_leg > static_cast<int>(foot_frame_ids.size())) {
         std::cerr << "Error: Invalid leg index " << i_leg << ". Must be between 1 and " 
                   << foot_frame_ids.size() << std::endl;
-        return Eigen::Vector3d::Zero();
+        std::exit(EXIT_FAILURE);
     }
     
     // Get foot position from the already-computed forward kinematics
@@ -309,13 +301,13 @@ Eigen::Vector3d RobotModel::get_foot_position(int i_leg) const {
 Eigen::MatrixXd RobotModel::get_foot_jacobian(int i_leg) const {
     if (foot_frame_ids.empty()) {
         std::cerr << "Error: Pinocchio not initialized properly" << std::endl;
-        return Eigen::MatrixXd::Zero(3, pin_model.nv);
+        std::exit(EXIT_FAILURE);
     }
     
     if (i_leg < 1 || i_leg > static_cast<int>(foot_frame_ids.size())) {
         std::cerr << "Error: Invalid leg index " << i_leg << ". Must be between 1 and " 
                   << foot_frame_ids.size() << std::endl;
-        return Eigen::MatrixXd::Zero(3, pin_model.nv);
+        std::exit(EXIT_FAILURE);
     }
     
     // Compute frame Jacobian in World frame
@@ -336,13 +328,13 @@ Eigen::MatrixXd RobotModel::get_foot_jacobian(int i_leg) const {
 Eigen::Vector3d RobotModel::get_foot_velocity(int i_leg) const {
     if (foot_frame_ids.empty()) {
         std::cerr << "Error: Pinocchio not initialized properly" << std::endl;
-        return Eigen::Vector3d::Zero();
+        std::exit(EXIT_FAILURE);
     }
     
     if (i_leg < 1 || i_leg > static_cast<int>(foot_frame_ids.size())) {
         std::cerr << "Error: Invalid leg index " << i_leg << ". Must be between 1 and " 
                   << foot_frame_ids.size() << std::endl;
-        return Eigen::Vector3d::Zero();
+        std::exit(EXIT_FAILURE);
     }
     
     // Compute frame velocity in World frame
@@ -364,12 +356,12 @@ void RobotModel::compute_joint_jacobians() const {
     pinocchio::computeJointJacobians(pin_model, const_cast<pinocchio::Data&>(pin_data));
 }
 
-void RobotModel::map_TextFile_to_encoders(const Eigen::VectorXd& TextFile_data, Eigen::VectorXd& output_vector, const std::string& encoder_type) const {
+void RobotModel::map_TextFile_to_encoders(const std::vector<double>& TextFile_data, Eigen::VectorXd& output_vector, const std::string& encoder_type) const {
 
     // Validate encoder_type parameter
     if (encoder_type != "encoder" && encoder_type != "encoderdot") {
         std::cerr << "Error: Invalid encoder_type '" << encoder_type << "'. Must be 'encoder' or 'encoderdot'" << std::endl;
-        return;
+        std::exit(EXIT_FAILURE);
     }
     
     // Select appropriate indices based on encoder_type
@@ -379,30 +371,35 @@ void RobotModel::map_TextFile_to_encoders(const Eigen::VectorXd& TextFile_data, 
     // Check if indices are configured
     if (indices.empty()) {
         std::cerr << "Error: " << type_name << " indices not configured in YAML file" << std::endl;
-        return;
+        std::exit(EXIT_FAILURE);
     }
     
-    // Check if TextFile_data size matches the number of active indices
-    if (TextFile_data.size() != static_cast<int>(indices.size())) {
-        std::cerr << "Error: TextFile data size mismatch for " << type_name << ". Expected " << indices.size()
-                  << " values, got " << TextFile_data.size() << std::endl;
-        return;
+    // Check if TextFile_data size exactly matches the number of indices
+    if (TextFile_data.size() != indices.size()) {
+        std::cerr << "FATAL ERROR: TextFile data size mismatch for " << type_name << "." << std::endl;
+        std::cerr << "  Expected exactly " << indices.size() << " values, got " << TextFile_data.size() << std::endl;
+        std::cerr << "  This is a configuration error - check your TextFileDataStruct and YAML indices." << std::endl;
+        std::exit(EXIT_FAILURE);
     }
     
     // Initialize output_vector to zero (all non-mapped indices will remain zero)
     output_vector.setZero();
     
     // Map TextFile data to output_vector using the index mapping
+    // indices[i] tells us WHERE to put the data in output_vector
+    // We take data from position i in TextFile_data
     for (size_t i = 0; i < indices.size(); ++i) {
-        int idx = indices[i];
+        int output_idx = indices[i];
         
-        // Validate index bounds against output vector size
-        if (idx < 0 || idx >= output_vector.size()) {
-            std::cerr << "Error: Invalid " << encoder_type << " index " << idx << " at position " << i 
-                      << " for output vector of size " << output_vector.size() << std::endl;
-            return;
+        // Validate output index bounds
+        if (output_idx < 0 || output_idx >= output_vector.size()) {
+            std::cerr << "FATAL ERROR: Invalid " << encoder_type << " mapping index " << output_idx 
+                      << " at position " << i << " for output vector of size " << output_vector.size() << std::endl;
+            std::exit(EXIT_FAILURE);
         }
-        output_vector(idx) = TextFile_data(i);
+        
+        // Map: TextFile_data[i] -> output_vector[indices[i]]
+        output_vector(output_idx) = TextFile_data[i];
     }
 }
 

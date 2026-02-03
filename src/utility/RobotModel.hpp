@@ -196,7 +196,7 @@ public:
      * @param output_vector Output encoder vector - must be pre-allocated
      * @param encoder_type Type of encoder data: "encoder" for positions or "encoderdot" for velocities
      */
-    void map_TextFile_to_encoders(const Eigen::VectorXd& TextFile_data, Eigen::VectorXd& output_vector, const std::string& encoder_type) const;
+    void map_TextFile_to_encoders(const std::vector<double>& TextFile_data, Eigen::VectorXd& output_vector, const std::string& encoder_type) const;
 
     /**
      * @brief Extract active encoder columns from full Jacobian matrix
