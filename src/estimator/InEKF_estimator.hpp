@@ -20,8 +20,7 @@ using namespace Eigen;
 using namespace std;
 
 // Robot State Type Definition - All variables needed for state representation
-typedef struct _ROBOT_STATES_ // I dont even need this maybe..send_States is not doing anything
-{
+typedef struct _ROBOT_STATES_ {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
     Eigen::Matrix3d Rotation;
@@ -51,6 +50,13 @@ class InEKFilter {
 
 
 public:
+    // Constructor - automatically initializes from YAML config
+    InEKFilter() = default;  // Default constructor (no initialization)
+    InEKFilter(const std::string& initialization_config_path, const std::string& robot_config_path) {
+        load_robot_config(robot_config_path);  // Load robot config FIRST
+        InitializeFromYAML(initialization_config_path);  // Then initialize
+    }
+    
     //functions
     void load_robot_config(const std::string& config_path) { 
         robot.load_config(config_path); 
@@ -59,8 +65,11 @@ public:
     void LoadTextFileData(const std::string& TextFile_filename);
 
     void Initialize(double _dt, Eigen::Vector<double,12> cov_val_setting, Eigen::Vector<double, 16> initial_condition, int sliding_window_size = 2); // default sliding window size = 2 (filter)
+    
+    void InitializeFromYAML(const std::string& config_path); // Initialize from YAML configuration file
 
     void new_measurement(Eigen::MatrixXd &Sensor_i, std::vector<bool> &Contact_i);
+    void new_measurement();  // No-argument version for TextFile mode
 
     void Propagate_and_Correct();
     std::vector<double> Variable_Contact_Cov(int time);
@@ -70,14 +79,12 @@ public:
 
     void SAVE_onestep(int save_index);
 
-    void Onestep(Eigen::MatrixXd &Sensor_i, std::vector<bool> &Contact_i, ROBOT_STATES &state_);
+    void Onestep(Eigen::MatrixXd &Sensor_i, std::vector<bool> &Contact_i);
+    void Onestep();  // No-argument version for TextFile mode
 
-
-    void writeSavedData(std::string cov_info);
-
+    void writeSavedData();
 
     int TextFile_Skip_Data = 0; // default (change in main.cpp if you have trash data)
-
 
     //Necessary classes & variables
     RobotModel robot; // This is where robot model is defined
@@ -119,10 +126,11 @@ public:
     std::string estimator_info;
     std::string file_info;
     std::string initial_info;
+    std::string cov_info;
 
     const static int SAVEMAXDATA = 100;
     const static int SAVEMAXCNT = 140000;
-    double SAVE_MATRIX [SAVEMAXDATA][SAVEMAXCNT];
+    std::vector<std::vector<double>> SAVE_MATRIX;  // Changed to vector to avoid stack overflow
     int save_index = 0;
 
     // File save indices - computed after robot config is loaded
@@ -152,6 +160,7 @@ public:
     //Parameters
     bool textfile_flag = false;
     TextFileDataStruct TextFileData; // Universal TextFile data type - robot agnostic
+    int time_length = 0;  // Total number of data points to process (from YAML)
 
     bool slip_rejection_mode = false;
     double slip_threshold=0.0;

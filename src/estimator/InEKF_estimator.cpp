@@ -16,6 +16,7 @@
 #include <string>
 #include <eigen3/Eigen/Dense>
 #include <vector>
+#include <yaml-cpp/yaml.h>
 #include "InEKF_estimator.hpp"
 #include "../utility/TextFileDataStruct.hpp"
 
@@ -81,9 +82,6 @@ std::vector<double> InEKFilter::Variable_Contact_Cov(int frame_count){ // time i
 }
 
 
-
-
-
 void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_setting, Eigen::Matrix<double, 16, 1> initial_condition, int sliding_window_size_arg)
 {
 
@@ -98,6 +96,12 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
     int SLIDING_WINDOW_SIZE = sliding_window_size_arg;
     std::cout << "Sliding window size set to: " << SLIDING_WINDOW_SIZE << std::endl;
     dt = dt_arg;
+    
+    // Initialize SAVE_MATRIX (moved to heap to avoid stack overflow)
+    SAVE_MATRIX.resize(SAVEMAXDATA);
+    for (int i = 0; i < SAVEMAXDATA; i++) {
+        SAVE_MATRIX[i].resize(SAVEMAXCNT, 0.0);
+    }
     
     // Resize all sliding window vectors
     Position_s.resize(SLIDING_WINDOW_SIZE);
@@ -153,7 +157,6 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
                         + BasicFunctions_Estimator::to_string_n_figures_under_0(initial_condition[6], 2) + "_"+ BasicFunctions_Estimator::to_string_n_figures_under_0(initial_condition[7], 2) + "_"
                         + BasicFunctions_Estimator::to_string_n_figures_under_0(initial_condition[8], 2) + "_"+ BasicFunctions_Estimator::to_string_n_figures_under_0(initial_condition[9], 2) + "_"
                         + BasicFunctions_Estimator::to_string_n_figures_under_0(initial_condition[10], 2) + "_"+ BasicFunctions_Estimator::to_string_n_figures_under_0(initial_condition[11], 2) + ")";
-
 
     //covariance setting, everything is diagonal and constant for each element
     // 15x15 covariance matrix for the state [R, v, p, bg, ba]
@@ -244,8 +247,94 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
    // Theta is bias of sensors 6x1 vector
 }
 
+void InEKFilter::InitializeFromYAML(const std::string& config_path) {
+    // Load YAML configuration
+    YAML::Node config = YAML::LoadFile(config_path);
+    
+    // // Load robot configuration path (only if not already loaded)
+    // if (robot.num_legs == 0) {  // Check if robot config already loaded
+    //     std::string robot_config_path = config["robot_config_path"].as<std::string>();
+    //     load_robot_config(robot_config_path);
+    // }
+    
+    // Load estimator parameters
+    int sliding_window_size = config["sliding_window_size"].as<int>();
+    double dt_val = config["dt"].as<double>();
+    
+    // Load covariance exponents
+    auto cov_exp = config["covariance_exponents"];
+    double gyro_exp = cov_exp["gyro"].as<double>();
+    double acc_exp = cov_exp["acc"].as<double>();
+    double slip_exp = cov_exp["slip"].as<double>();
+    double contact_exp = cov_exp["contact"].as<double>();
+    double encoder_exp = cov_exp["encoder"].as<double>();
+    double bg_exp = cov_exp["bias_gyro"].as<double>();
+    double ba_exp = cov_exp["bias_acc"].as<double>();
+    double pri_ori_exp = cov_exp["prior_orientation"].as<double>();
+    double pri_vel_exp = cov_exp["prior_velocity"].as<double>();
+    double pri_pos_exp = cov_exp["prior_position"].as<double>();
+    double pri_bg_exp = cov_exp["prior_bias_gyro"].as<double>();
+    double pri_ba_exp = cov_exp["prior_bias_acc"].as<double>();
+    
+    // Build estimator covariances vector
+    Eigen::Vector<double, 12> cov_val_setting;
+    cov_val_setting << std::pow(10, gyro_exp), std::pow(10, acc_exp), 
+                       std::pow(10, slip_exp), std::pow(10, contact_exp), 
+                       std::pow(10, encoder_exp),
+                       std::pow(10, bg_exp), std::pow(10, ba_exp),
+                       std::pow(10, pri_ori_exp), std::pow(10, pri_vel_exp), 
+                       std::pow(10, pri_pos_exp),
+                       std::pow(10, pri_bg_exp), std::pow(10, pri_ba_exp);
 
-// Inputs are 30x1 sensor measurement vector and dynamic contact state vector
+    cov_info = "(" + BasicFunctions_Estimator::to_string_n_signficant_figures(gyro_exp, 2) +
+               BasicFunctions_Estimator::to_string_n_signficant_figures(acc_exp, 2) +
+               BasicFunctions_Estimator::to_string_n_signficant_figures(slip_exp, 2) +
+               BasicFunctions_Estimator::to_string_n_signficant_figures(contact_exp, 2) +
+               BasicFunctions_Estimator::to_string_n_signficant_figures(encoder_exp, 2)
+               + " " + BasicFunctions_Estimator::to_string_n_signficant_figures(bg_exp, 2)
+               + " " + BasicFunctions_Estimator::to_string_n_signficant_figures(pri_ori_exp, 2) +
+               BasicFunctions_Estimator::to_string_n_signficant_figures(pri_bg_exp, 2) + ")";
+
+
+    
+    // Load initial condition
+    auto ic = config["initial_condition"];
+    auto pos = ic["position"].as<std::vector<double>>();
+    auto ori = ic["orientation"].as<std::vector<double>>();
+    auto vel = ic["velocity"].as<std::vector<double>>();
+    auto bg = ic["bias_gyro"].as<std::vector<double>>();
+    auto ba = ic["bias_acc"].as<std::vector<double>>();
+    
+    Eigen::Vector<double, 16> initial_condition;
+    initial_condition << pos[0], pos[1], pos[2],
+                         ori[0], ori[1], ori[2], ori[3],
+                         vel[0], vel[1], vel[2],
+                         bg[0], bg[1], bg[2],
+                         ba[0], ba[1], ba[2];
+    
+    // Load slip rejection settings
+    slip_rejection_mode = config["slip_rejection"]["enabled"].as<bool>();
+    slip_threshold = config["slip_rejection"]["threshold"].as<double>();
+    
+    // Load variable contact covariance settings
+    variable_contact_cov_mode = config["variable_contact_covariance"]["enabled"].as<bool>();
+    cov_amplifier = config["variable_contact_covariance"]["amplifier"].as<double>();
+    
+    // Load TextFile settings if present
+    if (config["textfile"]) {
+        textfile_flag = config["textfile"]["enabled"].as<bool>();
+        if (textfile_flag) {
+            std::string file_name = config["textfile"]["file_name"].as<std::string>();
+            LoadTextFileData(file_name);
+            TextFile_Skip_Data = config["textfile"]["starting_point"].as<int>();
+            time_length = config["textfile"]["time_length"].as<int>();
+        }
+    }
+    
+    // Call the existing Initialize function with loaded parameters
+    Initialize(dt_val, cov_val_setting, initial_condition, sliding_window_size);
+}
+
 void InEKFilter::new_measurement(Eigen::MatrixXd &Sensor_i, std::vector<bool> &Contact_i)
 {
     // ========================================================================
@@ -260,28 +349,6 @@ void InEKFilter::new_measurement(Eigen::MatrixXd &Sensor_i, std::vector<bool> &C
     // ========================================================================
 
 
-    //sensor measurement reading
-    if(textfile_flag) // Read from TextFile file
-    {
-
-        int j = time_count + TextFile_Skip_Data; // To skip trash data in TextFile at the beginning
-
-        // IMU data from TextFile (gyro_x, gyro_y, gyro_z, acc_x, acc_y, acc_z)
-        IMU_Gyro[frame_count] << TextFileData.gyro_x[j], TextFileData.gyro_y[j], TextFileData.gyro_z[j];
-        IMU_Acc[frame_count] << TextFileData.acc_x[j], TextFileData.acc_y[j], TextFileData.acc_z[j];
-
-        // Map TextFile data to encoder vectors using robot-specific indices
-        robot.map_TextFile_to_encoders(TextFileData.encoders[j], ENCODER[frame_count], "encoder");
-        robot.map_TextFile_to_encoders(TextFileData.encoderdots[j], ENCODERDOT[frame_count], "encoderdot");
-
-        // Get contact state from TextFile
-        CONTACT_t[frame_count] = TextFileData.contact_state[j];
-
-
-        imu_measurement << IMU_Gyro[frame_count], IMU_Acc[frame_count]; // Consolidate IMU measurement because propagate function needs it
-
-    }else{ // Read from Sensors
-
         IMU_Gyro[frame_count] = Sensor_i.block(0,0,3,1);
         IMU_Acc[frame_count] = Sensor_i.block(3,0,3,1);
 
@@ -295,53 +362,53 @@ void InEKFilter::new_measurement(Eigen::MatrixXd &Sensor_i, std::vector<bool> &C
         
         imu_measurement <<IMU_Gyro[frame_count], IMU_Acc[frame_count];
 
-    }
 
     // Pinnocchio FK and Jacobians - compute forward kinematics and joint Jacobians as soon as you get new measurement
     robot.Forward_Kinematics(ENCODER[frame_count], ENCODERDOT[frame_count]);
     robot.compute_joint_jacobians();
 
-   // // propagate-----------------------------------------------------------------------------
+}
 
-    // // Slip Rejection-------------------------------------------------------------------------------
 
-    // if ( frame_count==0 ){
 
-    //     for (int k=0; k<robot.num_legs; k++){
-    //         SLIP_t[0][k] = false; // Assume no legs are slipping at first frame
-    //         HARD_CONTACT_t[0][k]  = CONTACT_t[0][k]-SLIP_t[0][k]; // Actual hard contacts are contact - slip - [true - false = true, true - true = false]
-    //     }
+void InEKFilter::new_measurement()
+{
+    // No-argument version: only for TextFile mode
+    if(!textfile_flag) {
+        std::cerr << "Error: new_measurement() with no arguments requires textfile_flag == true" << std::endl;
+        return;
+    }
+    
+    int j = time_count + TextFile_Skip_Data;
+    
+    // IMU data from TextFile
+    IMU_Gyro[frame_count] << TextFileData.gyro_x[j], TextFileData.gyro_y[j], TextFileData.gyro_z[j];
+    IMU_Acc[frame_count] << TextFileData.acc_x[j], TextFileData.acc_y[j], TextFileData.acc_z[j];
 
-    // }else{
-
-    //     Eigen::Vector3d phi = (imu_measurement.block(0,0, 3,1)-filter.getState().getGyroscopeBias())*dt; // (angular increment - gyro bias)(*dt)
-    //     Rotation_s[frame_count] = filter.getState().getRotation() * BasicFunctions_Estimator::Expm_Vec(phi); // Rotation update with gyro bias correction
-    //     JacobiSVD<Matrix3d> svd(Rotation_s[frame_count], ComputeFullU|ComputeFullV); // Cause we're doing dt, we need to re-orthogonalize the rotation matrix back to its manifold
-    //     Rotation_s[frame_count] = svd.matrixU() * svd.matrixV().transpose();
-
-    //     Velocity_s[frame_count] = filter.getState().getVelocity() + (Rotation_s[frame_count]*(imu_measurement.block(3,0, 3,1)-filter.getState().getAccelerometerBias()) + gravity)*dt;
-    //     // Velocity update with accel bias correction and gravity
-
-    // }
-
-    //     for (int k=0; k<robot.num_legs; k++) {
-
-    //         d_v[frame_count].block(3*k,0,3,1) = Velocity_s[frame_count]
-    //                                     + Rotation_s[frame_count]*robot.get_foot_velocity(k+1)
-    //                                     + Rotation_s[frame_count]*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[frame_count] - Bias_Gyro_s[frame_count])*robot.get_foot_position(k+1);
-
-    //         // Initialize slip to false, then check for slip condition
-    //         // SLIP_t[frame_count][k] = false;
-    //         HARD_CONTACT_t[frame_count][k]  = CONTACT_t[frame_count][k];
-    //         if ((slip_rejection_mode == true) && (CONTACT_t[frame_count][k] == true) &&
-    //             (d_v[frame_count].block(3 * k, 0, 3, 1).norm() > slip_threshold)) {
-    //             SLIP_t[frame_count][k] = true;
-    //         }
-
-    //         // Remove slipping legs from contact list
-    //         // HARD_CONTACT_t[frame_count][k] = CONTACT_t[frame_count][k] - SLIP_t[frame_count][k];
-    //     }
-
+    // ========================================================================
+    // ROBOT-SPECIFIC ENCODER ASSIGNMENT
+    // This section assigns encoder and encoder velocity data from TextFile to 
+    // the appropriate indices for Pinocchio FK.
+    // 
+    // When creating a new robot model:
+    // 1. Implement assign_encoder_from_TextFile() in your Robot_Model_XXX class
+    // 2. Implement assign_encoderdot_from_TextFile() in your Robot_Model_XXX class
+    // 3. These methods should map TextFile data to correct joint indices per your URDF/MJCF
+    // ========================================================================
+    
+    // Map TextFile data to encoder vectors
+    robot.map_TextFile_to_encoders(TextFileData.encoders[j], ENCODER[frame_count], "encoder");
+    robot.map_TextFile_to_encoders(TextFileData.encoderdots[j], ENCODERDOT[frame_count], "encoderdot");
+    
+    // Get contact state from TextFile
+    CONTACT_t[frame_count] = TextFileData.contact_state[j];
+    
+    // Consolidate IMU measurement
+    imu_measurement << IMU_Gyro[frame_count], IMU_Acc[frame_count];
+    
+    // Compute forward kinematics and Jacobians
+    robot.Forward_Kinematics(ENCODER[frame_count], ENCODERDOT[frame_count]);
+    robot.compute_joint_jacobians();
 }
 
 void InEKFilter::Propagate_and_Correct()
@@ -591,7 +658,7 @@ void InEKFilter::sliding_window(){
 
 }
 
-void InEKFilter::writeSavedData(std::string cov_info){
+void InEKFilter::writeSavedData(){
 
     // Build filename efficiently
     std::string filename = "../result/pinnochio_inekf/" + estimator_info + "_" + cov_info + "_" + 
@@ -643,41 +710,22 @@ void InEKFilter::writeSavedData(std::string cov_info){
 
 
 
-
-
-// Inputs are 30x1 sensor measurement vector and 4x1 contact state vector
-void InEKFilter::Onestep(Eigen::MatrixXd &Sensor_i, std::vector<bool> &Contact_i,ROBOT_STATES &state_){
+void InEKFilter::Onestep(Eigen::MatrixXd &Sensor_i, std::vector<bool> &Contact_i){
 
     new_measurement(Sensor_i, Contact_i); // read in new measurement and calculate rotation, velocity updates and slip states
 
 
     Propagate_and_Correct();
 
-
-    if (!textfile_flag)
-    {
-        send_states(state_); // send estimated states
-    }
-    else 
-    {
-        SAVE_onestep(time_count); // save estimated and true states to SAVE_MATRIX
-    }
-
-
     if(filter.getState().getVelocity().norm()>10 && dt!=0){
        cout<<"Diverged!! from time "<<time_count<<endl;
         dt = 0;
     }
 
-
     // Keep frame_count in [0, 1] range for sliding window
     frame_count++;
     if(frame_count > 1) {
         frame_count = 1;
-    }
-    
-    if(textfile_flag) {
-        time_count++;
     }
 
     // Frame 1 information is now moved to frame 0
@@ -685,4 +733,32 @@ void InEKFilter::Onestep(Eigen::MatrixXd &Sensor_i, std::vector<bool> &Contact_i
 
 
 }
+
+void InEKFilter::Onestep(){
+    // No-argument version: uses TextFile data directly (requires textfile_flag == true)
+
+    
+    new_measurement(); // reads from TextFile when textfile_flag is true
+    Propagate_and_Correct();
+
+    SAVE_onestep(time_count); // save estimated and true states to SAVE_MATRIX
+
+    
+    if(filter.getState().getVelocity().norm()>10 && dt!=0){
+       cout<<"Diverged!! from time "<<time_count<<endl;
+        dt = 0;
+    }
+    
+    // Keep frame_count in [0, 1] range for sliding window
+    frame_count++;
+    if(frame_count > 1) {
+        frame_count = 1;
+    }
+
+    time_count++;
+    
+    // Frame 1 information is now moved to frame 0
+    sliding_window();
+}
+
 

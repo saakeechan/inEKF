@@ -1,0 +1,54 @@
+    # ------------------------------------------------------------
+# USER CONFIGURABLE PARAMETERS
+# ------------------------------------------------------------
+
+# Robot configuration
+robot_config_path: "../config/digit_config.yaml"
+
+# Estimator parameters
+sliding_window_size: 2
+dt: 0.005
+
+# TextFile data file configuration
+textfile:
+  enabled: true  # Set to true to use TextFile data, false to use sensor data
+  file_name: "../digit_cropped_data.csv"
+  time_length: 976  # Total number of data points to process from the TextFile
+  starting_point: 0  # Number of initial data points to skip in TextFile
+
+# Slip rejection configuration
+slip_rejection:
+  enabled: true  # Slip rejection mode
+  threshold: 0.3  # Slip threshold in m/s
+
+# Variable contact covariance configuration
+variable_contact_covariance:
+  enabled: false  # Variable contact covariance mode
+  amplifier: 5.0  # Multiplied to contact covariance when VCC is enabled
+
+# Estimator Covariances (exponents for 10^x)
+# Order: gyro, acc, slip, contact, encoder, bias_gyro, bias_acc,
+#        prior_ori, prior_vel, prior_pos, prior_bias_gyro, prior_bias_acc
+covariance_exponents:
+  gyro: -5
+  acc: -1
+  slip: -1
+  contact: -4
+  encoder: -8
+  bias_gyro: -10
+  bias_acc: -7
+  prior_orientation: -10
+  prior_velocity: -10
+  prior_position: -10
+  prior_bias_gyro: -10
+  prior_bias_acc: -10
+
+# Initial condition (16-dimensional state vector)
+initial_condition:
+  position: [0.0, 0.0, 0.0]  # Px, Py, Pz
+  orientation: [0.0, 0.0, 0.0, 0.0]  # Quaternion or Euler (indices 3,4,5 for roll,pitch,yaw)
+  velocity: [0.0, 0.0, 0.0]  # Vx, Vy, Vz
+  bias_gyro: [0.0, 0.0, 0.0]  # bgx, bgy, bgz
+  bias_acc: [0.0, 0.0, 0.0]  # bax, bay, baz
+
+# ------------------------------------------------------------
