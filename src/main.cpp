@@ -19,15 +19,22 @@ using std::endl;
 /// @return 
 int main() {
 
-    std::cout << "Initializing InEKF Estimator..." << std::endl;
+
+    // If this is your first time running a new robot, uncomment the line below
+    //  to extract parameters and use that to fill in the yaml files
     
-    // Declare estimator outside try block so it stays in scope
-    InEKFilter estimator_IEKF("../config/initialization_config.yaml", "../config/digit_config.yaml");
+    // InEKFilter::getParameters("/home/saakee/Research/Saaketh_INEKF/src/utility/G1/g1_29dof_IMUShifted.urdf", "g1");
+    // return 0;
+
+
+    // InEKFilter::getParameters("../digit_mujoco-main/src/digit_mujoco/models/flat/digit-v3-flat.xml", "Digit");
+    // return 0;
+
+    InEKFilter estimator_IEKF("../config/initialization_config.yaml", "../config/G1_config.yaml");
 
     std::vector<double> step_times;
 
-
-        for (int time = 0; time < estimator_IEKF.time_length; time++) {
+        for (int time = 0; time < (estimator_IEKF.time_length - estimator_IEKF.TextFile_Skip_Data); time++) {
             auto start = std::chrono::high_resolution_clock::now();
 
             estimator_IEKF.Onestep();
@@ -35,6 +42,7 @@ int main() {
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
             step_times.push_back(elapsed.count());
+
         }
         
         // Compute and print timing statistics

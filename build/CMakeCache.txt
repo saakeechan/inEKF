@@ -213,18 +213,6 @@ PKG_CONFIG_ARGN:STRING=
 //pkg-config executable
 PKG_CONFIG_EXECUTABLE:FILEPATH=/usr/bin/pkg-config
 
-//Python version to use for compiling modules
-PYBIND11_PYTHON_VERSION:STRING=
-
-//Path to a program.
-PYTHON_EXECUTABLE:FILEPATH=/usr/bin/python3.10
-
-//Path to a library.
-PYTHON_LIBRARY:FILEPATH=/usr/lib/x86_64-linux-gnu/libpython3.10.so
-
-//Dependencies for the target
-inekf_estimator_LIB_DEPENDS:STATIC=general;lib_INEKF_Estimator;
-
 //Dependencies for the target
 lib_INEKF_Estimator_LIB_DEPENDS:STATIC=general;pinocchio_default;general;pinocchio_parsers;general;pinocchio_casadi;general;boost_filesystem;general;boost_serialization;general;boost_system;general;urdfdom_sensor;general;urdfdom_model_state;general;urdfdom_model;general;urdfdom_world;general;console_bridge;general;casadi;general;yaml-cpp;
 
@@ -263,9 +251,6 @@ pkgcfg_lib_PINOCCHIO_urdfdom_sensor:FILEPATH=/usr/lib/x86_64-linux-gnu/liburdfdo
 
 //Path to a library.
 pkgcfg_lib_PINOCCHIO_urdfdom_world:FILEPATH=/usr/lib/x86_64-linux-gnu/liburdfdom_world.so
-
-//The directory containing a CMake configuration file for pybind11.
-pybind11_DIR:PATH=/usr/lib/cmake/pybind11
 
 //The directory containing a CMake configuration file for yaml-cpp.
 yaml-cpp_DIR:PATH=/usr/lib/x86_64-linux-gnu/cmake/yaml-cpp
@@ -406,12 +391,8 @@ CMAKE_TAPI-ADVANCED:INTERNAL=1
 CMAKE_UNAME:INTERNAL=/usr/bin/uname
 //ADVANCED property for variable: CMAKE_VERBOSE_MAKEFILE
 CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
-//Details about finding PYTHON
-FIND_PACKAGE_MESSAGE_DETAILS_PYTHON:INTERNAL=/usr/bin/python3.103.10.12
 //Details about finding PkgConfig
 FIND_PACKAGE_MESSAGE_DETAILS_PkgConfig:INTERNAL=[/usr/bin/pkg-config][v0.29.2()]
-//Test HAS_FLTO
-HAS_FLTO:INTERNAL=1
 PINOCCHIO_CFLAGS:INTERNAL=-DPINOCCHIO_WITH_URDFDOM;-DPINOCCHIO_ENABLE_TEMPLATE_INSTANTIATION;-I/opt/openrobots/lib/pkgconfig/../../include;-I/opt/openrobots/include;-I/usr/lib/x86_64-linux-gnu/pkgconfig/../../../include;-I/usr/include;-I/usr/include/eigen3;-I/usr/include
 PINOCCHIO_CFLAGS_I:INTERNAL=
 PINOCCHIO_CFLAGS_OTHER:INTERNAL=-DPINOCCHIO_WITH_URDFDOM;-DPINOCCHIO_ENABLE_TEMPLATE_INSTANTIATION
@@ -451,20 +432,6 @@ PINOCCHIO_pinocchio_VERSION:INTERNAL=
 PKG_CONFIG_ARGN-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: PKG_CONFIG_EXECUTABLE
 PKG_CONFIG_EXECUTABLE-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: PYTHON_EXECUTABLE
-PYTHON_EXECUTABLE-ADVANCED:INTERNAL=1
-PYTHON_INCLUDE_DIRS:INTERNAL=/usr/include/python3.10
-PYTHON_IS_DEBUG:INTERNAL=0
-PYTHON_LIBRARIES:INTERNAL=/usr/lib/x86_64-linux-gnu/libpython3.10.so
-//ADVANCED property for variable: PYTHON_LIBRARY
-PYTHON_LIBRARY-ADVANCED:INTERNAL=1
-PYTHON_MODULE_EXTENSION:INTERNAL=.cpython-310-x86_64-linux-gnu.so
-PYTHON_MODULE_PREFIX:INTERNAL=
-PYTHON_VERSION:INTERNAL=3.10.12
-PYTHON_VERSION_MAJOR:INTERNAL=3
-PYTHON_VERSION_MINOR:INTERNAL=10
-Python_ADDITIONAL_VERSIONS:INTERNAL=3.11;3.10;3.9;3.8;3.7;3.6;3.5;3.4
-_Python:INTERNAL=PYTHON
 __pkg_config_arguments_PINOCCHIO:INTERNAL=REQUIRED;pinocchio
 __pkg_config_checked_PINOCCHIO:INTERNAL=1
 //ADVANCED property for variable: pkgcfg_lib_PINOCCHIO_boost_filesystem
@@ -492,6 +459,4 @@ pkgcfg_lib_PINOCCHIO_urdfdom_sensor-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: pkgcfg_lib_PINOCCHIO_urdfdom_world
 pkgcfg_lib_PINOCCHIO_urdfdom_world-ADVANCED:INTERNAL=1
 prefix_result:INTERNAL=/opt/openrobots/lib/pkgconfig/../../lib
-//Directories where pybind11 and possibly Python headers are located
-pybind11_INCLUDE_DIRS:INTERNAL=/usr/include;/usr/include/python3.10
 

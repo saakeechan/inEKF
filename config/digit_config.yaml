@@ -64,7 +64,7 @@ covariance:
 # Indices of encoder and encoderdot that receive actual TextFile data or sensor data (non-zero assignments)
 # Got to put some work into finding these indices for your robot
 
-TextFile_encoder_indices: [7, 8, 9, 14, 15, 16, 17, 18, 23, 28, 29, 34, 35, 36, 41, 42, 43, 44, 45, 50, 55, 56]
-TextFile_encoderdot_indices: [6, 7, 8, 10, 11, 12, 13, 14, 16, 18, 19, 24, 25, 26, 28, 29, 30, 31, 32, 34, 36, 37]
+Encoder_indices_map: [7, 8, 9, 14, 15, 16, 17, 18, 23, 28, 29,    34, 35, 36, 41, 42, 43, 44, 45, 50, 55, 56]
+Encoderdot_indices_map: [6, 7, 8, 12, 13, 14, 15, 16, 20, 24, 25,   30, 31, 32, 36, 37, 38, 39, 40, 44, 48, 49]
 
   

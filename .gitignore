@@ -1,0 +1,18 @@
+# Python virtual environments
+g1_env/
+
+# Build directories
+build/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# CMake user files
+CMakeLists.txt.user
+CMakeCache.txt
+
+# Output images (generated)
+output_images/

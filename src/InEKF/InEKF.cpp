@@ -13,6 +13,7 @@
 
 #include "InEKF.h"
 #include "../utility/BasicFunctions_Estimator.hpp"
+#include <unsupported/Eigen/MatrixFunctions>
 
 namespace inekf {
 
@@ -190,11 +191,13 @@ void InEKF::Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector
 
     // Discretization
     Eigen::MatrixXd I = Eigen::MatrixXd::Identity(dimP,dimP);
-    Eigen::MatrixXd Phi = I + A*dt; // Fast approximation of exp(A*dt). TODO: explore using the full exp() instead
+    // Eigen::MatrixXd Phi = I + A*dt; // Fast approximation of exp(A*dt). TODO: explore using the full exp() instead
+    Eigen::MatrixXd Phi = (A*dt).exp(); // Matrix exponential for state transition matrix
     Eigen::MatrixXd Adj = I;
     Adj.block(0,0,dimP-dimTheta,dimP-dimTheta) = Adjoint_SEK3(X); // Approx 200 microseconds
-    // Eigen::MatrixXd PhiAdj = Phi * Adj;
-    Eigen::MatrixXd Qk_hat = Adj*dt * Qk * dt*Adj.transpose(); // Further simplified from PhiAdj*Qk*PhiAdj.transpose() to reduce computation time
+    Eigen::MatrixXd PhiAdj = Phi * Adj;
+    Eigen::MatrixXd Qk_hat = PhiAdj * Qk * PhiAdj.transpose();
+    // Eigen::MatrixXd Qk_hat = Adj*dt * Qk * dt*Adj.transpose(); // Further simplified from PhiAdj*Qk*PhiAdj.transpose() to reduce computation time
     // Propagate Covariance
     Eigen::MatrixXd P_pred = Phi * P * Phi.transpose() + Qk_hat;
 

@@ -6,12 +6,9 @@
 #include <pinocchio/algorithm/kinematics.hpp>
 #include <pinocchio/algorithm/jacobian.hpp>
 #include <pinocchio/algorithm/frames.hpp>
+#include "getParameters.hpp"
 
-int main() {
-    // Robot model parameters
-    std::string urdf_path = "../../../unitree_ros/robots/go2_description/urdf/go2_description.urdf";
-    std::string robot_name = "go2";
-    
+void extractParameters(const std::string& urdf_path, const std::string& robot_name) {
     pinocchio::Model model;
     
     std::cout << "Loading model: " << urdf_path << std::endl;
@@ -32,17 +29,17 @@ int main() {
         pinocchio::mjcf::buildModel(urdf_path, model);
     } else {
         std::cerr << "Error: Unknown file format '" << extension << "'. Supported formats: .urdf, .xml, .mjcf" << std::endl;
-        return 1;
+        return;
     }
     
     pinocchio::Data data(model);
     
-    // Open output file
-    std::string output_filename = robot_name + "Parameters";
+    // Open output file (save to parent directory)
+    std::string output_filename = "../" + robot_name + "Parameters";
     std::ofstream outfile(output_filename);
     if (!outfile.is_open()) {
         std::cerr << "Error: Could not open file " << output_filename << " for writing." << std::endl;
-        return 1;
+        return;
     }
     
     std::cout << "Writing parameters to: " << output_filename << std::endl;
@@ -133,6 +130,4 @@ int main() {
     
     outfile.close();
     std::cout << "Parameters written successfully to: " << output_filename << std::endl;
-    
-    return 0;
 }

@@ -73,18 +73,41 @@ bool RobotModel::load_config(const std::string& config_file) {
         // ====================================================================
         // ENCODER MAPPING
         // ====================================================================
-        if (config["TextFile_encoder_indices"]) {
-            TextFile_encoder_indices = config["TextFile_encoder_indices"].as<std::vector<int>>();
-            std::cout << "Loaded " << TextFile_encoder_indices.size() << " TextFile encoder position mapping indices" << std::endl;
+        if (config["Encoder_indices_map"]) {
+            Encoder_indices_map = config["Encoder_indices_map"].as<std::vector<int>>();
+            std::cout << "Loaded " << Encoder_indices_map.size() << " Encoder position mapping indices for pinnochio" << std::endl;
         }
-        if (config["TextFile_encoderdot_indices"]) {
-            TextFile_encoderdot_indices = config["TextFile_encoderdot_indices"].as<std::vector<int>>();
-            std::cout << "Loaded " << TextFile_encoderdot_indices.size() << " TextFile encoder velocity mapping indices" << std::endl;
+        if (config["Encoderdot_indices_map"]) {
+            Encoderdot_indices_map = config["Encoderdot_indices_map"].as<std::vector<int>>();
+            std::cout << "Loaded " << Encoderdot_indices_map.size() << " Encoder velocity mapping indices for pinnochio" << std::endl;
+        }
+        
+        // ====================================================================
+        // TORQUE MAPPING (Optional, but must match num_legs if provided)
+        // ====================================================================
+        if (config["Torque_indices_map"]) {
+            Torque_indices_map = config["Torque_indices_map"].as<std::vector<std::vector<int>>>();
+            
+            // Validate that the number of rows matches num_legs
+            if (Torque_indices_map.size() != static_cast<size_t>(num_legs)) {
+                throw std::runtime_error(
+                    "Torque_indices_map has " + std::to_string(Torque_indices_map.size()) + 
+                    " rows, but num_legs is " + std::to_string(num_legs) + 
+                    ". Number of rows must equal number of legs."
+                );
+            }
+            
+            std::cout << "Loaded Torque_indices_map with " << Torque_indices_map.size() << " legs:" << std::endl;
+            for (size_t i = 0; i < Torque_indices_map.size(); ++i) {
+                std::cout << "  Leg " << i << ": " << Torque_indices_map[i].size() << " torque indices" << std::endl;
+            }
+        } else {
+            std::cout << "Torque_indices_map not provided (optional)" << std::endl;
         }
         
         // ====================================================================
         // IMU2BD OFFSET
-        // ====================================================================
+        // =====================================================================
         // IMU offset
         if (config["imu_to_body"]) {
             auto imu_offset = config["imu_to_body"].as<std::vector<double>>();
@@ -295,7 +318,8 @@ Eigen::Vector3d RobotModel::get_foot_position(int i_leg) const {
     const pinocchio::SE3& foot_placement = pin_data.oMf[foot_frame_ids[i_leg - 1]];
     Eigen::Vector3d foot_position = foot_placement.translation();
     
-    return foot_position + IMU2BD;
+    // return foot_position + IMU2BD;
+    return foot_position; // We are using an IMU-shifted model, so no need to add IMU2BD offset here
 }
 
 Eigen::MatrixXd RobotModel::get_foot_jacobian(int i_leg) const {
@@ -356,7 +380,7 @@ void RobotModel::compute_joint_jacobians() const {
     pinocchio::computeJointJacobians(pin_model, const_cast<pinocchio::Data&>(pin_data));
 }
 
-void RobotModel::map_TextFile_to_encoders(const std::vector<double>& TextFile_data, Eigen::VectorXd& output_vector, const std::string& encoder_type) const {
+void RobotModel::map_indices_to_encoders(const std::vector<double>& motor_data, Eigen::VectorXd& output_vector, const std::string& encoder_type) const {
 
     // Validate encoder_type parameter
     if (encoder_type != "encoder" && encoder_type != "encoderdot") {
@@ -365,7 +389,7 @@ void RobotModel::map_TextFile_to_encoders(const std::vector<double>& TextFile_da
     }
     
     // Select appropriate indices based on encoder_type
-    const std::vector<int>& indices = (encoder_type == "encoder") ? TextFile_encoder_indices : TextFile_encoderdot_indices;
+    const std::vector<int>& indices = (encoder_type == "encoder") ? Encoder_indices_map : Encoderdot_indices_map;
     const std::string type_name = (encoder_type == "encoder") ? "encoder position" : "encoder velocity";
     
     // Check if indices are configured
@@ -374,20 +398,25 @@ void RobotModel::map_TextFile_to_encoders(const std::vector<double>& TextFile_da
         std::exit(EXIT_FAILURE);
     }
     
-    // Check if TextFile_data size exactly matches the number of indices
-    if (TextFile_data.size() != indices.size()) {
+    // Check if motor_data size exactly matches the number of indices
+    if (motor_data.size() != indices.size()) {
         std::cerr << "FATAL ERROR: TextFile data size mismatch for " << type_name << "." << std::endl;
-        std::cerr << "  Expected exactly " << indices.size() << " values, got " << TextFile_data.size() << std::endl;
+        std::cerr << "  Expected exactly " << indices.size() << " values, got " << motor_data.size() << std::endl;
         std::cerr << "  This is a configuration error - check your TextFileDataStruct and YAML indices." << std::endl;
+        std::cerr << "  Debug: motor_data contents: ";
+        for (size_t i = 0; i < motor_data.size(); i++) {
+            std::cerr << motor_data[i] << " ";
+        }
+        std::cerr << std::endl;
         std::exit(EXIT_FAILURE);
     }
     
     // Initialize output_vector to zero (all non-mapped indices will remain zero)
     output_vector.setZero();
     
-    // Map TextFile data to output_vector using the index mapping
+    // Map motor_data to output_vector using the index mapping
     // indices[i] tells us WHERE to put the data in output_vector
-    // We take data from position i in TextFile_data
+    // We take data from position i in motor_data
     for (size_t i = 0; i < indices.size(); ++i) {
         int output_idx = indices[i];
         
@@ -398,15 +427,15 @@ void RobotModel::map_TextFile_to_encoders(const std::vector<double>& TextFile_da
             std::exit(EXIT_FAILURE);
         }
         
-        // Map: TextFile_data[i] -> output_vector[indices[i]]
-        output_vector(output_idx) = TextFile_data[i];
+        // Map: motor_data[i] -> output_vector[indices[i]]
+        output_vector(output_idx) = motor_data[i];
     }
 }
 
 Eigen::MatrixXd RobotModel::extract_active_encoder_jacobian(const Eigen::MatrixXd& full_jacobian) const {
     
     // Check if encoderdot indices are configured
-    if (TextFile_encoderdot_indices.empty()) {
+    if (Encoderdot_indices_map.empty()) {
         std::cerr << "Warning: No encoderdot indices configured. Returning full Jacobian." << std::endl;
         return full_jacobian;
     }
@@ -414,11 +443,11 @@ Eigen::MatrixXd RobotModel::extract_active_encoder_jacobian(const Eigen::MatrixX
     // Create output matrix with only columns specified in yaml config
     // Number of rows = same as input (typically 3 for position)
     // Number of cols = number of active encoders specified in yaml
-    Eigen::MatrixXd active_jacobian(full_jacobian.rows(), TextFile_encoderdot_indices.size());
+    Eigen::MatrixXd active_jacobian(full_jacobian.rows(), Encoderdot_indices_map.size());
     
     // Extract only the columns corresponding to encoderdot_indices from yaml
-    for (size_t i = 0; i < TextFile_encoderdot_indices.size(); ++i) {
-        int col_idx = TextFile_encoderdot_indices[i];
+    for (size_t i = 0; i < Encoderdot_indices_map.size(); ++i) {
+        int col_idx = Encoderdot_indices_map[i];
         
         // Validate column index bounds
         if (col_idx < 0 || col_idx >= full_jacobian.cols()) {

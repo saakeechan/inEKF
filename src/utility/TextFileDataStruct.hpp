@@ -17,7 +17,7 @@
 #include <vector>
 #include <cstddef>
 #include <string>
-#include "Digit/csvParserDigit.hpp"
+#include "G1/csvParserG1.hpp"
 
 /**
  * Universal data structure for robot sensor data
@@ -27,10 +27,10 @@
 class TextFileDataStruct {
 public:
     // CSV Parser data source
-    DigitDataStruct digit_data;
+    G1DataStruct robot_data; // <- This can be replaced with the appropriate data structure for other robots (e.g., DigitDataStruct, Go2DataStruct)
     
     // Configuration
-    size_t num_encoders = 22; // Number of active encoders
+    size_t num_encoders = 29; // Number of active encoders
     size_t num_contacts = 2;
     
     // Timestamp data
@@ -65,87 +65,125 @@ public:
     
     // Simple direct assignment from csvParser
     void loadFromParser(const std::string& filename) {
-        digit_data = ParseDigitCSV(filename);
+        robot_data = ParseG1CSV(filename); // This can be switched to a different parser based on the robot type
         
         // Direct assignment
-        timestamp = digit_data.timestamp;
-        gyro_x = digit_data.gyro_x;
-        gyro_y = digit_data.gyro_y;
-        gyro_z = digit_data.gyro_z;
-        acc_x = digit_data.acc_x;
-        acc_y = digit_data.acc_y;
-        acc_z = digit_data.acc_z;
-        pos_x = digit_data.pos_x;
-        pos_y = digit_data.pos_y;
-        pos_z = digit_data.pos_z;
-        vel_x = digit_data.vel_x;
-        vel_y = digit_data.vel_y;
-        vel_z = digit_data.vel_z;
-        quat_w = digit_data.quat_w;
-        quat_i = digit_data.quat_i;
-        quat_j = digit_data.quat_j;
-        quat_k = digit_data.quat_k;
+        timestamp = robot_data.timestamp;
+        gyro_x = robot_data.gyro_body_x;
+        gyro_y = robot_data.gyro_body_y;
+        gyro_z = robot_data.gyro_body_z;
+        acc_x = robot_data.acc_body_x;
+        acc_y = robot_data.acc_body_y;
+        acc_z = robot_data.acc_body_z;
+        pos_x = robot_data.pos_x;
+        pos_y = robot_data.pos_y;
+        pos_z = robot_data.pos_z;
+        vel_x = robot_data.vel_x;
+        vel_y = robot_data.vel_y;
+        vel_z = robot_data.vel_z;
+        quat_w = robot_data.quat_w;
+        quat_i = robot_data.quat_i;
+        quat_j = robot_data.quat_j;
+        quat_k = robot_data.quat_k;
         
-        num_rows = digit_data.num_rows;
+        num_rows = robot_data.num_rows;
 
         
         // Encoders - 2D array [num_rows x num_encoders]
         encoders.resize(num_rows, std::vector<double>(num_encoders));
         encoderdots.resize(num_rows, std::vector<double>(num_encoders));
         
+        std::cout << "  Resized encoders to " << encoders.size() << " rows x " << num_encoders << " cols" << std::endl;
+        
+        // Map according to G1 joint order (q[0] to q[28])
         for (size_t i = 0; i < num_rows; i++) {
-            encoders[i][0] = digit_data.left_hip_roll[i];
-            encoders[i][1] = digit_data.left_hip_yaw[i];
-            encoders[i][2] = digit_data.left_hip_pitch[i];
-            encoders[i][3] = digit_data.left_knee[i];
-            encoders[i][4] = digit_data.left_shin[i];
-            encoders[i][5] = digit_data.left_tarsus[i];
-            encoders[i][6] = digit_data.left_heel_spring[i];
-            encoders[i][7] = digit_data.left_toe_A[i];
-            encoders[i][8] = digit_data.left_toe_B[i];
-            encoders[i][9] = digit_data.left_toe_pitch[i];
-            encoders[i][10] = digit_data.left_toe_roll[i];
-            encoders[i][11] = digit_data.right_hip_roll[i];
-            encoders[i][12] = digit_data.right_hip_yaw[i];
-            encoders[i][13] = digit_data.right_hip_pitch[i];
-            encoders[i][14] = digit_data.right_knee[i];
-            encoders[i][15] = digit_data.right_shin[i];
-            encoders[i][16] = digit_data.right_tarsus[i];
-            encoders[i][17] = digit_data.right_heel_spring[i];
-            encoders[i][18] = digit_data.right_toe_A[i];
-            encoders[i][19] = digit_data.right_toe_B[i];
-            encoders[i][20] = digit_data.right_toe_pitch[i];
-            encoders[i][21] = digit_data.right_toe_roll[i];
+            // Left leg (q[0-5])
+            encoders[i][0] = robot_data.joint_pos_left_hip_pitch[i];
+            encoders[i][1] = robot_data.joint_pos_left_hip_roll[i];
+            encoders[i][2] = robot_data.joint_pos_left_hip_yaw[i];
+            encoders[i][3] = robot_data.joint_pos_left_knee[i];
+            encoders[i][4] = robot_data.joint_pos_left_ankle_pitch[i];
+            encoders[i][5] = robot_data.joint_pos_left_ankle_roll[i];
             
-            encoderdots[i][0] = digit_data.left_hip_roll_vel[i];
-            encoderdots[i][1] = digit_data.left_hip_yaw_vel[i];
-            encoderdots[i][2] = digit_data.left_hip_pitch_vel[i];
-            encoderdots[i][3] = digit_data.left_knee_vel[i];
-            encoderdots[i][4] = digit_data.left_shin_vel[i];
-            encoderdots[i][5] = digit_data.left_tarsus_vel[i];
-            encoderdots[i][6] = digit_data.left_heel_spring_vel[i];
-            encoderdots[i][7] = digit_data.left_toe_A_vel[i];
-            encoderdots[i][8] = digit_data.left_toe_B_vel[i];
-            encoderdots[i][9] = digit_data.left_toe_pitch_vel[i];
-            encoderdots[i][10] = digit_data.left_toe_roll_vel[i];
-            encoderdots[i][11] = digit_data.right_hip_roll_vel[i];
-            encoderdots[i][12] = digit_data.right_hip_yaw_vel[i];
-            encoderdots[i][13] = digit_data.right_hip_pitch_vel[i];
-            encoderdots[i][14] = digit_data.right_knee_vel[i];
-            encoderdots[i][15] = digit_data.right_shin_vel[i];
-            encoderdots[i][16] = digit_data.right_tarsus_vel[i];
-            encoderdots[i][17] = digit_data.right_heel_spring_vel[i];
-            encoderdots[i][18] = digit_data.right_toe_A_vel[i];
-            encoderdots[i][19] = digit_data.right_toe_B_vel[i];
-            encoderdots[i][20] = digit_data.right_toe_pitch_vel[i];
-            encoderdots[i][21] = digit_data.right_toe_roll_vel[i];
+            // Right leg (q[6-11])
+            encoders[i][6] = robot_data.joint_pos_right_hip_pitch[i];
+            encoders[i][7] = robot_data.joint_pos_right_hip_roll[i];
+            encoders[i][8] = robot_data.joint_pos_right_hip_yaw[i];
+            encoders[i][9] = robot_data.joint_pos_right_knee[i];
+            encoders[i][10] = robot_data.joint_pos_right_ankle_pitch[i];
+            encoders[i][11] = robot_data.joint_pos_right_ankle_roll[i];
+            
+            // Waist (q[12-14])
+            encoders[i][12] = robot_data.joint_pos_waist_yaw[i];
+            encoders[i][13] = robot_data.joint_pos_waist_roll[i];
+            encoders[i][14] = robot_data.joint_pos_waist_pitch[i];
+            
+            // Left arm (q[15-21])
+            encoders[i][15] = robot_data.joint_pos_left_shoulder_pitch[i];
+            encoders[i][16] = robot_data.joint_pos_left_shoulder_roll[i];
+            encoders[i][17] = robot_data.joint_pos_left_shoulder_yaw[i];
+            encoders[i][18] = robot_data.joint_pos_left_elbow[i];
+            encoders[i][19] = robot_data.joint_pos_left_wrist_roll[i];
+            encoders[i][20] = robot_data.joint_pos_left_wrist_pitch[i];
+            encoders[i][21] = robot_data.joint_pos_left_wrist_yaw[i];
+            
+            // Right arm (q[22-28])
+            encoders[i][22] = robot_data.joint_pos_right_shoulder_pitch[i];
+            encoders[i][23] = robot_data.joint_pos_right_shoulder_roll[i];
+            encoders[i][24] = robot_data.joint_pos_right_shoulder_yaw[i];
+            encoders[i][25] = robot_data.joint_pos_right_elbow[i];
+            encoders[i][26] = robot_data.joint_pos_right_wrist_roll[i];
+            encoders[i][27] = robot_data.joint_pos_right_wrist_pitch[i];
+            encoders[i][28] = robot_data.joint_pos_right_wrist_yaw[i];
+            
+            // -------------------------------------------------------//
+
+            // Left leg velocities (v[0-5])
+            encoderdots[i][0] = robot_data.joint_vel_left_hip_pitch[i];
+            encoderdots[i][1] = robot_data.joint_vel_left_hip_roll[i];
+            encoderdots[i][2] = robot_data.joint_vel_left_hip_yaw[i];
+            encoderdots[i][3] = robot_data.joint_vel_left_knee[i];
+            encoderdots[i][4] = robot_data.joint_vel_left_ankle_pitch[i];
+            encoderdots[i][5] = robot_data.joint_vel_left_ankle_roll[i];
+            
+            // Right leg velocities (v[6-11])
+            encoderdots[i][6] = robot_data.joint_vel_right_hip_pitch[i];
+            encoderdots[i][7] = robot_data.joint_vel_right_hip_roll[i];
+            encoderdots[i][8] = robot_data.joint_vel_right_hip_yaw[i];
+            encoderdots[i][9] = robot_data.joint_vel_right_knee[i];
+            encoderdots[i][10] = robot_data.joint_vel_right_ankle_pitch[i];
+            encoderdots[i][11] = robot_data.joint_vel_right_ankle_roll[i];
+            
+            // Waist velocities (v[12-14])
+            encoderdots[i][12] = robot_data.joint_vel_waist_yaw[i];
+            encoderdots[i][13] = robot_data.joint_vel_waist_roll[i];
+            encoderdots[i][14] = robot_data.joint_vel_waist_pitch[i];
+            
+            // Left arm velocities (v[15-21])
+            encoderdots[i][15] = robot_data.joint_vel_left_shoulder_pitch[i];
+            encoderdots[i][16] = robot_data.joint_vel_left_shoulder_roll[i];
+            encoderdots[i][17] = robot_data.joint_vel_left_shoulder_yaw[i];
+            encoderdots[i][18] = robot_data.joint_vel_left_elbow[i];
+            encoderdots[i][19] = robot_data.joint_vel_left_wrist_roll[i];
+            encoderdots[i][20] = robot_data.joint_vel_left_wrist_pitch[i];
+            encoderdots[i][21] = robot_data.joint_vel_left_wrist_yaw[i];
+            
+            // Right arm velocities (v[22-28])
+            encoderdots[i][22] = robot_data.joint_vel_right_shoulder_pitch[i];
+            encoderdots[i][23] = robot_data.joint_vel_right_shoulder_roll[i];
+            encoderdots[i][24] = robot_data.joint_vel_right_shoulder_yaw[i];
+            encoderdots[i][25] = robot_data.joint_vel_right_elbow[i];
+            encoderdots[i][26] = robot_data.joint_vel_right_wrist_roll[i];
+            encoderdots[i][27] = robot_data.joint_vel_right_wrist_pitch[i];
+            encoderdots[i][28] = robot_data.joint_vel_right_wrist_yaw[i];
         }
+
         
         // Contact states - 2D array [num_rows x num_contacts]
         contact_state.resize(num_rows, std::vector<bool>(num_contacts));
         for (size_t i = 0; i < num_rows; i++) {
-            contact_state[i][0] = digit_data.lfoot_contact[i];
-            contact_state[i][1] = digit_data.rfoot_contact[i];
+            contact_state[i][0] = robot_data.lfoot_contact[i];
+            contact_state[i][1] = robot_data.rfoot_contact[i];
         }
     }
 };

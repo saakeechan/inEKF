@@ -3,14 +3,17 @@
 clear; close all; clc;
 
 % --- Go to result folder ---
-cd result/pinnochio_inekf
+cd /home/saakee/Research/Saaketh_INEKF/result/pinnochio_inekf
 
 % --- File information ---
 slip = 0.3;
 SRmode = sprintf('(SR%.1f)', slip);
-cov = '-5-1-1-4-8 -10 -10-10';
-initial = '0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.50_0.00_0.00_0.00_0.00';
-data = 'x976_';
+cov = '-5-1-1-4-8 -6 -10-10';
+% cov = '-2-1-3-6-12 -3 -10-10';
+% cov = '-1-1-1-5-10 -10 -2-2';
+% cov = '-5-4-1-2-4 -10 -10-10';
+initial = '0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00';
+data = 'x999_';
 index = 1;
 
 % --- Construct filename and full path ---
@@ -33,8 +36,8 @@ name1 = 'H SR (Your File)';
 % Basic
 [finish, ~] = size(result1);
 
-dt = 0.005;
-finish = (4.8 / dt);
+dt = 0.02;
+finish = (19.5 / dt);
 start = (0 / dt) + 1;
 t = start:1:finish - 1;
 t = t .* dt;
@@ -263,6 +266,8 @@ grid minor;
 
 sgtitle('True vs Estimated Velocities');
 
+%%
+
 % RPY (Single File Only)
 
 figure(121);
@@ -300,6 +305,8 @@ legend('Yaw true', 'Yaw estimated');
 grid minor;
 
 sgtitle('True vs Estimated Roll–Pitch–Yaw');
+
+
 
 
 

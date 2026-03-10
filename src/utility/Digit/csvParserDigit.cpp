@@ -52,6 +52,10 @@ DigitDataStruct ParseDigitCSV(const std::string& csv_filename) {
         
         // Parse all comma-separated values in this row
         while (std::getline(ss, value, ',')) {
+            // Skip empty values (from trailing commas)
+            if (value.empty()) {
+                continue;
+            }
             try {
                 row_values.push_back(std::stod(value));
             } catch (const std::exception& e) {

@@ -66,8 +66,9 @@ public:
     int encoder_size;                // Configuration space dimension (nq) - auto-set from model
     int encoderdot_size;             // Velocity space dimension (nv) - auto-set from model
     
-    std::vector<int> TextFile_encoder_indices;     // Indices for mapping TextFile data to encoder vector
-    std::vector<int> TextFile_encoderdot_indices;  // Indices for mapping TextFile data to encoderdot vector
+    std::vector<int> Encoder_indices_map;     // Indices for mapping TextFile data to encoder vector
+    std::vector<int> Encoderdot_indices_map;  // Indices for mapping TextFile data to encoderdot vector
+    std::vector<std::vector<int>> Torque_indices_map;  // 2D array: each row = torque indices for one leg
     
     // ========================================================================
     // PINOCCHIO MODEL
@@ -88,7 +89,6 @@ public:
     // FRAME TRANSFORMATIONS
     // ========================================================================
     
-    Eigen::Vector3d Gravity;
     Eigen::Vector3d IMU2BD;  // IMU to Body frame offset
     
     // ========================================================================
@@ -196,7 +196,7 @@ public:
      * @param output_vector Output encoder vector - must be pre-allocated
      * @param encoder_type Type of encoder data: "encoder" for positions or "encoderdot" for velocities
      */
-    void map_TextFile_to_encoders(const std::vector<double>& TextFile_data, Eigen::VectorXd& output_vector, const std::string& encoder_type) const;
+    void map_indices_to_encoders(const std::vector<double>& motor_data, Eigen::VectorXd& output_vector, const std::string& encoder_type) const;
 
     /**
      * @brief Extract active encoder columns from full Jacobian matrix

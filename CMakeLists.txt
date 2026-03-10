@@ -17,7 +17,7 @@ check_build_type_macro(CMAKE_BUILD_TYPE)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_COMPILER_LAUNCHER ccache)
-set(CMAKE_UNITY_BUILD ON)  # Disabled to avoid symbol conflicts between robot implementations
+set(CMAKE_UNITY_BUILD OFF)  # Disabled to avoid symbol conflicts between robot implementations
 
 # Set default build type to Release if not specified
 if(NOT CMAKE_BUILD_TYPE)
@@ -51,18 +51,10 @@ include_directories(${EIGEN3_INCLUDE_DIR})  # Add this for compatibility
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(PINOCCHIO REQUIRED pinocchio)
 
-# message(STATUS "Found Pinocchio version ${PINOCCHIO_VERSION}")
-# message(STATUS "Pinocchio include dirs: ${PINOCCHIO_INCLUDE_DIRS}")
-# message(STATUS "Pinocchio library dirs: ${PINOCCHIO_LIBRARY_DIRS}")
-
 include_directories(${PINOCCHIO_INCLUDE_DIRS})
 link_directories(${PINOCCHIO_LIBRARY_DIRS})
 
-# Find yaml-cpp
 find_package(yaml-cpp REQUIRED)
-# message(STATUS "Found yaml-cpp")
-
-
 
 link_directories(
         /usr/lib
@@ -80,16 +72,12 @@ include_directories(
 )
 
 
-# NOTE: Building InEKF estimator with robot-specific models
-# Robot selection is done via RobotConfig.hpp
-
 file(GLOB_RECURSE INEKF_Estimator_src
-    src/estimator/InEKF_estimator.cpp
-    src/estimator/*.hpp
-    src/csvParser*.cpp
-    src/*.hpp
-    src/InEKF/*.cpp
-    src/utility/*.cpp) # maybe streamline this later
+    src/*.cpp
+    src/*.hpp)
+
+# Remove files with main() functions from the source list
+list (FILTER INEKF_Estimator_src EXCLUDE REGEX ".*/main\\.cpp$")
 
 
 add_library(lib_INEKF_Estimator SHARED ${INEKF_Estimator_src})
@@ -125,37 +113,16 @@ set_target_properties(${TARGET} PROPERTIES
 target_link_libraries(${TARGET} lib_INEKF_Estimator)
 
 
-# # ============================================================
-# # Python bindings with pybind11
-# # ============================================================
+# ============================================================
+# Installation rules
+# ============================================================
+install(TARGETS lib_INEKF_Estimator
+    LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+)
 
-# # Check if pybind11 is available
-# find_package(pybind11 QUIET)
-
-# if(pybind11_FOUND)
-#     message(STATUS "Found pybind11, building Python bindings")
-    
-#     # Create Python module
-#     pybind11_add_module(inekf_estimator src/python_bindings.cpp)
-    
-#     # Link against the main library
-#     target_link_libraries(inekf_estimator PRIVATE lib_INEKF_Estimator)
-    
-#     # Set RPATH for Python module
-#     set_target_properties(inekf_estimator PROPERTIES
-#         BUILD_RPATH "${PINOCCHIO_LIBRARY_DIRS}"
-#         INSTALL_RPATH "${PINOCCHIO_LIBRARY_DIRS}"
-#     )
-    
-#     # Optimization for Python module
-#     target_compile_options(inekf_estimator PRIVATE -O3)
-    
-#     message(STATUS "Python module 'inekf_estimator' will be built")
-#     message(STATUS "After building, copy the .so file to your Python path or PYTHONPATH")
-    
-# else()
-#     message(WARNING "pybind11 not found. Python bindings will not be built.")
-#     message(STATUS "To install pybind11: pip3 install pybind11[global]")
-# endif()
-
-
+# Install header files
+install(DIRECTORY src/
+    DESTINATION ${CMAKE_INSTALL_PREFIX}/include/inekf_estimator
+    FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+)

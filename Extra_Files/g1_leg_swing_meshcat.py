@@ -10,7 +10,7 @@ import numpy as np
 import time
 
 # Load G1 URDF model
-urdf_path = "unitree_ros/robots/g1_description/g1_29dof_mode_15.urdf"
+urdf_path = "/home/saakee/Research/Saaketh_INEKF/src/utility/G1/g1_29dof_IMUShifted.urdf"
 mesh_dir = "unitree_ros/robots/g1_description"
 
 print(f"Loading G1 model from: {urdf_path}")
@@ -45,7 +45,7 @@ except Exception as e:
 # Add red sphere marker at left foot (frame 15)
 import meshcat.geometry as g
 import meshcat.transformations as tf
-viz.viewer["left_foot_marker"].set_object(g.Sphere(0.01), g.MeshLambertMaterial(color=0xff0000))
+viz.viewer["left_foot_marker"].set_object(g.Sphere(0.075), g.MeshLambertMaterial(color=0xff0000))
 
 print("\n" + "="*60)
 print("MeshCat viewer is now running!")
@@ -69,7 +69,7 @@ RIGHT_ANKLE_PITCH = 10
 RIGHT_ANKLE_ROLL = 11
 
 # Animation parameters
-duration = 8.0  # seconds
+duration = 5.0  # seconds
 fps = 30
 dt = 1.0 / fps
 num_frames = int(duration * fps)
@@ -82,50 +82,60 @@ swing_amplitude_knee = 1.0  # radians (~57 degrees)
 print(f"\nStarting animation ({duration}s at {fps} fps)")
 print("Press Ctrl+C to stop\n")
 
+# Generate random frequencies and amplitudes for each joint
+np.random.seed(42)  # For reproducibility
+joint_frequencies = np.random.uniform(0.3, 1.0, model.nq)  # Hz
+joint_amplitudes = np.random.uniform(0.2, 0.8, model.nq)  # radians
+joint_phases = np.random.uniform(0, 2*np.pi, model.nq)  # random phase offset
+
+print(f"Animating all {model.nq} joints with random motions")
+
+# Specify the frame index to track velocity (frame 1 - left foot)
+FRAME_ID = 4
+
 # Animation loop
 try:
     for frame in range(num_frames):
         t = frame * dt
-        phase = 2 * np.pi * swing_freq * t
         
-        # Initialize configuration
+        # Initialize configuration, velocity, and acceleration
         q = np.zeros(model.nq)
+        v = np.zeros(model.nv)
+        a = np.zeros(model.nv)
         
-        # Left leg swing (forward-backward)
-        hip_angle = swing_amplitude_hip * np.sin(phase)
-        knee_angle = swing_amplitude_knee * max(0, np.sin(phase))  # Only flexion
+        # Apply random sinusoidal motion to all joints
+        for joint_idx in range(model.nq):
+            phase = 2 * np.pi * joint_frequencies[joint_idx] * t + joint_phases[joint_idx]
+            omega = joint_frequencies[joint_idx] * 2 * np.pi
+            q[joint_idx] = joint_amplitudes[joint_idx] * np.sin(phase)
+            # Compute joint velocity (derivative of position)
+            v[joint_idx] = joint_amplitudes[joint_idx] * omega * np.cos(phase)
+            # Compute joint acceleration (derivative of velocity)
+            a[joint_idx] = -joint_amplitudes[joint_idx] * omega * omega * np.sin(phase)
         
-        q[LEFT_HIP_PITCH] = hip_angle
-        q[LEFT_KNEE] = knee_angle
-        q[LEFT_ANKLE_PITCH] = -0.4 * hip_angle  # Counterbalance
-        
-        # # Right leg swing (opposite phase)
-        # hip_angle_right = swing_amplitude_hip * np.sin(phase + np.pi)
-        # knee_angle_right = swing_amplitude_knee * max(0, np.sin(phase + np.pi))
-        
-        # q[RIGHT_HIP_PITCH] = hip_angle_right
-        # q[RIGHT_KNEE] = knee_angle_right
-        # q[RIGHT_ANKLE_PITCH] = -0.4 * hip_angle_right
-        
-        # Compute forward kinematics
-        pin.forwardKinematics(model, data, q)
+        # Compute forward kinematics with velocities and accelerations
+        pin.forwardKinematics(model, data, q, v, a)
         pin.updateFramePlacements(model, data)
+        
+        # # Compute frame velocity and acceleration (print every 10 frames)
+        # if frame % 10 == 0:
+        #     frame_velocity = pin.getFrameVelocity(model, data, FRAME_ID, pin.ReferenceFrame.WORLD)
+        #     frame_acceleration = pin.getFrameAcceleration(model, data, FRAME_ID, pin.ReferenceFrame.WORLD)
+        #     print(f"Frame {FRAME_ID} | Velocity: linear=[{frame_velocity.linear[0]:.4f}, {frame_velocity.linear[1]:.4f}, {frame_velocity.linear[2]:.4f}], "
+        #           f"angular=[{frame_velocity.angular[0]:.4f}, {frame_velocity.angular[1]:.4f}, {frame_velocity.angular[2]:.4f}]")
+        #     print(f"Frame {FRAME_ID} | Acceleration: linear=[{frame_acceleration.linear[0]:.4f}, {frame_acceleration.linear[1]:.4f}, {frame_acceleration.linear[2]:.4f}], "
+        #           f"angular=[{frame_acceleration.angular[0]:.4f}, {frame_acceleration.angular[1]:.4f}, {frame_acceleration.angular[2]:.4f}]\n")
         
         # Update visualization
         viz.display(q)
         
         # Update left foot marker position at frame 31
-        left_foot_pos = data.oMf[16].translation
+        left_foot_pos = data.oMf[FRAME_ID].translation
+        print("Frame: ", left_foot_pos)
         viz.viewer["left_foot_marker"].set_transform(
             tf.translation_matrix(left_foot_pos)
         )
-        
-        # Progress indicator
-        if frame % fps == 0:
-            progress = (frame / num_frames) * 100
-            print(f"Progress: {progress:.0f}% | Time: {t:.1f}s / {duration:.1f}s | "
-                  f"Left Hip: {np.rad2deg(q[LEFT_HIP_PITCH]):+6.1f}° | "
-                  f"Right Hip: {np.rad2deg(q[RIGHT_HIP_PITCH]):+6.1f}°")
+
         
         time.sleep(dt)
     
@@ -143,3 +153,9 @@ except KeyboardInterrupt:
     print("Closing viewer...")
 
 print("\nDone!")
+
+# Left foot position:  [ 0.04525  0.      -0.08339] frame 3 - imu pelvis
+# Left foot position:  [ 0.04525  0.      -0.08339] frame 2
+# Left foot position:  [-0.04313164  0.11850645 -0.78649488] - frame 16 and 17 are the same for torso
+
+# cd /home/saakee/Research/Saaketh_INEKF && /home/saakee/Research/Saaketh_INEKF/g1_env/bin/python Extra_Files/g1_leg_swing_meshcat.py

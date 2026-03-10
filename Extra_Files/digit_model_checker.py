@@ -73,11 +73,6 @@ if left_foot_heel_idx is None:
 
 
 
-
-
-
-
-
 try:
     import meshcat
     

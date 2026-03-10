@@ -12,10 +12,10 @@ robot_name: "G1"
 # ============================================================================
 model:
   # Path to robot model file
-  model_path: "../G1_mujoco-main/src/G1_mujoco/models/flat/G1-v3-flat.xml"
+  model_path: "/home/saakee/Research/Saaketh_INEKF/src/utility/G1/g1_29dof_IMUShifted.urdf"
   
   # Model format: "urdf" or "mjcf"
-  format: "mjcf"
+  format: "urdf"
 
 # ============================================================================
 # ROBOT STRUCTURE
@@ -26,13 +26,14 @@ structure:
   
   # Contact point frame IDs in the Pinocchio model - size should match num of legs
   # For G1: Left foot=16, Right foot=32 - open up a visualization tool to verify
-  contact_frame_ids: [16, 32]
+  contact_frame_ids: [19, 35]
 
 # ============================================================================
 # IMU2BD OFFSET
 # ============================================================================
 # IMU to body frame offset [x, y, z] in meters - investigate exact relationship later
-imu_to_body: [0.0, 0.0, 0.0]
+# imu_to_body: [0.0, 0.0, 0.0]
+imu_to_body:  [ 0,  0.0, 0]
 
 # ============================================================================
 # COVARIANCE PARAMETERS for the Robot
@@ -64,7 +65,9 @@ covariance:
 # Indices of encoder and encoderdot that receive actual TextFile data or sensor data (non-zero assignments)
 # Got to put some work into finding these indices for your robot
 
-TextFile_encoder_indices: [7, 8, 9, 14, 15, 16, 17, 18, 23, 28, 29, 34, 35, 36, 41, 42, 43, 44, 45, 50, 55, 56]
-TextFile_encoderdot_indices: [6, 7, 8, 10, 11, 12, 13, 14, 16, 18, 19, 24, 25, 26, 28, 29, 30, 31, 32, 34, 36, 37]
+Encoder_indices_map: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]
+Encoderdot_indices_map: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]
 
-  
+Torque_indices_map:
+  - [0, 1, 2, 3, 4, 5]        # Left leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
+  - [6, 7, 8, 9, 10, 11]       # Right leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll

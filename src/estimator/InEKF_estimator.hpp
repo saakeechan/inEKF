@@ -6,6 +6,7 @@
 #include <eigen3/Eigen/Dense>
 #include "../InEKF/InEKF.h"
 #include "../utility/BasicFunctions_Estimator.hpp"
+#include "../utility/getParameters.hpp"
 
 // ----------------------------
 // Include robot model
@@ -13,7 +14,6 @@
 
 // Include CSV data parser
 #include "../utility/TextFileDataStruct.hpp"
-
 // ----------------------------
 
 using namespace Eigen;
@@ -36,13 +36,6 @@ typedef struct _ROBOT_STATES_ {
     std::vector<bool> Contact;      // Dynamic size
     std::vector<bool> Hard_Contact;  // Dynamic size
     std::vector<bool> Slip;          // Dynamic size
-
-    // int contact_leg_num; // delete everything below this later
-
-    // int state_size;
-    // int state_idx;
-    // int para_size;
-    // int para_idx;
 
 }ROBOT_STATES;
 
@@ -68,9 +61,11 @@ public:
     
     void InitializeFromYAML(const std::string& config_path); // Initialize from YAML configuration file
 
-    void new_measurement(Eigen::MatrixXd &Sensor_i, std::vector<bool> &Contact_i);
+    void new_measurement(const std::vector<double> &imu_i, const std::vector<double> &motor_data_i, const std::vector<bool> &Contact_i);
+    void new_measurement(const std::vector<double> &imu_i, const std::vector<double> &motor_data_i);  // Contact detection from torques
     void new_measurement();  // No-argument version for TextFile mode
 
+    std::vector<bool> contact_detection_logic(const std::vector<double> &motor_torques_i);  // Helper for contact detection from torques
     void Propagate_and_Correct();
     std::vector<double> Variable_Contact_Cov(int time);
 
@@ -79,10 +74,15 @@ public:
 
     void SAVE_onestep(int save_index);
 
-    void Onestep(Eigen::MatrixXd &Sensor_i, std::vector<bool> &Contact_i);
+    void Onestep(const std::vector<double> &imu_i, const std::vector<double> &motor_data_i, const std::vector<bool> &Contact_i);
+    void Onestep(const std::vector<double> &imu_i, const std::vector<double> &motor_data_i, const std::vector<double> &motor_torques_i);  // Contact detection from torques
     void Onestep();  // No-argument version for TextFile mode
 
     void writeSavedData();
+    void writeDvHistory();  // Write dv norms to CSV file
+
+    // Static utility function - can be called without creating an estimator object
+    static void getParameters(const std::string& urdf_path, const std::string& robot_name);
 
     int TextFile_Skip_Data = 0; // default (change in main.cpp if you have trash data)
 
@@ -92,6 +92,7 @@ public:
     int frame_count=0;
     int time_count=0;
 
+    ROBOT_STATES current_state;  // Current estimated state populated by send_states()
 
     double dt;
     Vector3d gravity{0, 0, -9.806659};
@@ -167,6 +168,9 @@ public:
 
     bool variable_contact_cov_mode = false;
     double cov_amplifier = 2;
+
+    // dv history for CSV logging: [time_step][leg] = dv_norm
+    std::vector<std::vector<double>> dv_history;
 
 
 private:

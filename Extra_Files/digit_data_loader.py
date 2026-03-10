@@ -7,8 +7,12 @@ Provides all 191+ columns as named variables.
 import numpy as np
 
 # Load the CSV file with headers
-digit_data = np.loadtxt("digit_cropped_data.csv", delimiter=",", skiprows=1)
+digit_data = np.genfromtxt("digit_cropped_data_full.csv", delimiter=",", skip_header=1, filling_values=0.0)
 print(f"Loaded digit data: {digit_data.shape[0]} rows, {digit_data.shape[1]} columns")
+
+digit_data = digit_data[0:977, :] # Crop to 977 rows to match timestamp length
+
+
 
 # Parse all columns into named variables
 timestamp = digit_data[:, 0]
