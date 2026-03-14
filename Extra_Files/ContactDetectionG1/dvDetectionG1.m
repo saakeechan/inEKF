@@ -6,7 +6,7 @@ dv_leg2 = T_dv{:,2};
 
 T = readtable(fullfile("/home/saakee/Research/Saaketh_INEKF/G1LoggingData.csv"));
 
-n = min(height(T), 300);
+n = min(height(T), 100);
 
 % --- Ground-truth contacts ---
 l_gt = logical(T.lfoot_contact(1:n));
@@ -27,12 +27,12 @@ median(dv_leg2_inContact)
 % Asymmetric DV -> contact probability (piecewise)
 % =========================
 
-dv0 = 1.1;        % midpoint: p = 0.5
+dv0 = 0.3;        % midpoint: p = 0.5
 zclip = 4;
 
 % --- Anchors you actually mean ---
 dv_contact    = 0.10;   p_contact    = 0.95;  % confident contact below dv0
-dv_nocontact  = 1;   p_nocontact  = 0.05;  % confident NO contact above dv0
+dv_nocontact  = 0.7;   p_nocontact  = 0.05;  % confident NO contact above dv0
 
 % Distances from dv0
 dL = dv0 - dv_contact;      % >0
@@ -252,3 +252,5 @@ function plot_contact_patches(t, gt, yl)
         patch(xs, ys, 0.85*[1 1 1], 'EdgeColor','none', 'FaceAlpha',0.35);
     end
 end
+
+save("dvDetectionG1.mat")

@@ -13,6 +13,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <iomanip>
 #include <string>
 #include <eigen3/Eigen/Dense>
 #include <vector>
@@ -75,17 +76,6 @@ std::vector<double> InEKFilter::Variable_Contact_Cov(int frame_count){ // time i
 
         }
 
-        // Contact detection
-        // 1. Torque reading
-            // Solving dynamics equation
-
-            // 2. Abrupt change of torque reading
-            //moving average and raw torque reading through low pass filter
-            //3, From foot velocity - dv was high, during contact dv = 0..but dv>>0 means foot is swinging, or slipping
-            
-            //4. Look at phase, legs are alternating -- no explicit phases in rl 
-
-
         //push back is like append for each iteration of the leg
         contact_cov_array.push_back( contact_cov );
 
@@ -133,6 +123,12 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
     // Initialize dv_history for tracking dv norms over time
     dv_history.clear();
     
+    // Initialize contact detection accuracy tracking
+    contact_match_count.resize(robot.num_legs, 0);
+    contact_mismatch_count.resize(robot.num_legs, 0);
+    total_comparisons = 0;
+    GroundTruthContact.resize(robot.num_legs, false);
+    
     // Initialize each element to the correct size
     for (int i = 0; i < SLIDING_WINDOW_SIZE; i++) {
         // Fixed-size types
@@ -147,7 +143,7 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
         // Dynamic-size types based on robot model
         ENCODER[i] = Eigen::VectorXd::Zero(robot.encoder_size);
         ENCODERDOT[i] = Eigen::VectorXd::Zero(robot.encoderdot_size);
-        d_v[i] = Eigen::VectorXd::Zero(3 * robot.num_legs);  // 3 components per leg
+        d_v[i] = Eigen::VectorXd::Constant(3 * robot.num_legs, std::numeric_limits<double>::infinity());  // 3 components per leg
         
         // Contact state vectors - resize inner vector for each leg
         CONTACT_t[i].resize(robot.num_legs, false);
@@ -349,23 +345,29 @@ void InEKFilter::InitializeFromYAML(const std::string& config_path) {
     Initialize(dt_val, cov_val_setting, initial_condition, sliding_window_size);
 }
 
-void InEKFilter::new_measurement(const std::vector<double> &imu_i, const std::vector<double> &motor_data_i, const std::vector<bool> &Contact_i)
+void InEKFilter::new_measurement(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const std::vector<bool> &Contact_i)
 {
     // ========================================================================
     // ROBOT-SPECIFIC ENCODER ASSIGNMENT
-    // imu_i: 6-element vector [gyro_x, gyro_y, gyro_z, acc_x, acc_y, acc_z]
-    // motor_data_i: N-element vector [encoder_1, ..., encoder_N, encoderdot_1, ..., encoderdot_N]
-    //               where N = 2 * robot.encoder_size (e.g., 24 for 12-DOF robot)
+    // imu_i: 6-element Eigen::VectorXd [omega_x, omega_y, omega_z, acc_x, acc_y, acc_z]
+    // motor_data_i: 2 x num_joints Eigen::MatrixXd
+    //               Row 0: joint positions
+    //               Row 1: joint velocities
     // ========================================================================
     
     // Extract IMU data
-    IMU_Gyro[frame_count] << imu_i[0], imu_i[1], imu_i[2];
-    IMU_Acc[frame_count] << imu_i[3], imu_i[4], imu_i[5];
+    IMU_Gyro[frame_count] << imu_i(0), imu_i(1), imu_i(2);
+    IMU_Acc[frame_count] << imu_i(3), imu_i(4), imu_i(5);
     
-    // Split motor_data into encoder positions and velocities
-    int half_size = motor_data_i.size() / 2;
-    std::vector<double> encoder_data(motor_data_i.begin(), motor_data_i.begin() + half_size);
-    std::vector<double> encoderdot_data(motor_data_i.begin() + half_size, motor_data_i.end());
+    // Extract encoder positions and velocities from matrix rows
+    int num_joints = motor_data_i.cols();
+    std::vector<double> encoder_data(num_joints);
+    std::vector<double> encoderdot_data(num_joints);
+    
+    for (int i = 0; i < num_joints; ++i) {
+        encoder_data[i] = motor_data_i(0, i);      // Row 0: positions
+        encoderdot_data[i] = motor_data_i(1, i);   // Row 1: velocities
+    }
     
     // Map directly to Eigen vectors (no conversion needed)
     robot.map_indices_to_encoders(encoder_data, ENCODER[frame_count], "encoder");
@@ -382,24 +384,30 @@ void InEKFilter::new_measurement(const std::vector<double> &imu_i, const std::ve
 
 }
 
-void InEKFilter::new_measurement(const std::vector<double> &imu_i, const std::vector<double> &motor_data_i)
+void InEKFilter::new_measurement(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i)
 {
     // ========================================================================
     // ROBOT-SPECIFIC ENCODER ASSIGNMENT
-    // imu_i: 6-element vector [gyro_x, gyro_y, gyro_z, acc_x, acc_y, acc_z]
-    // motor_data_i: N-element vector [encoder_1, ..., encoder_N, encoderdot_1, ..., encoderdot_N]
-    //               where N = 2 * robot.encoder_size (e.g., 24 for 12-DOF robot)
+    // imu_i: 6-element Eigen::VectorXd [omega_x, omega_y, omega_z, acc_x, acc_y, acc_z]
+    // motor_data_i: 2 x num_joints Eigen::MatrixXd
+    //               Row 0: joint positions
+    //               Row 1: joint velocities
     // Note: This version doesn't set contact info - caller must handle contacts
     // ========================================================================
     
     // Extract IMU data
-    IMU_Gyro[frame_count] << imu_i[0], imu_i[1], imu_i[2];
-    IMU_Acc[frame_count] << imu_i[3], imu_i[4], imu_i[5];
+    IMU_Gyro[frame_count] << imu_i(0), imu_i(1), imu_i(2);
+    IMU_Acc[frame_count] << imu_i(3), imu_i(4), imu_i(5);
     
-    // Split motor_data into encoder positions and velocities
-    int half_size = motor_data_i.size() / 2;
-    std::vector<double> encoder_data(motor_data_i.begin(), motor_data_i.begin() + half_size);
-    std::vector<double> encoderdot_data(motor_data_i.begin() + half_size, motor_data_i.end());
+    // Extract encoder positions and velocities from matrix rows
+    int num_joints = motor_data_i.cols();
+    std::vector<double> encoder_data(num_joints);
+    std::vector<double> encoderdot_data(num_joints);
+    
+    for (int i = 0; i < num_joints; ++i) {
+        encoder_data[i] = motor_data_i(0, i);      // Row 0: positions
+        encoderdot_data[i] = motor_data_i(1, i);   // Row 1: velocities
+    }
     
     // Map directly to Eigen vectors (no conversion needed)
     robot.map_indices_to_encoders(encoder_data, ENCODER[frame_count], "encoder");
@@ -429,8 +437,10 @@ void InEKFilter::new_measurement()
     IMU_Gyro[frame_count] << TextFileData.gyro_x[j], TextFileData.gyro_y[j], TextFileData.gyro_z[j];
     IMU_Acc[frame_count] << TextFileData.acc_x[j], TextFileData.acc_y[j], TextFileData.acc_z[j];
 
+    if (robot.robot_name == "G1") {
     // Convert gravity-compensated body IMU to world frame with gravity added back
     IMU_Acc[frame_count] = filter.getState().getRotation() * IMU_Acc[frame_count] - gravity;
+    }
     // IMU_Gyro[frame_count] = filter.getState().getRotation() * IMU_Gyro[frame_count];
 
     // cout << "Frame " << frame_count << " IMU Gyro: " << IMU_Gyro[frame_count].transpose() << endl;
@@ -453,13 +463,6 @@ void InEKFilter::new_measurement()
     
     // Get contact state from TextFile
     CONTACT_t[frame_count] = TextFileData.contact_state[j];
-
-    // std::cout << "Frame " << frame_count << " Contact: [";
-    // for (size_t i = 0; i < CONTACT_t[frame_count].size(); i++) {
-    //     std::cout << CONTACT_t[frame_count][i];
-    //     if (i < CONTACT_t[frame_count].size() - 1) std::cout << ", ";
-    // }
-    // std::cout << "]" << std::endl;
     
     // Consolidate IMU measurement
     imu_measurement << IMU_Gyro[frame_count], IMU_Acc[frame_count];
@@ -509,16 +512,8 @@ void InEKFilter::Propagate_and_Correct()
         pose.block<3,3>(0,0) = Eigen::Matrix3d::Identity();
         pose.block<3,1>(0,3) = robot.get_foot_position(k+1);
         
-        // Extract Jacobian for this leg and compute measurement covariance
-        Eigen::MatrixXd FK_Jacobian_full = robot.get_foot_jacobian(k+1);
-
-        
-
-        // Extract only the active encoder columns (removes base DOFs + unused joints)
-        Eigen::MatrixXd FK_Jacobian = robot.extract_active_encoder_jacobian(FK_Jacobian_full);
-
-        // std::cout << "Full FK Jacobian for leg " << k+1 << ":\n" << FK_Jacobian_full << std::endl;
-        // std::cout << "Active FK Jacobian for leg " << k+1 << ":\n" << FK_Jacobian << std::endl;
+        // Get active Jacobian for this leg (already extracts only active encoder columns)
+        Eigen::MatrixXd FK_Jacobian = robot.get_foot_jacobian(k+1);
         
         // Compute diagonal covariance from norm squared of Jacobian rows
         Eigen::Vector3d jac_norm_sq;
@@ -540,31 +535,31 @@ void InEKFilter::Propagate_and_Correct()
         // Store dv norms for this time step
         std::vector<double> dv_norms_current(robot.num_legs);
 
-        // DEBUG: Override filter velocity and rotation with ground truth for dv computation
-        int j_debug = time_count + TextFile_Skip_Data;
-        Eigen::Vector3d v_gt;
-        v_gt << TextFileData.vel_x[j_debug], TextFileData.vel_y[j_debug], TextFileData.vel_z[j_debug];
-        Eigen::Vector4d quat_gt;
-        quat_gt << TextFileData.quat_w[j_debug], TextFileData.quat_i[j_debug], TextFileData.quat_j[j_debug], TextFileData.quat_k[j_debug];
-        Eigen::Matrix3d R_gt = BasicFunctions_Estimator::Quaternion_to_Rotation_Matrix(quat_gt);
+        // // DEBUG: Override filter velocity and rotation with ground truth for dv computation
+        // int j_debug = time_count + TextFile_Skip_Data;
+        // Eigen::Vector3d v_gt;
+        // v_gt << TextFileData.vel_x[j_debug], TextFileData.vel_y[j_debug], TextFileData.vel_z[j_debug];
+        // Eigen::Vector4d quat_gt;
+        // quat_gt << TextFileData.quat_w[j_debug], TextFileData.quat_i[j_debug], TextFileData.quat_j[j_debug], TextFileData.quat_k[j_debug];
+        // Eigen::Matrix3d R_gt = BasicFunctions_Estimator::Quaternion_to_Rotation_Matrix(quat_gt);
 
         for (int k=0; k<robot.num_legs; k++){
             
-            // d_v[frame_count].block(3*k,0,3,1) = filter.getState().getVelocity()
-            //         + filter.getState().getRotation()*robot.get_foot_velocity(k+1)
-            //         + filter.getState().getRotation()*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias())*robot.get_foot_position(k+1);
+            d_v[frame_count].block(3*k,0,3,1) = filter.getState().getVelocity()
+                    + filter.getState().getRotation()*robot.get_foot_velocity(k+1)
+                    + filter.getState().getRotation()*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias())*robot.get_foot_position(k+1);
 
-            d_v[frame_count].block(3*k,0,3,1) = v_gt
-                    + R_gt * robot.get_foot_velocity(k+1)
-                    + R_gt * BasicFunctions_Estimator::Hat_so3(IMU_Gyro[frame_count])*robot.get_foot_position(k+1);
+            // d_v[frame_count].block(3*k,0,3,1) = v_gt
+            //         + R_gt * robot.get_foot_velocity(k+1)
+            //         + R_gt * BasicFunctions_Estimator::Hat_so3(IMU_Gyro[frame_count])*robot.get_foot_position(k+1);
                     
             
         // Store the norm for this leg
             dv_norms_current[k] = d_v[frame_count].block(3*k,0, 3,1).norm();
 
-            if (k == 0) {
-                std::cout << "Leg1 dv_norm: " << dv_norms_current[k] << "  contact: " << CONTACT_t[frame_count][k] << std::endl;
-            }
+            // if (k == 0) {
+            //     std::cout << "Leg1 dv_norm: " << dv_norms_current[k] << "  contact: " << CONTACT_t[frame_count][k] << std::endl;
+            // }
 
             SLIP_t[frame_count][k] = false;
             
@@ -586,18 +581,11 @@ void InEKFilter::Propagate_and_Correct()
 
 void InEKFilter::send_states(ROBOT_STATES &state_){ 
 
-
     //Sending Estimated States----------------------------------------------------------------------------
 
-    Eigen::Vector3d W_pos_imu2bd = filter.getState().getRotation() * robot.IMU2BD;
+    state_.Position = filter.getState().getPosition();
 
-    state_.Position = filter.getState().getPosition() + W_pos_imu2bd;
-
-    Eigen::Vector3d w_gyro;
-    w_gyro = filter.getState().getRotation()*(IMU_Gyro[1] - filter.getState().getGyroscopeBias());
-
-
-    state_.Velocity = filter.getState().getVelocity() + w_gyro.cross(W_pos_imu2bd);
+    state_.Velocity = filter.getState().getVelocity();
     state_.Bias_Gyro = filter.getState().getGyroscopeBias();
     state_.Bias_Acc = filter.getState().getAccelerometerBias();
     state_.Rotation= filter.getState().getRotation();
@@ -737,7 +725,6 @@ void InEKFilter::sliding_window(){
         std::swap(ENCODERDOT[0],ENCODERDOT[1]);
         std::swap(d_v[0], d_v[1]);
     }
-
 }
 
 void InEKFilter::writeSavedData(){
@@ -765,22 +752,35 @@ void InEKFilter::writeSavedData(){
     cout << filename << endl;
     cout << "Saving to a file done" << endl;
     
+    // // Print contact detection accuracy statistics
+    // if (total_comparisons > 0) {
+    //     cout << "\n=== Contact Detection Accuracy ==="<< endl;
+    //     cout << "Total comparisons: " << total_comparisons << endl;
+    //     for (int k = 0; k < robot.num_legs; k++) {
+    //         int total_leg = contact_match_count[k] + contact_mismatch_count[k];
+    //         double accuracy = (total_leg > 0) ? (100.0 * contact_match_count[k] / total_leg) : 0.0;
+    //         cout << "Leg " << (k+1) << ": Matches=" << contact_match_count[k] 
+    //              << ", Mismatches=" << contact_mismatch_count[k]
+    //              << ", Accuracy=" << std::fixed << std::setprecision(2) << accuracy << "%" << endl;
+    //     }
+    // }
+    
     // Write dv history to CSV
     writeDvHistory();
 
 }
 
-void InEKFilter::Onestep(const std::vector<double> &imu_i, const std::vector<double> &motor_data_i, const std::vector<bool> &Contact_i){
+void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const std::vector<bool> &Contact_i){
 
     new_measurement(imu_i, motor_data_i, Contact_i); // read in new measurement and calculate rotation, velocity updates and slip states
 
 
     Propagate_and_Correct();
-    send_states(current_state); // update current_state with latest estimates for external use (e.g., logging, visualization)
+    send_states(robot_state); // update current_state with latest estimates for external use (e.g., logging, visualization)
 
     if(filter.getState().getVelocity().norm()>10 && dt!=0){
-       cout<<"Diverged!! from time "<<time_count<<endl;
-        dt = 0;
+    //    cout<<"Diverged!! from time "<<time_count<<endl;
+        // dt = 0;
     }
 
     // Keep frame_count in [0, 1] range for sliding window
@@ -794,7 +794,7 @@ void InEKFilter::Onestep(const std::vector<double> &imu_i, const std::vector<dou
 
 
 }
-void InEKFilter::Onestep(const std::vector<double> &imu_i, const std::vector<double> &motor_data_i, const std::vector<double> &motor_torques_i){
+void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const Eigen::VectorXd &motor_torques_i){
 
     new_measurement(imu_i, motor_data_i); // read motor and IMU data first
 
@@ -804,23 +804,23 @@ void InEKFilter::Onestep(const std::vector<double> &imu_i, const std::vector<dou
         // Sum torques for all motors in this leg
         double leg_torque_sum = 0.0;
         for (int idx : robot.Torque_indices_map[i]) {
-            leg_torque_sum += std::abs(motor_torques_i[idx]);
+            leg_torque_sum += std::abs(motor_torques_i(idx));
         }
         leg_torques(i) = leg_torque_sum;
     }
     
     // Detect contacts from motor torques and velocity residuals
     // Use previous dv if available (frame_count >= 1), otherwise use current (frame_count = 0)
-    Eigen::VectorXd dv_for_detection = (frame_count < 1) ? d_v[frame_count] : d_v[frame_count - 1];
+    Eigen::VectorXd dv_for_detection = d_v[0]; // Use dv from frame 0 for detection, as it is the most recent after sliding window update
     CONTACT_t[frame_count] = ContactDetection::detect_contact(leg_torques, dv_for_detection);
 
     Propagate_and_Correct();
 
-    send_states(current_state); // update current_state with latest estimates for external use (e.g., logging, visualization)
+    send_states(robot_state); // update current_state with latest estimates for external use (e.g., logging, visualization)
 
     if(filter.getState().getVelocity().norm()>10 && dt!=0){
-       cout<<"Diverged!! from time "<<time_count<<endl;
-        dt = 0;
+    //    cout<<"Diverged!! from time "<<time_count<<endl;
+        // dt = 0;
     }
 
     // Keep frame_count in [0, 1] range for sliding window
@@ -838,6 +838,43 @@ void InEKFilter::Onestep(){
     // No-argument version: uses TextFile data directly (requires textfile_flag == true)
 
     new_measurement(); // reads from TextFile when textfile_flag is true
+
+    // // Create zero leg torques vector (only checking dv-based detection)
+    // Eigen::VectorXd leg_torques = Eigen::VectorXd::Zero(robot.num_legs);
+    
+    // Eigen::VectorXd dv_for_detection = (frame_count < 1) ? d_v[frame_count] : d_v[frame_count - 1];
+    
+    // ContactDetection::detect_contact(leg_torques, dv_for_detection);
+
+    
+    // Extract leg torques from TextFile data
+    int j = time_count + TextFile_Skip_Data;
+    Eigen::VectorXd leg_torques(robot.num_legs);
+    for (int i = 0; i < robot.num_legs; i++) {
+        // Sum squared torques for all motors in this leg
+        double leg_torque_sum = 0.0;
+        for (int idx : robot.Torque_indices_map[i]) {
+            double torque = TextFileData.motor_torques[j][idx];
+            leg_torque_sum += torque * torque;
+        }
+        leg_torques(i) = leg_torque_sum;
+    }
+    
+    Eigen::VectorXd dv_for_detection = d_v[0]; // Use dv from frame 0 for detection, as it is the most recent after sliding window update
+    CONTACT_t[frame_count] = ContactDetection::detect_contact(leg_torques, dv_for_detection);
+
+    // GroundTruthContact = TextFileData.contact_state[j]; // For evaluation purposes, store ground truth contact from TextFile
+
+    // // Compare detected contact with ground truth and update counters
+    // for (int k = 0; k < robot.num_legs; k++) {
+    //     if (CONTACT_t[frame_count][k] == GroundTruthContact[k]) {
+    //         contact_match_count[k]++;
+    //     } else {
+    //         contact_mismatch_count[k]++;
+    //     }
+    // }
+    // total_comparisons++;
+
     Propagate_and_Correct();
 
     SAVE_onestep(time_count); // save estimated and true states to SAVE_MATRIX
@@ -846,8 +883,8 @@ void InEKFilter::Onestep(){
 
     
     if(filter.getState().getVelocity().norm()>10 && dt!=0){
-       cout<<"Diverged!! from time "<<time_count<<endl;
-        dt = 0;
+    //    cout<<"Diverged!! from time "<<time_count<<endl;
+        // dt = 0;
     }
     
     // Keep frame_count in [0, 1] range for sliding window
@@ -863,7 +900,8 @@ void InEKFilter::Onestep(){
 }
 
 void InEKFilter::writeDvHistory() {
-    std::string filename = "G1_dv_values.csv";
+    std::string filename = robot.robot_name + "_dv_values.csv";
+
     std::ofstream outfile(filename);
     
     if (!outfile.is_open()) {
