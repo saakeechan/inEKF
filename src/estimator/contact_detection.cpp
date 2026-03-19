@@ -10,9 +10,7 @@ namespace ContactDetection {
 
     std::vector<bool> detect_contact(
         const Eigen::VectorXd& leg_torques,
-        const Eigen::VectorXd& d_v,
-        double torque_threshold,
-        double velocity_threshold
+        const Eigen::VectorXd& d_v
     ) {
         int num_legs = leg_torques.size();
         std::vector<bool> contacts(num_legs, false);
@@ -22,7 +20,7 @@ namespace ContactDetection {
             std::cerr << "Warning: d_v size (" << d_v.size() 
                       << ") doesn't match 3*num_legs (" << 3*num_legs << ")" << std::endl;
             // Fall back to torque-only detection
-            std::vector<double> torque_probs = detect_contact_torque(leg_torques, torque_threshold);
+            std::vector<double> torque_probs = detect_contact_torque(leg_torques);
             for (int i = 0; i < num_legs; i++) {
                 contacts[i] = (torque_probs[i] > 0.5);
             }
@@ -30,33 +28,39 @@ namespace ContactDetection {
         }
         
         // Get probabilities from both methods
-        std::vector<double> torque_probs = detect_contact_torque(leg_torques, torque_threshold);
-        std::vector<double> velocity_probs = detect_contact_velocity(d_v, velocity_threshold);
+        std::vector<double> torque_probs = detect_contact_torque(leg_torques);
+        std::vector<double> velocity_probs = detect_contact_velocity(d_v);
         
-        // Fuse probabilities: multiply them (treating as independent probabilities)
-        // p(contact | torque AND velocity) ≈ p(torque) * p(velocity) / normalization
+        // Normalize weights
+        double weight_sum = w_torque + w_velocity;
+        
+        // Fuse probabilities: normalized weighted average
         for (int leg = 0; leg < num_legs; leg++) {
-            double fused_prob = torque_probs[leg] * velocity_probs[leg];
-            contacts[leg] = (fused_prob > 0.25);  // Threshold for fused probability
+            double fused_prob = (w_torque * torque_probs[leg] + w_velocity * velocity_probs[leg]) / weight_sum;
+            contacts[leg] = (fused_prob >= 0.5);
+            
+            // // Print leg 0 fused probability
+            // if (leg == 0) {
+            //     printf("Leg 0 fused prob: %.4f\n", fused_prob);
+            // }
         }
+        
+        // // Print leg 1 velocity probability
+        // std::cout << "Left leg dv contact prob: " << velocity_probs[0] << std::endl;
+
+        // // Print leg 1 torque probability
+        // std::cout << "Left leg torque contact prob: " << torque_probs[0] << std::endl;
         
         return contacts;
     }
 
     std::vector<double> detect_contact_torque(
-        const Eigen::VectorXd& leg_torques,
-        double torque_threshold
+        const Eigen::VectorXd& leg_torques
     ) {
         // Asymmetric Torque -> contact probability
         // Parameters
-        const double T0 = 5000.0;        // midpoint: p = 0.5
+
         const double zclip = 10.0;
-        
-        // Anchors
-        const double T_high = 22500.0;   // confident contact (high torque)
-        const double p_high = 0.95;
-        const double T_low = 200.0;      // confident NO contact (low torque)
-        const double p_low = 0.05;
         
         // Distances from T0
         const double d_high = T_high - T0;   // >0
@@ -71,7 +75,7 @@ namespace ContactDetection {
         const double k_low = (-a_low) / (d_low * d_low);   // curvature for T < T0
         
         // Lambda function for asymmetric torque to probability conversion
-        auto torque2prob_asym = [T0, k_high, k_low, zclip](double torque) -> double {
+        auto torque2prob_asym = [k_high, k_low, zclip](double torque) -> double {
             double d = torque - T0;  // signed distance from midpoint
             double z;
             
@@ -95,7 +99,7 @@ namespace ContactDetection {
         std::vector<double> contact_probabilities(num_legs, 0.0);
         
         for (int leg = 0; leg < num_legs; leg++) {
-            double torque = std::abs(leg_torques(leg));
+            double torque = (leg_torques(leg));
             contact_probabilities[leg] = torque2prob_asym(torque);
         }
         
@@ -103,19 +107,10 @@ namespace ContactDetection {
     }
 
     std::vector<double> detect_contact_velocity(
-        const Eigen::VectorXd& d_v,
-        double velocity_threshold
+        const Eigen::VectorXd& d_v
     ) {
         // Asymmetric DV -> contact probability (piecewise)
-        // Parameters
-        const double dv0 = 0.3;        // midpoint: p = 0.5
         const double zclip = 4.0;
-        
-        // Anchors
-        const double dv_contact = 0.10;     // confident contact below dv0
-        const double p_contact = 0.95;
-        const double dv_nocontact = 1.0;    // confident NO contact above dv0
-        const double p_nocontact = 0.05;
         
         // Distances from dv0
         const double dL = dv0 - dv_contact;      // >0
@@ -130,7 +125,7 @@ namespace ContactDetection {
         const double kU = (-aU) / (dU * dU);        // >0
         
         // Lambda function for asymmetric DV to probability conversion
-        auto dv2prob_asym = [dv0, kL, kU, zclip](double dv) -> double {
+        auto dv2prob_asym = [kL, kU, zclip](double dv) -> double {
             double d = dv - dv0;
             double z;
             
@@ -164,6 +159,11 @@ namespace ContactDetection {
             contact_probabilities[leg] = dv2prob_asym(velocity_norm);
         }
         
+        // printf("Velocity-based contact probabilities: ");
+        // for (int leg = 0; leg < num_legs; leg++) {
+        //     printf("Leg %d: %.3f ", leg+1, contact_probabilities[leg]);
+        // }
+        // printf("\n");
         return contact_probabilities;
     }
 

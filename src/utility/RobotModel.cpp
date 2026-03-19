@@ -10,7 +10,7 @@
 
 RobotModel::RobotModel() {
     // Initialize default values
-    IMU2BD.setZero();
+    imu_frame_id = -1;  // Will be set from config
     
     // Initialize covariance constants with defaults
     cov_gyro_const = 1e-4;
@@ -106,12 +106,12 @@ bool RobotModel::load_config(const std::string& config_file) {
         }
         
         // ====================================================================
-        // IMU2BD OFFSET
-        // =====================================================================
-        // IMU offset
-        if (config["imu_to_body"]) {
-            auto imu_offset = config["imu_to_body"].as<std::vector<double>>();
-            IMU2BD << imu_offset[0], imu_offset[1], imu_offset[2];
+        // IMU FRAME ID
+        // ====================================================================
+        if (config["imuFrame_id"]) {
+            imu_frame_id = config["imuFrame_id"].as<int>();
+        } else {
+            std::cout << "Warning: imuFrame_id not specified in config" << std::endl;
         }
         
         // ====================================================================
@@ -314,12 +314,15 @@ Eigen::Vector3d RobotModel::get_foot_position(int i_leg) const {
         std::exit(EXIT_FAILURE);
     }
     
-    // Get foot position from the already-computed forward kinematics
+    // Get foot position relative to IMU frame
+    // Formula: foot_in_imu = inv(SE3_imu) * SE3_foot
+    const pinocchio::SE3& imu_placement = pin_data.oMf[imu_frame_id];
     const pinocchio::SE3& foot_placement = pin_data.oMf[foot_frame_ids[i_leg - 1]];
-    Eigen::Vector3d foot_position = foot_placement.translation();
     
-    // return foot_position + IMU2BD;
-    return foot_position; // We are using an IMU-shifted model, so no need to add IMU2BD offset here
+    // Use actInv for efficient computation: imu.actInv(foot) = inv(imu) * foot
+    pinocchio::SE3 foot_relative_to_imu = imu_placement.actInv(foot_placement);
+    
+    return foot_relative_to_imu.translation();
 }
 
 Eigen::MatrixXd RobotModel::get_foot_jacobian(int i_leg) const {
@@ -334,19 +337,33 @@ Eigen::MatrixXd RobotModel::get_foot_jacobian(int i_leg) const {
         std::exit(EXIT_FAILURE);
     }
     
-    // Compute frame Jacobian in World frame
-    // This is efficient because Forward_Kinematics() already computed the kinematics
-    Eigen::MatrixXd J_full = Eigen::MatrixXd::Zero(6, pin_model.nv);
+    // Compute foot frame Jacobian in World frame
+    Eigen::MatrixXd J_foot_full = Eigen::MatrixXd::Zero(6, pin_model.nv);
     pinocchio::getFrameJacobian(
         pin_model,
         const_cast<pinocchio::Data&>(pin_data),
         foot_frame_ids[i_leg - 1],
-        pinocchio::WORLD,
-        J_full
+        pinocchio::LOCAL_WORLD_ALIGNED,
+        J_foot_full
     );
     
-    // Extract linear velocity part (first 3 rows)
-    return J_full.topRows(3);
+    // Compute IMU frame Jacobian in World frame
+    Eigen::MatrixXd J_imu_full = Eigen::MatrixXd::Zero(6, pin_model.nv);
+    pinocchio::getFrameJacobian(
+        pin_model,
+        const_cast<pinocchio::Data&>(pin_data),
+        imu_frame_id,
+        pinocchio::LOCAL_WORLD_ALIGNED,
+        J_imu_full
+    );
+    
+    // Extract linear velocity parts (first 3 rows) and compute relative Jacobian
+    Eigen::MatrixXd J_foot_linear = J_foot_full.topRows(3);
+    Eigen::MatrixXd J_imu_linear = J_imu_full.topRows(3);
+    Eigen::MatrixXd J_relative = J_foot_linear - J_imu_linear;
+    
+    // Filter to only active encoder columns
+    return extract_active_encoder_jacobian(J_relative);
 }
 
 Eigen::Vector3d RobotModel::get_foot_velocity(int i_leg) const {
@@ -361,16 +378,33 @@ Eigen::Vector3d RobotModel::get_foot_velocity(int i_leg) const {
         std::exit(EXIT_FAILURE);
     }
     
-    // Compute frame velocity in World frame
-    pinocchio::Motion foot_velocity = pinocchio::getFrameVelocity(
+    // Get foot velocity in world frame
+    pinocchio::Motion foot_velocity_world = pinocchio::getFrameVelocity(
         pin_model,
         const_cast<pinocchio::Data&>(pin_data),
         foot_frame_ids[i_leg - 1],
-        pinocchio::WORLD
+        pinocchio::LOCAL_WORLD_ALIGNED
     );
     
-    // Extract linear velocity component
-    return foot_velocity.linear();
+    // Get IMU velocity in world frame
+    pinocchio::Motion imu_velocity_world = pinocchio::getFrameVelocity(
+        pin_model,
+        const_cast<pinocchio::Data&>(pin_data),
+        imu_frame_id,
+        pinocchio::LOCAL_WORLD_ALIGNED
+    );
+    
+    // Compute relative velocity in world frame
+    Eigen::Vector3d v_rel_world = 
+        foot_velocity_world.linear() - 
+        imu_velocity_world.linear();
+    
+    // Get IMU rotation matrix from world frame
+    const Eigen::Matrix3d R_oi = 
+        pin_data.oMf[imu_frame_id].rotation();
+    
+    // Transform relative velocity to IMU frame: v_imu = R_oi^T * v_world
+    return R_oi.transpose() * v_rel_world;
 }
 
 void RobotModel::compute_joint_jacobians() const {

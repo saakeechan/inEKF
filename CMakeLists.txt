@@ -14,7 +14,7 @@ endmacro(check_build_type_macro val)
 check_build_type_macro(CMAKE_BUILD_TYPE)
 
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_COMPILER_LAUNCHER ccache)
 set(CMAKE_UNITY_BUILD OFF)  # Disabled to avoid symbol conflicts between robot implementations
@@ -80,22 +80,32 @@ file(GLOB_RECURSE INEKF_Estimator_src
 list (FILTER INEKF_Estimator_src EXCLUDE REGEX ".*/main\\.cpp$")
 
 
-add_library(lib_INEKF_Estimator SHARED ${INEKF_Estimator_src})
+add_library(INEKF_Estimator SHARED ${INEKF_Estimator_src})
 # Always compile with -O3 optimization
-target_compile_options(lib_INEKF_Estimator PRIVATE -O3)
+target_compile_options(INEKF_Estimator PRIVATE -O3)
 
 # Set RPATH to find libraries at runtime
-set_target_properties(lib_INEKF_Estimator PROPERTIES
+set_target_properties(INEKF_Estimator PROPERTIES
     BUILD_RPATH "${PINOCCHIO_LIBRARY_DIRS}"
     INSTALL_RPATH "${PINOCCHIO_LIBRARY_DIRS}"
 )
 
 # Force linkage of pinocchio parsers with --no-as-needed
-target_link_options(lib_INEKF_Estimator PRIVATE "LINKER:--no-as-needed")
+target_link_options(INEKF_Estimator PRIVATE "LINKER:--no-as-needed,-rpath,/opt/openrobots/lib")
 
-# Link pinocchio libraries using pkg-config info
-target_link_libraries(lib_INEKF_Estimator PUBLIC 
-    ${PINOCCHIO_LIBRARIES}
+# Link pinocchio libraries (excluding casadi which has version compatibility issues)
+target_link_libraries(INEKF_Estimator PUBLIC 
+    pinocchio_default
+    pinocchio_parsers  
+    coal    # Required by pinocchio_parsers
+    boost_filesystem
+    boost_serialization
+    boost_system
+    urdfdom_sensor
+    urdfdom_model_state
+    urdfdom_model
+    urdfdom_world
+    console_bridge
     yaml-cpp
 )
 
@@ -110,13 +120,13 @@ set_target_properties(${TARGET} PROPERTIES
     INSTALL_RPATH "${PINOCCHIO_LIBRARY_DIRS}"
 )
 
-target_link_libraries(${TARGET} lib_INEKF_Estimator)
+target_link_libraries(${TARGET} INEKF_Estimator)
 
 
 # ============================================================
 # Installation rules
 # ============================================================
-install(TARGETS lib_INEKF_Estimator
+install(TARGETS INEKF_Estimator
     LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
     ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
 )

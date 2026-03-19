@@ -11,6 +11,30 @@
 
 namespace ContactDetection {
 
+    // --- Velocity detection parameters ---
+    inline constexpr double dv0          = 0.3;   // midpoint: p = 0.5
+
+    inline constexpr double dv_contact   = 0.10;  // confident contact below dv0
+    inline constexpr double p_contact    = 0.95;
+
+    inline constexpr double dv_nocontact = 0.7;   // confident NO contact above dv0
+    inline constexpr double p_nocontact  = 0.05;
+
+    // --- Torque detection parameters ---
+    inline constexpr double T0 = 800.0;        // midpoint: p = 0.5
+
+    inline constexpr double T_high = 2000.0;  // confident contact (high torque)
+    inline constexpr double p_high = 0.95;
+    inline constexpr double T_low  = 50.0;    // confident NO contact (low torque)
+    inline constexpr double p_low  = 0.05;
+
+    // --- Fusion weights ---
+    inline constexpr double w_torque   = 0.7;
+    inline constexpr double w_velocity = 0.3;
+    
+    // ---------------------------------------------------------
+
+
     /**
      * @brief Detect ground contact combining motor torques and foot velocities
      * 
@@ -22,33 +46,27 @@ namespace ContactDetection {
      */
     std::vector<bool> detect_contact(
         const Eigen::VectorXd& leg_torques,
-        const Eigen::VectorXd& d_v,
-        double torque_threshold = 10.0,
-        double velocity_threshold = 0.1
+        const Eigen::VectorXd& d_v
     );
 
     /**
      * @brief Detect ground contact using only torque information
      * 
      * @param leg_torques Vector of torque values for each leg
-     * @param torque_threshold Torque magnitude threshold for contact detection (Nm) - unused, kept for backward compatibility
      * @return std::vector<double> Contact probability for each leg (0.0 to 1.0)
      */
     std::vector<double> detect_contact_torque(
-        const Eigen::VectorXd& leg_torques,
-        double torque_threshold = 10.0
+        const Eigen::VectorXd& leg_torques
     );
 
     /**
      * @brief Detect ground contact using only velocity residual information
      * 
      * @param d_v Foot velocity residuals (size: 3*num_legs, ordered as [leg1_xyz, leg2_xyz, ...])
-     * @param velocity_threshold Velocity threshold for contact detection (m/s) - unused, kept for backward compatibility
      * @return std::vector<double> Contact probability for each leg (0.0 to 1.0)
      */
     std::vector<double> detect_contact_velocity(
-        const Eigen::VectorXd& d_v,
-        double velocity_threshold = 0.1
+        const Eigen::VectorXd& d_v
     );
 
 } // namespace ContactDetection

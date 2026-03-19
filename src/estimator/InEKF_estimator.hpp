@@ -19,30 +19,30 @@
 using namespace Eigen;
 using namespace std;
 
-// Robot State Type Definition - All variables needed for state representation
-typedef struct _ROBOT_STATES_ {
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
-    Eigen::Matrix3d Rotation;
-    Eigen::Vector3d Velocity;
-    Eigen::Vector3d Position;
-
-    // Eigen::VectorXd d;        // Dynamic size, set at runtime based on num_legs
-    Eigen::VectorXd d_v;      // Dynamic size, set at runtime based on num_legs
-
-    Eigen::Vector3d Bias_Gyro;
-    Eigen::Vector3d Bias_Acc;
-
-    std::vector<bool> Contact;      // Dynamic size
-    std::vector<bool> Hard_Contact;  // Dynamic size
-    std::vector<bool> Slip;          // Dynamic size
-
-}ROBOT_STATES;
-
 class InEKFilter {
 
-
 public:
+    // Robot State Type Definition - All variables needed for state representation
+    typedef struct _ROBOT_STATES_ {
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+        Eigen::Matrix3d Rotation;
+        Eigen::Vector3d Velocity;
+        Eigen::Vector3d Position;
+
+        // Eigen::VectorXd d;        // Dynamic size, set at runtime based on num_legs
+        Eigen::VectorXd d_v;      // Dynamic size, set at runtime based on num_legs
+
+        Eigen::Vector3d Bias_Gyro;
+        Eigen::Vector3d Bias_Acc;
+
+        std::vector<bool> Contact;      // Dynamic size
+        std::vector<bool> Hard_Contact;  // Dynamic size
+        std::vector<bool> Slip;          // Dynamic size
+
+    }ROBOT_STATES;
+
+
     // Constructor - automatically initializes from YAML config
     InEKFilter() = default;  // Default constructor (no initialization)
     InEKFilter(const std::string& initialization_config_path, const std::string& robot_config_path) {
@@ -61,8 +61,8 @@ public:
     
     void InitializeFromYAML(const std::string& config_path); // Initialize from YAML configuration file
 
-    void new_measurement(const std::vector<double> &imu_i, const std::vector<double> &motor_data_i, const std::vector<bool> &Contact_i);
-    void new_measurement(const std::vector<double> &imu_i, const std::vector<double> &motor_data_i);  // Contact detection from torques
+    void new_measurement(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const std::vector<bool> &Contact_i);
+    void new_measurement(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i);  // Contact detection from torques
     void new_measurement();  // No-argument version for TextFile mode
 
     std::vector<bool> contact_detection_logic(const std::vector<double> &motor_torques_i);  // Helper for contact detection from torques
@@ -74,8 +74,8 @@ public:
 
     void SAVE_onestep(int save_index);
 
-    void Onestep(const std::vector<double> &imu_i, const std::vector<double> &motor_data_i, const std::vector<bool> &Contact_i);
-    void Onestep(const std::vector<double> &imu_i, const std::vector<double> &motor_data_i, const std::vector<double> &motor_torques_i);  // Contact detection from torques
+    void Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const std::vector<bool> &Contact_i);
+    void Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const Eigen::VectorXd &motor_torques_i);  // Contact detection from torques
     void Onestep();  // No-argument version for TextFile mode
 
     void writeSavedData();
@@ -92,7 +92,7 @@ public:
     int frame_count=0;
     int time_count=0;
 
-    ROBOT_STATES current_state;  // Current estimated state populated by send_states()
+    ROBOT_STATES robot_state;  // Current estimated state populated by send_states()
 
     double dt;
     Vector3d gravity{0, 0, -9.806659};
@@ -172,6 +172,11 @@ public:
     // dv history for CSV logging: [time_step][leg] = dv_norm
     std::vector<std::vector<double>> dv_history;
 
+    // Contact detection accuracy tracking
+    std::vector<bool> GroundTruthContact;  // Ground truth contact state
+    std::vector<int> contact_match_count;   // Counts per leg
+    std::vector<int> contact_mismatch_count; // Counts per leg
+    int total_comparisons = 0;  // Total number of timesteps compared
 
 private:
     // Helper function to compute indices after robot config is loaded

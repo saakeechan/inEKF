@@ -16,7 +16,6 @@ import time
 
 # Load Digit MJCF model with floating base
 urdf_path = "/home/saakee/Research/Saaketh_INEKF/digit_mujoco-main/src/digit_mujoco/models/flat/digit-v3-flat.xml"
-# mesh_dir = "/home/saakee/Research/Saaketh_INEKF/digit_mujoco-main/src/digit_mujoco/models/stl"
 
 print(f"Loading Digit model from: {urdf_path}")
 
@@ -40,16 +39,26 @@ dl_arrays = {attr: getattr(dl, attr) for attr in dir(dl)
 # Digit has a floating base: actual joints start at index 1, q[7+], v[6+]
 joint_mapping = {}
 
-for i in range(1, min(len(model.names)-1, 40)):
-    joint_name = model.names[i+1]  # +1 because index 0 is universe
+ENCODER_INDICES_MAP    = [7, 8, 9, 14, 15, 16, 17, 18, 23, 28, 29, 34, 35, 36, 41, 42, 43, 44, 45, 50, 55, 56]
+ENCODERDOT_INDICES_MAP = [6, 7, 8, 12, 13, 14, 15, 16, 20, 24, 25, 30, 31, 32, 36, 37, 38, 39, 40, 44, 48, 49]
+
+for joint_id in range(2, model.njoints):  # 0=universe, 1=floating_base
+    joint_name = model.names[joint_id]
     dl_name = joint_name.replace('-', '_')      # e.g. "left_hip_roll"
     dl_vel_name = dl_name + '_vel'              # e.g. "left_hip_roll_vel"
     if dl_name in dl_arrays and dl_vel_name in dl_arrays:
-        joint_mapping[i] = (dl_arrays[dl_name], dl_arrays[dl_vel_name])
+        joint_mapping[joint_id] = (dl_arrays[dl_name], dl_arrays[dl_vel_name])
+        # print(f"  ✓ Mapped joint '{joint_name}' to data loader arrays '{dl_name}' and '{dl_vel_name}'")
     else:
         print(f"      ✗ No matching data loader array for: {joint_name}")
 
-print(f"Successfully mapped {len(joint_mapping)} joints (excluding floating base)")
+for joint_id, (pos_arr, _) in sorted(joint_mapping.items()):
+    jname = model.names[joint_id]
+    iq = model.joints[joint_id].idx_q
+    iv = model.joints[joint_id].idx_v
+    eq = iq in ENCODER_INDICES_MAP
+    ev = iv in ENCODERDOT_INDICES_MAP
+    print(f"  joint_id={joint_id:2d}  {jname:35s}  q[{iq:2d}] {'✓' if eq else '✗'}  v[{iv:2d}] {'✓' if ev else '✗'}")
 
 # Initialize MeshCat visualizer
 print("\nInitializing MeshCat visualizer...")
@@ -85,14 +94,14 @@ print("URL: http://127.0.0.1:7000/static/")
 print("="*60)
 
 # Specify the frame index to track velocity (frame 44 - left foot)
-FRAME_ID = 9
+FRAME_ID = 31
 frame_name = model.frames[FRAME_ID].name if FRAME_ID < len(model.frames) else "Unknown"
 print (f"\nTracking velocity of frame {FRAME_ID}: {frame_name}")
 
 # Animation parameters
 fps = 30
 dt = 1.0 / fps
-speed_multiplier = 0.1  # Adjust to slow down or speed up the animation
+speed_multiplier = 5  # Adjust to slow down or speed up the animation
 
 print(f"\nStarting animation at {fps} fps (speed: {speed_multiplier}x)")
 print(f"Total frames to animate: {N}")
@@ -109,40 +118,37 @@ try:
         q = np.zeros(model.nq)
         v = np.zeros(model.nv)
         
-        # Populate floating base position (x, y, z) - first 3 elements of q
-        q[0] = dl.pos_x[idx]
-        q[1] = dl.pos_y[idx]
-        q[2] = dl.pos_z[idx]
+        # # Set base pose from CSV data
+        q[0:7] = dl.pos_x[idx], dl.pos_y[idx], dl.pos_z[idx] - 1.063*1.4, dl.quat_i[idx], dl.quat_j[idx], dl.quat_k[idx], dl.quat_w[idx]  # figure out z offset later
         
-        # Populate floating base orientation (quaternion: w, x, y, z) - next 4 elements of q
-        q[3] = dl.quat_w[idx]
-        q[4] = dl.quat_i[idx]
-        q[5] = dl.quat_j[idx]
-        q[6] = dl.quat_k[idx]
+        # Convert world-frame velocities to body-frame for Pinocchio
+        # Build rotation matrix from quaternion (quat format: x, y, z, w in q, but w, x, y, z in data)
+        quat = pin.Quaternion(dl.quat_w[idx], dl.quat_i[idx], dl.quat_j[idx], dl.quat_k[idx])
+        R = quat.toRotationMatrix()
         
-        # Populate floating base linear velocity (vx, vy, vz) - first 3 elements of v
-        v[0] = dl.vel_x[idx]
-        v[1] = dl.vel_y[idx]
-        v[2] = dl.vel_z[idx]
+        # World-frame velocities from data loader
+        v_world = np.array([dl.vel_x[idx], dl.vel_y[idx], dl.vel_z[idx]])
+        omega_world = np.array([dl.r_rate[idx], dl.p_rate[idx], dl.y_rate[idx]])
         
-        # Populate floating base angular velocity (roll_rate, pitch_rate, yaw_rate) - next 3 elements of v
-        v[3] = dl.r_rate[idx]
-        v[4] = dl.p_rate[idx]
-        v[5] = dl.y_rate[idx]
+        # Transform to body frame: v_body = R^T * v_world
+        v_body = R.T @ v_world
+        omega_body = R.T @ omega_world
         
-        # Fill in joint positions using the proper mapping
-        # model_idx starts at 1 for first actual joint (after floating base)
-        # In q: floating base takes indices 0-6 (3 pos + 4 quat)
-        # So actual joints start at index 7, which is model_idx 1 -> q[7]
-        for model_idx, (pos_arr, vel_arr) in joint_mapping.items():
-            q[model_idx + 6] = pos_arr[idx]  # +6 because model_idx=1 → q[7]
-            v[model_idx + 5] = vel_arr[idx]  # +5 because model_idx=1 → v[6]
+        # Populate floating base velocities in body frame
+        v[0:3] = v_body
+        v[3:6] = omega_body
+
+        # q[2] = 1.0  # Set a fixed z height for better visualization (adjust as needed)
+        # q[1] = 3.0  # Set a fixed y position for better visualization (adjust as needed)
         
-        # For acceleration, we'll approximate it as zero (or could compute from velocity differences)
-        a = np.zeros(model.nv)
+        # Fill in joint positions using pinocchio's native idx_q / idx_v
+        # (Digit has passive spring joints in between actuated joints, so indices are non-consecutive)
+        for joint_id, (pos_arr, vel_arr) in joint_mapping.items():
+            q[model.joints[joint_id].idx_q] = pos_arr[idx]
+            v[model.joints[joint_id].idx_v] = vel_arr[idx]
         
         # Compute forward kinematics with velocities and accelerations
-        pin.forwardKinematics(model, data, q, v, a)
+        pin.forwardKinematics(model, data, q, v)
         pin.updateFramePlacements(model, data)
 
         # Read left foot contact state from data loader
@@ -166,13 +172,14 @@ try:
             prev_contact_state = left_contact
 
         # Compute left foot velocity and relative position in world frame during contact
-        left_foot_vel = pin.getFrameVelocity(model, data, FRAME_ID, pin.ReferenceFrame.WORLD)
+        left_foot_vel = pin.getFrameVelocity(model, data, FRAME_ID, pin.ReferenceFrame.LOCAL_WORLD_ALIGNED)
         if left_contact and contact_foot_pos_init is not None:
-            v_x = left_foot_vel.linear[0]
+            v_norm = np.linalg.norm(left_foot_vel.linear)
             current_pos = data.oMf[FRAME_ID].translation
             rel_pos = current_pos - contact_foot_pos_init
-            print(f"Time: {timestamp:.3f}s | Left foot v_x = {v_x:.4f} m/s | "
-                  f"rel_pos = [{rel_pos[0]:.4f}, {rel_pos[1]:.4f}, {rel_pos[2]:.4f}] m")
+            print(f"Time: {timestamp:.3f}s | Left foot v_norm = {v_norm:.4f} m/s | "
+                  f"world_pos = [{current_pos[0]:.4f}, {current_pos[1]:.4f}, {current_pos[2]:.4f}] m | ")
+                #   f"rel_pos = [{rel_pos[0]:.4f}, {rel_pos[1]:.4f}, {rel_pos[2]:.4f}] m")
 
         # Update visualization
         viz.display(q)

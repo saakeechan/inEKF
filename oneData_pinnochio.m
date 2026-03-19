@@ -6,14 +6,14 @@ clear; close all; clc;
 cd /home/saakee/Research/Saaketh_INEKF/result/pinnochio_inekf
 
 % --- File information ---
-slip = 0.3;
-SRmode = sprintf('(SR%.1f)', slip);
-cov = '-5-1-1-4-8 -6 -10-10';
+slip = 5;
+SRmode = sprintf('(SR%.0f)', slip);
+cov = '-5-1-1-4-8 -10 -10-10';
 % cov = '-2-1-3-6-12 -3 -10-10';
 % cov = '-1-1-1-5-10 -10 -2-2';
 % cov = '-5-4-1-2-4 -10 -10-10';
 initial = '0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00';
-data = 'x999_';
+data = 'x990_';
 index = 1;
 
 % --- Construct filename and full path ---

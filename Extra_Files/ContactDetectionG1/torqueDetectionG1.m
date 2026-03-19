@@ -1,10 +1,10 @@
-clc;close all
+clc;close all;
 
 %% Load
 T = readtable(fullfile('/home/saakee/Research/Saaketh_INEKF/G1LoggingData.csv'));
 
 tname = 'timestamp';
-n = min(height(T), 1000);
+n = min(height(T), 300);
 
 time = T.(tname)(1:n);
 
@@ -26,6 +26,7 @@ dt = 0.02;
 cols_left_tau = { ...
     'joint_torque_left_hip_roll_joint', ...
     'joint_torque_left_hip_yaw_joint', ...
+    'joint_torque_left_hip_pitch_joint', ...      
     'joint_torque_left_knee_joint', ...
     'joint_torque_left_ankle_pitch_joint', ...
     'joint_torque_left_ankle_roll_joint' };
@@ -33,6 +34,7 @@ cols_left_tau = { ...
 cols_right_tau = { ...
     'joint_torque_right_hip_roll_joint', ...
     'joint_torque_right_hip_yaw_joint', ...
+    'joint_torque_right_hip_pitch_joint', ...    
     'joint_torque_right_knee_joint', ...
     'joint_torque_right_ankle_pitch_joint', ...
     'joint_torque_right_ankle_roll_joint' };
@@ -42,7 +44,7 @@ R = zeros(numel(cols_right_tau),n);
 moving_avg_Left = [];
 moving_avg_Right = [];
 
-window_size_time = dt * 2;
+window_size_time = dt * 1;
 window_size = int32(window_size_time/dt);
 
 
@@ -61,7 +63,7 @@ moving_avg_Right(t) = mean(RightTorquesCombined(start_idx:t));
 
 end
 
-
+% 
 figure
 plot(time, moving_avg_Left, 'b')
 hold on
@@ -138,12 +140,12 @@ sL = slopeL / dt;
 % =========================
 
 % ---- Midpoint + anchors ----
-T0     = 750;       % midpoint: p(T0)=0.5
+T0     = 850;       % midpoint: p(T0)=0.5
 
 T_high = 2000;    % confident contact point (high torque)
 p_high = 0.95;
 
-T_low  = 50;       % confident NO-contact point (low torque)
+T_low  = 100;       % confident NO-contact point (low torque)
 p_low  = 0.05;
 
 % ---- Compute asymmetric quadratic gains ----
@@ -159,7 +161,7 @@ k_low  = (-a_low) / (d_low^2);     % curvature for T < T0  (positive)
 % ---- Slope bias tuning (same as before) ----
 Dgate   = 500;     % torque units: "near threshold" width
 S0      = 1e5;      % slope units: saturation scale (torque/sec)
-k_slope = 2;      % max logit bump near threshold
+k_slope = 0;      % max logit bump near threshold
 
 % ---- Utility: clamp logits ----
 zclip = 10;
@@ -252,4 +254,4 @@ fprintf('TP=%d  TN=%d  FP=%d  FN=%d\n', TP_R, TN_R, FP_R, FN_R);
 fprintf('Accuracy=%.3f  Precision=%.3f  Recall=%.3f  F1=%.3f\n', acc_R, prec_R, rec_R, F1_R);
 
 
-
+save torqueDetectionG1.mat

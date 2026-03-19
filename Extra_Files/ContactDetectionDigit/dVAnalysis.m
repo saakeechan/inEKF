@@ -1,10 +1,10 @@
 clear;clc;close all;
 
-T_dv = readtable("/home/saakee/Research/Saaketh_INEKF/build/G1_dv_values.csv");
+T_dv = readtable("/home/saakee/Research/Saaketh_INEKF/build/Digit_dv_values.csv");
 dv_leg1 = T_dv{:,1};
 dv_leg2 = T_dv{:,2};
 
-T = readtable(fullfile("/home/saakee/Research/Saaketh_INEKF/G1LoggingData.csv"));
+T = readtable(fullfile("/home/saakee/Research/Saaketh_INEKF/digit_cropped_data.csv"));
 
 n = min(height(T), 998);
 
@@ -19,6 +19,7 @@ r_gt_indices = find(r_gt);
 dv_leg2_inContact = dv_leg2(r_gt_indices);
 
 sorted_leg_1 = sort(dv_leg1_inContact,'descend');
+sorted_leg_1_noContact = sort(dv_leg1(find(~l_gt)),'descend');
 
 median(sorted_leg_1)
 median(dv_leg2_inContact)
@@ -31,7 +32,7 @@ dv0 = 0.3;        % midpoint: p = 0.5
 zclip = 4;
 
 % --- Anchors you actually mean ---
-dv_contact    = 0.10;   p_contact    = 0.95;  % confident contact below dv0
+dv_contact    = 0.05;   p_contact    = 0.95;  % confident contact below dv0
 dv_nocontact  = 1;   p_nocontact  = 0.05;  % confident NO contact above dv0
 
 % Distances from dv0

@@ -43,29 +43,29 @@ if(NOT DEFINED CMAKE_OBJDUMP)
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
-  if(EXISTS "$ENV{DESTDIR}/usr/local/lib/liblib_INEKF_Estimator.so" AND
-     NOT IS_SYMLINK "$ENV{DESTDIR}/usr/local/lib/liblib_INEKF_Estimator.so")
+  if(EXISTS "$ENV{DESTDIR}/usr/local/lib/libINEKF_Estimator.so" AND
+     NOT IS_SYMLINK "$ENV{DESTDIR}/usr/local/lib/libINEKF_Estimator.so")
     file(RPATH_CHECK
-         FILE "$ENV{DESTDIR}/usr/local/lib/liblib_INEKF_Estimator.so"
+         FILE "$ENV{DESTDIR}/usr/local/lib/libINEKF_Estimator.so"
          RPATH "/opt/openrobots/lib/pkgconfig/../../lib:/opt/openrobots/lib:/usr/lib/x86_64-linux-gnu/pkgconfig/../../../lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu")
   endif()
   list(APPEND CMAKE_ABSOLUTE_DESTINATION_FILES
-   "/usr/local/lib/liblib_INEKF_Estimator.so")
+   "/usr/local/lib/libINEKF_Estimator.so")
   if(CMAKE_WARN_ON_ABSOLUTE_INSTALL_DESTINATION)
     message(WARNING "ABSOLUTE path INSTALL DESTINATION : ${CMAKE_ABSOLUTE_DESTINATION_FILES}")
   endif()
   if(CMAKE_ERROR_ON_ABSOLUTE_INSTALL_DESTINATION)
     message(FATAL_ERROR "ABSOLUTE path INSTALL DESTINATION forbidden (by caller): ${CMAKE_ABSOLUTE_DESTINATION_FILES}")
   endif()
-  file(INSTALL DESTINATION "/usr/local/lib" TYPE SHARED_LIBRARY FILES "/home/saakee/Research/Saaketh_INEKF/build/liblib_INEKF_Estimator.so")
-  if(EXISTS "$ENV{DESTDIR}/usr/local/lib/liblib_INEKF_Estimator.so" AND
-     NOT IS_SYMLINK "$ENV{DESTDIR}/usr/local/lib/liblib_INEKF_Estimator.so")
+  file(INSTALL DESTINATION "/usr/local/lib" TYPE SHARED_LIBRARY FILES "/home/saakee/Research/Saaketh_INEKF/build/libINEKF_Estimator.so")
+  if(EXISTS "$ENV{DESTDIR}/usr/local/lib/libINEKF_Estimator.so" AND
+     NOT IS_SYMLINK "$ENV{DESTDIR}/usr/local/lib/libINEKF_Estimator.so")
     file(RPATH_CHANGE
-         FILE "$ENV{DESTDIR}/usr/local/lib/liblib_INEKF_Estimator.so"
+         FILE "$ENV{DESTDIR}/usr/local/lib/libINEKF_Estimator.so"
          OLD_RPATH "/opt/openrobots/lib/pkgconfig/../../lib:/opt/openrobots/lib:/usr/lib/x86_64-linux-gnu/pkgconfig/../../../lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/usr/local/lib:"
          NEW_RPATH "/opt/openrobots/lib/pkgconfig/../../lib:/opt/openrobots/lib:/usr/lib/x86_64-linux-gnu/pkgconfig/../../../lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu")
     if(CMAKE_INSTALL_DO_STRIP)
-      execute_process(COMMAND "/usr/bin/strip" "$ENV{DESTDIR}/usr/local/lib/liblib_INEKF_Estimator.so")
+      execute_process(COMMAND "/usr/bin/strip" "$ENV{DESTDIR}/usr/local/lib/libINEKF_Estimator.so")
     endif()
   endif()
 endif()

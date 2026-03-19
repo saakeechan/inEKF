@@ -45,6 +45,8 @@ public:
     
     // Joint encoder velocities - 2D array [num_rows x num_encoders]
     std::vector<std::vector<double>> encoderdots;
+
+    std::vector<std::vector<double>> motor_torques; // 2D array [num_rows x num_motors]
     
     // Base position data
     std::vector<double> pos_x, pos_y, pos_z;
@@ -92,6 +94,8 @@ public:
         // Encoders - 2D array [num_rows x num_encoders]
         encoders.resize(num_rows, std::vector<double>(num_encoders));
         encoderdots.resize(num_rows, std::vector<double>(num_encoders));
+        motor_torques.resize(num_rows, std::vector<double>(num_encoders)); // Assuming 1 torque per motor, adjust if different
+
         
         std::cout << "  Resized encoders to " << encoders.size() << " rows x " << num_encoders << " cols" << std::endl;
         
@@ -176,6 +180,37 @@ public:
             encoderdots[i][26] = robot_data.joint_vel_right_wrist_roll[i];
             encoderdots[i][27] = robot_data.joint_vel_right_wrist_pitch[i];
             encoderdots[i][28] = robot_data.joint_vel_right_wrist_yaw[i];
+
+            motor_torques[i][0] = robot_data.joint_torque_left_hip_pitch[i];
+            motor_torques[i][1] = robot_data.joint_torque_left_hip_roll[i];
+            motor_torques[i][2] = robot_data.joint_torque_left_hip_yaw[i];
+            motor_torques[i][3] = robot_data.joint_torque_left_knee[i];
+            motor_torques[i][4] = robot_data.joint_torque_left_ankle_pitch[i];
+            motor_torques[i][5] = robot_data.joint_torque_left_ankle_roll[i];
+            motor_torques[i][6] = robot_data.joint_torque_right_hip_pitch[i];
+            motor_torques[i][7] = robot_data.joint_torque_right_hip_roll[i];
+            motor_torques[i][8] = robot_data.joint_torque_right_hip_yaw[i];
+            motor_torques[i][9] = robot_data.joint_torque_right_knee[i];
+            motor_torques[i][10] = robot_data.joint_torque_right_ankle_pitch[i];
+            motor_torques[i][11] = robot_data.joint_torque_right_ankle_roll[i];
+            motor_torques[i][12] = robot_data.joint_torque_waist_yaw[i];
+            motor_torques[i][13] = robot_data.joint_torque_waist_roll[i];
+            motor_torques[i][14] = robot_data.joint_torque_waist_pitch[i];
+            motor_torques[i][15] = robot_data.joint_torque_left_shoulder_pitch[i];
+            motor_torques[i][16] = robot_data.joint_torque_left_shoulder_roll[i];
+            motor_torques[i][17] = robot_data.joint_torque_left_shoulder_yaw[i];
+            motor_torques[i][18] = robot_data.joint_torque_left_elbow[i];
+            motor_torques[i][19] = robot_data.joint_torque_left_wrist_roll[i];
+            motor_torques[i][20] = robot_data.joint_torque_left_wrist_pitch[i];
+            motor_torques[i][21] = robot_data.joint_torque_left_wrist_yaw[i];
+            motor_torques[i][22] = robot_data.joint_torque_right_shoulder_pitch[i];
+            motor_torques[i][23] = robot_data.joint_torque_right_shoulder_roll[i];
+            motor_torques[i][24] = robot_data.joint_torque_right_shoulder_yaw[i];
+            motor_torques[i][25] = robot_data.joint_torque_right_elbow[i];
+            motor_torques[i][26] = robot_data.joint_torque_right_wrist_roll[i];
+            motor_torques[i][27] = robot_data.joint_torque_right_wrist_pitch[i];
+            motor_torques[i][28] = robot_data.joint_torque_right_wrist_yaw[i];
+
         }
         
         // Contact states - 2D array [num_rows x num_contacts]

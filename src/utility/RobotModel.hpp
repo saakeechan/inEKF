@@ -62,6 +62,7 @@ public:
     std::string robot_model_path;    // Path to URDF/MJCF file
     std::string model_format;        // "urdf" or "mjcf"
     std::vector<int> contact_point_frame_ids;  // Frame IDs for contact points
+    int imu_frame_id;                // Frame ID for IMU in Pinocchio model
     
     int encoder_size;                // Configuration space dimension (nq) - auto-set from model
     int encoderdot_size;             // Velocity space dimension (nv) - auto-set from model
@@ -88,8 +89,6 @@ public:
     // ========================================================================
     // FRAME TRANSFORMATIONS
     // ========================================================================
-    
-    Eigen::Vector3d IMU2BD;  // IMU to Body frame offset
     
     // ========================================================================
     // COVARIANCE PARAMETERS

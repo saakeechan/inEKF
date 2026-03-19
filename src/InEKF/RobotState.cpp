@@ -124,19 +124,19 @@ const Eigen::Vector3d RobotState::getAccelerometerBias() {
 #endif
     return Theta_.tail(3); 
 }
-const int RobotState::dimX() { 
+int RobotState::dimX() { 
 #if INEKF_USE_MUTEX
     unique_lock<mutex> mlock(mutex_);
 #endif
     return X_.cols(); 
 }
-const int RobotState::dimTheta() {
+int RobotState::dimTheta() {
 #if INEKF_USE_MUTEX
     unique_lock<mutex> mlock(mutex_);
 #endif
     return Theta_.rows();
 }
-const int RobotState::dimP() { 
+int RobotState::dimP() { 
 #if INEKF_USE_MUTEX
     unique_lock<mutex> mlock(mutex_);
 #endif

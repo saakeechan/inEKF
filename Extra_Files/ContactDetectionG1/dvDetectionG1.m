@@ -6,7 +6,7 @@ dv_leg2 = T_dv{:,2};
 
 T = readtable(fullfile("/home/saakee/Research/Saaketh_INEKF/G1LoggingData.csv"));
 
-n = min(height(T), 100);
+n = min(height(T), 300);
 
 % --- Ground-truth contacts ---
 l_gt = logical(T.lfoot_contact(1:n));

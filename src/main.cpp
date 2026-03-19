@@ -23,7 +23,7 @@ int main() {
     // If this is your first time running a new robot, uncomment the line below
     //  to extract parameters and use that to fill in the yaml files
     
-    // InEKFilter::getParameters("/home/saakee/Research/Saaketh_INEKF/src/utility/G1/g1_29dof_IMUShifted.urdf", "g1");
+    // InEKFilter::getParameters("/home/saakee/Research/Saaketh_INEKF/src/utility/G1/g1_29dof_rev_1_0_wFootFrames.urdf", "g1_wFootFrames");
     // return 0;
 
 
@@ -32,12 +32,31 @@ int main() {
 
     InEKFilter estimator_IEKF("../config/initialization_config.yaml", "../config/G1_config.yaml");
 
+    // // Create random Eigen vectors for IMU, motor data (2×num_joints matrix), and torque values
+    // Eigen::VectorXd imu_values(6);
+    // Eigen::MatrixXd motor_data(2, 29);  // Row 0: positions, Row 1: velocities
+    // Eigen::VectorXd torque_values(29);
+
+    // // Initialize random values
+    // for (int i = 0; i < 6; i++) {
+    //     imu_values(i) = static_cast<double>(rand()) / RAND_MAX;
+    // }
+    // for (int i = 0; i < 29; i++) {
+    //     motor_data(0, i) = static_cast<double>(rand()) / RAND_MAX;  // Position
+    //     motor_data(1, i) = static_cast<double>(rand()) / RAND_MAX;  // Velocity
+    //     torque_values(i) = static_cast<double>(rand()) / RAND_MAX;
+    // }
+
     std::vector<double> step_times;
 
         for (int time = 0; time < (estimator_IEKF.time_length - estimator_IEKF.TextFile_Skip_Data); time++) {
             auto start = std::chrono::high_resolution_clock::now();
 
-            estimator_IEKF.Onestep();
+            estimator_IEKF.Onestep();  // Contact detection from torques
+
+            // if (time % 100 == 0) {
+            //     std::cout << estimator_IEKF.robot_state.Position.transpose() << " " << estimator_IEKF.robot_state.Contact[1] << endl;
+            // }
 
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;

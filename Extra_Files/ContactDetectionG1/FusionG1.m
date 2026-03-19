@@ -1,28 +1,31 @@
 %% Fusion
 
-S = load("IMUTest1.mat");
-DV = load("dVAnalysis.mat");
+S = load("torqueDetectionG1.mat");
+DV = load("dvDetectionG1.mat");
 
-pR_imu = S.p_r(:);
-pL_imu = S.p_l(:);
+pL_torque = S.pL_contact(:);
+
+pR_torque = S.pR_contact(:);
+
+pL_dv = DV.pDV_leg1(:);
+pL_dv = [0.018; pL_dv(1:end-1)];  % prepend 0.018 and remove last value
 
 pR_dv = DV.pDV_leg2(:);
-pL_dv = DV.pDV_leg1(:);
+pR_dv = [0.018; pR_dv(1:end-1)];  % prepend 0.018 and remove last value
 
 %% =========================
 % Fuse probabilities (normalized weights)
 % =========================
-w_tau = 0.65;
-w_imu = 0;
-w_dv  = 0.35;
+w_tau = 0.7;
+w_dv  = 0.3;
 
-wsum = w_tau + w_imu + w_dv;
+wsum = w_tau + w_dv;
 w_tau = w_tau/wsum;  
-w_imu = w_imu/wsum;  
+
 w_dv  = w_dv/wsum;
 
-pR_total = w_tau*pR_contact + w_imu*pR_imu + w_dv*pR_dv;
-pL_total = w_tau*pL_contact + w_imu*pL_imu + w_dv*pL_dv;
+pR_total = w_tau*pR_torque + w_dv*pR_dv;
+pL_total = w_tau*pL_torque + w_dv*pL_dv;
 
 % Hard decisions
 th = 0.5;

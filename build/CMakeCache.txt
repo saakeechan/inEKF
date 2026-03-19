@@ -204,6 +204,9 @@ INEKF_Estimator_BINARY_DIR:STATIC=/home/saakee/Research/Saaketh_INEKF/build
 //Value Computed by CMake
 INEKF_Estimator_IS_TOP_LEVEL:STATIC=ON
 
+//Dependencies for the target
+INEKF_Estimator_LIB_DEPENDS:STATIC=general;pinocchio_default;general;pinocchio_parsers;general;coal;general;boost_filesystem;general;boost_serialization;general;boost_system;general;urdfdom_sensor;general;urdfdom_model_state;general;urdfdom_model;general;urdfdom_world;general;console_bridge;general;yaml-cpp;
+
 //Value Computed by CMake
 INEKF_Estimator_SOURCE_DIR:STATIC=/home/saakee/Research/Saaketh_INEKF
 
@@ -213,17 +216,8 @@ PKG_CONFIG_ARGN:STRING=
 //pkg-config executable
 PKG_CONFIG_EXECUTABLE:FILEPATH=/usr/bin/pkg-config
 
-//Dependencies for the target
-lib_INEKF_Estimator_LIB_DEPENDS:STATIC=general;pinocchio_default;general;pinocchio_parsers;general;pinocchio_casadi;general;boost_filesystem;general;boost_serialization;general;boost_system;general;urdfdom_sensor;general;urdfdom_model_state;general;urdfdom_model;general;urdfdom_world;general;console_bridge;general;casadi;general;yaml-cpp;
-
 //Path to a library.
 pkgcfg_lib_PINOCCHIO_boost_filesystem:FILEPATH=/usr/lib/x86_64-linux-gnu/libboost_filesystem.so
-
-//Path to a library.
-pkgcfg_lib_PINOCCHIO_boost_serialization:FILEPATH=/usr/lib/x86_64-linux-gnu/libboost_serialization.so
-
-//Path to a library.
-pkgcfg_lib_PINOCCHIO_boost_system:FILEPATH=/usr/lib/x86_64-linux-gnu/libboost_system.so
 
 //Path to a library.
 pkgcfg_lib_PINOCCHIO_casadi:FILEPATH=/opt/openrobots/lib/libcasadi.so
@@ -399,10 +393,10 @@ PINOCCHIO_CFLAGS_OTHER:INTERNAL=-DPINOCCHIO_WITH_URDFDOM;-DPINOCCHIO_ENABLE_TEMP
 PINOCCHIO_FOUND:INTERNAL=1
 PINOCCHIO_INCLUDEDIR:INTERNAL=/opt/openrobots/lib/pkgconfig/../../include
 PINOCCHIO_INCLUDE_DIRS:INTERNAL=/opt/openrobots/lib/pkgconfig/../../include;/opt/openrobots/include;/usr/lib/x86_64-linux-gnu/pkgconfig/../../../include;/usr/include;/usr/include/eigen3;/usr/include
-PINOCCHIO_LDFLAGS:INTERNAL=-L/opt/openrobots/lib/pkgconfig/../../lib;-L/opt/openrobots/lib;-L/usr/lib/x86_64-linux-gnu/pkgconfig/../../../lib/x86_64-linux-gnu;-L/usr/lib/x86_64-linux-gnu;-Wl,-rpath,/opt/openrobots/lib/pkgconfig/../../lib;-lpinocchio_default;-lpinocchio_parsers;-lpinocchio_casadi;-lboost_filesystem;-lboost_serialization;-lboost_system;-lurdfdom_sensor;-lurdfdom_model_state;-lurdfdom_model;-lurdfdom_world;-lconsole_bridge;-Wl,-rpath,/opt/openrobots/lib;-lcasadi
+PINOCCHIO_LDFLAGS:INTERNAL=-L/opt/openrobots/lib/pkgconfig/../../lib;-L/opt/openrobots/lib;-L/usr/lib/x86_64-linux-gnu/pkgconfig/../../../lib/x86_64-linux-gnu;-L/usr/lib/x86_64-linux-gnu;-Wl,-rpath,/opt/openrobots/lib/pkgconfig/../../lib;-lpinocchio_default;-lpinocchio_parsers;-lpinocchio_casadi;-lboost_filesystem;-lurdfdom_sensor;-lurdfdom_model_state;-lurdfdom_model;-lurdfdom_world;-lconsole_bridge;-Wl,-rpath,/opt/openrobots/lib;-lcasadi
 PINOCCHIO_LDFLAGS_OTHER:INTERNAL=-Wl,-rpath,/opt/openrobots/lib/pkgconfig/../../lib;-Wl,-rpath,/opt/openrobots/lib
 PINOCCHIO_LIBDIR:INTERNAL=/opt/openrobots/lib/pkgconfig/../../lib
-PINOCCHIO_LIBRARIES:INTERNAL=pinocchio_default;pinocchio_parsers;pinocchio_casadi;boost_filesystem;boost_serialization;boost_system;urdfdom_sensor;urdfdom_model_state;urdfdom_model;urdfdom_world;console_bridge;casadi
+PINOCCHIO_LIBRARIES:INTERNAL=pinocchio_default;pinocchio_parsers;pinocchio_casadi;boost_filesystem;urdfdom_sensor;urdfdom_model_state;urdfdom_model;urdfdom_world;console_bridge;casadi
 PINOCCHIO_LIBRARY_DIRS:INTERNAL=/opt/openrobots/lib/pkgconfig/../../lib;/opt/openrobots/lib;/usr/lib/x86_64-linux-gnu/pkgconfig/../../../lib/x86_64-linux-gnu;/usr/lib/x86_64-linux-gnu
 PINOCCHIO_LIBS:INTERNAL=
 PINOCCHIO_LIBS_L:INTERNAL=
@@ -414,16 +408,16 @@ PINOCCHIO_STATIC_CFLAGS:INTERNAL=-DPINOCCHIO_WITH_URDFDOM;-DPINOCCHIO_ENABLE_TEM
 PINOCCHIO_STATIC_CFLAGS_I:INTERNAL=
 PINOCCHIO_STATIC_CFLAGS_OTHER:INTERNAL=-DPINOCCHIO_WITH_URDFDOM;-DPINOCCHIO_ENABLE_TEMPLATE_INSTANTIATION
 PINOCCHIO_STATIC_INCLUDE_DIRS:INTERNAL=/opt/openrobots/lib/pkgconfig/../../include;/opt/openrobots/include;/usr/lib/x86_64-linux-gnu/pkgconfig/../../../include;/usr/include;/usr/include/eigen3;/usr/include
-PINOCCHIO_STATIC_LDFLAGS:INTERNAL=-L/opt/openrobots/lib/pkgconfig/../../lib;-L/opt/openrobots/lib;-L/usr/lib/x86_64-linux-gnu/pkgconfig/../../../lib/x86_64-linux-gnu;-L/usr/lib/x86_64-linux-gnu;-Wl,-rpath,/opt/openrobots/lib/pkgconfig/../../lib;-lpinocchio_default;-lpinocchio_parsers;-lpinocchio_casadi;-lboost_filesystem;-lboost_serialization;-lboost_system;-lurdfdom_sensor;-lurdfdom_model_state;-lurdfdom_model;-lurdfdom_world;-lconsole_bridge;-Wl,-rpath,/opt/openrobots/lib;-lcasadi
+PINOCCHIO_STATIC_LDFLAGS:INTERNAL=-L/opt/openrobots/lib/pkgconfig/../../lib;-L/opt/openrobots/lib;-L/usr/lib/x86_64-linux-gnu/pkgconfig/../../../lib/x86_64-linux-gnu;-L/usr/lib/x86_64-linux-gnu;-Wl,-rpath,/opt/openrobots/lib/pkgconfig/../../lib;-lpinocchio_default;-lpinocchio_parsers;-lpinocchio_casadi;-lboost_filesystem;-lurdfdom_sensor;-lurdfdom_model_state;-lurdfdom_model;-lurdfdom_world;-lconsole_bridge;-Wl,-rpath,/opt/openrobots/lib;-lcasadi
 PINOCCHIO_STATIC_LDFLAGS_OTHER:INTERNAL=-Wl,-rpath,/opt/openrobots/lib/pkgconfig/../../lib;-Wl,-rpath,/opt/openrobots/lib
 PINOCCHIO_STATIC_LIBDIR:INTERNAL=
-PINOCCHIO_STATIC_LIBRARIES:INTERNAL=pinocchio_default;pinocchio_parsers;pinocchio_casadi;boost_filesystem;boost_serialization;boost_system;urdfdom_sensor;urdfdom_model_state;urdfdom_model;urdfdom_world;console_bridge;casadi
+PINOCCHIO_STATIC_LIBRARIES:INTERNAL=pinocchio_default;pinocchio_parsers;pinocchio_casadi;boost_filesystem;urdfdom_sensor;urdfdom_model_state;urdfdom_model;urdfdom_world;console_bridge;casadi
 PINOCCHIO_STATIC_LIBRARY_DIRS:INTERNAL=/opt/openrobots/lib/pkgconfig/../../lib;/opt/openrobots/lib;/usr/lib/x86_64-linux-gnu/pkgconfig/../../../lib/x86_64-linux-gnu;/usr/lib/x86_64-linux-gnu
 PINOCCHIO_STATIC_LIBS:INTERNAL=
 PINOCCHIO_STATIC_LIBS_L:INTERNAL=
 PINOCCHIO_STATIC_LIBS_OTHER:INTERNAL=
 PINOCCHIO_STATIC_LIBS_PATHS:INTERNAL=
-PINOCCHIO_VERSION:INTERNAL=3.4.0
+PINOCCHIO_VERSION:INTERNAL=3.9.0
 PINOCCHIO_pinocchio_INCLUDEDIR:INTERNAL=
 PINOCCHIO_pinocchio_LIBDIR:INTERNAL=
 PINOCCHIO_pinocchio_PREFIX:INTERNAL=
@@ -436,10 +430,6 @@ __pkg_config_arguments_PINOCCHIO:INTERNAL=REQUIRED;pinocchio
 __pkg_config_checked_PINOCCHIO:INTERNAL=1
 //ADVANCED property for variable: pkgcfg_lib_PINOCCHIO_boost_filesystem
 pkgcfg_lib_PINOCCHIO_boost_filesystem-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: pkgcfg_lib_PINOCCHIO_boost_serialization
-pkgcfg_lib_PINOCCHIO_boost_serialization-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: pkgcfg_lib_PINOCCHIO_boost_system
-pkgcfg_lib_PINOCCHIO_boost_system-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: pkgcfg_lib_PINOCCHIO_casadi
 pkgcfg_lib_PINOCCHIO_casadi-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: pkgcfg_lib_PINOCCHIO_console_bridge

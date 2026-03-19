@@ -1,0 +1,244 @@
+============================================================
+Model Information:
+============================================================
+Number of joints (nq): 36
+Number of velocities (nv): 35
+Number of bodies: 31
+Number of frames: 84
+
+============================================================
+Joint Information:
+============================================================
+ 0. universe
+ 1. floating_base_joint
+ 2. left_hip_pitch_joint
+ 3. left_hip_roll_joint
+ 4. left_hip_yaw_joint
+ 5. left_knee_joint
+ 6. left_ankle_pitch_joint
+ 7. left_ankle_roll_joint
+ 8. right_hip_pitch_joint
+ 9. right_hip_roll_joint
+10. right_hip_yaw_joint
+11. right_knee_joint
+12. right_ankle_pitch_joint
+13. right_ankle_roll_joint
+14. waist_yaw_joint
+15. waist_roll_joint
+16. waist_pitch_joint
+17. left_shoulder_pitch_joint
+18. left_shoulder_roll_joint
+19. left_shoulder_yaw_joint
+20. left_elbow_joint
+21. left_wrist_roll_joint
+22. left_wrist_pitch_joint
+23. left_wrist_yaw_joint
+24. right_shoulder_pitch_joint
+25. right_shoulder_roll_joint
+26. right_shoulder_yaw_joint
+27. right_elbow_joint
+28. right_wrist_roll_joint
+29. right_wrist_pitch_joint
+30. right_wrist_yaw_joint
+
+============================================================
+Configuration Vector (q) Mapping:
+============================================================
+Total configuration size: 36
+
+q index → Joint mapping:
+  q[0:7]  → floating_base_joint (JointModelFreeFlyer)
+  q[7]  → left_hip_pitch_joint (JointModelRY)
+  q[8]  → left_hip_roll_joint (JointModelRX)
+  q[9]  → left_hip_yaw_joint (JointModelRZ)
+  q[10]  → left_knee_joint (JointModelRY)
+  q[11]  → left_ankle_pitch_joint (JointModelRY)
+  q[12]  → left_ankle_roll_joint (JointModelRX)
+  q[13]  → right_hip_pitch_joint (JointModelRY)
+  q[14]  → right_hip_roll_joint (JointModelRX)
+  q[15]  → right_hip_yaw_joint (JointModelRZ)
+  q[16]  → right_knee_joint (JointModelRY)
+  q[17]  → right_ankle_pitch_joint (JointModelRY)
+  q[18]  → right_ankle_roll_joint (JointModelRX)
+  q[19]  → waist_yaw_joint (JointModelRZ)
+  q[20]  → waist_roll_joint (JointModelRX)
+  q[21]  → waist_pitch_joint (JointModelRY)
+  q[22]  → left_shoulder_pitch_joint (JointModelRY)
+  q[23]  → left_shoulder_roll_joint (JointModelRX)
+  q[24]  → left_shoulder_yaw_joint (JointModelRZ)
+  q[25]  → left_elbow_joint (JointModelRY)
+  q[26]  → left_wrist_roll_joint (JointModelRX)
+  q[27]  → left_wrist_pitch_joint (JointModelRY)
+  q[28]  → left_wrist_yaw_joint (JointModelRZ)
+  q[29]  → right_shoulder_pitch_joint (JointModelRY)
+  q[30]  → right_shoulder_roll_joint (JointModelRX)
+  q[31]  → right_shoulder_yaw_joint (JointModelRZ)
+  q[32]  → right_elbow_joint (JointModelRY)
+  q[33]  → right_wrist_roll_joint (JointModelRX)
+  q[34]  → right_wrist_pitch_joint (JointModelRY)
+  q[35]  → right_wrist_yaw_joint (JointModelRZ)
+
+============================================================
+Velocity Vector (v) Mapping:
+============================================================
+Total velocity size: 35
+
+v index → Joint mapping:
+  v[0:6]  → floating_base_joint (JointModelFreeFlyer)
+  v[6]  → left_hip_pitch_joint (JointModelRY)
+  v[7]  → left_hip_roll_joint (JointModelRX)
+  v[8]  → left_hip_yaw_joint (JointModelRZ)
+  v[9]  → left_knee_joint (JointModelRY)
+  v[10]  → left_ankle_pitch_joint (JointModelRY)
+  v[11]  → left_ankle_roll_joint (JointModelRX)
+  v[12]  → right_hip_pitch_joint (JointModelRY)
+  v[13]  → right_hip_roll_joint (JointModelRX)
+  v[14]  → right_hip_yaw_joint (JointModelRZ)
+  v[15]  → right_knee_joint (JointModelRY)
+  v[16]  → right_ankle_pitch_joint (JointModelRY)
+  v[17]  → right_ankle_roll_joint (JointModelRX)
+  v[18]  → waist_yaw_joint (JointModelRZ)
+  v[19]  → waist_roll_joint (JointModelRX)
+  v[20]  → waist_pitch_joint (JointModelRY)
+  v[21]  → left_shoulder_pitch_joint (JointModelRY)
+  v[22]  → left_shoulder_roll_joint (JointModelRX)
+  v[23]  → left_shoulder_yaw_joint (JointModelRZ)
+  v[24]  → left_elbow_joint (JointModelRY)
+  v[25]  → left_wrist_roll_joint (JointModelRX)
+  v[26]  → left_wrist_pitch_joint (JointModelRY)
+  v[27]  → left_wrist_yaw_joint (JointModelRZ)
+  v[28]  → right_shoulder_pitch_joint (JointModelRY)
+  v[29]  → right_shoulder_roll_joint (JointModelRX)
+  v[30]  → right_shoulder_yaw_joint (JointModelRZ)
+  v[31]  → right_elbow_joint (JointModelRY)
+  v[32]  → right_wrist_roll_joint (JointModelRX)
+  v[33]  → right_wrist_pitch_joint (JointModelRY)
+  v[34]  → right_wrist_yaw_joint (JointModelRZ)
+
+============================================================
+
+============================================================
+All Frame Indices:
+============================================================
+  Frame[ 0]: universe                      (parent joint: universe)
+  Frame[1 ]: world                         (parent joint: universe)
+  Frame[2 ]: floating_base_joint           (parent joint: floating_base_joint)
+  Frame[3 ]: pelvis                        (parent joint: floating_base_joint)
+  Frame[4 ]: imu_in_pelvis_joint           (parent joint: floating_base_joint)
+  Frame[5 ]: imu_in_pelvis                 (parent joint: floating_base_joint)
+  Frame[6 ]: left_hip_pitch_joint          (parent joint: left_hip_pitch_joint)
+  Frame[7 ]: left_hip_pitch_link           (parent joint: left_hip_pitch_joint)
+  Frame[8 ]: left_hip_roll_joint           (parent joint: left_hip_roll_joint)
+  Frame[9 ]: left_hip_roll_link            (parent joint: left_hip_roll_joint)
+  Frame[10]: left_hip_yaw_joint            (parent joint: left_hip_yaw_joint)
+  Frame[11]: left_hip_yaw_link             (parent joint: left_hip_yaw_joint)
+  Frame[12]: left_knee_joint               (parent joint: left_knee_joint)
+  Frame[13]: left_knee_link                (parent joint: left_knee_joint)
+  Frame[14]: left_ankle_pitch_joint        (parent joint: left_ankle_pitch_joint)
+  Frame[15]: left_ankle_pitch_link         (parent joint: left_ankle_pitch_joint)
+  Frame[16]: left_ankle_roll_joint         (parent joint: left_ankle_roll_joint)
+  Frame[17]: left_ankle_roll_link          (parent joint: left_ankle_roll_joint)
+  Frame[18]: left_foot_bottom_frame_joint  (parent joint: left_ankle_roll_joint)
+  Frame[19]: left_foot_bottom_frame        (parent joint: left_ankle_roll_joint)
+  Frame[20]: pelvis_contour_joint          (parent joint: floating_base_joint)
+  Frame[21]: pelvis_contour_link           (parent joint: floating_base_joint)
+  Frame[22]: right_hip_pitch_joint         (parent joint: right_hip_pitch_joint)
+  Frame[23]: right_hip_pitch_link          (parent joint: right_hip_pitch_joint)
+  Frame[24]: right_hip_roll_joint          (parent joint: right_hip_roll_joint)
+  Frame[25]: right_hip_roll_link           (parent joint: right_hip_roll_joint)
+  Frame[26]: right_hip_yaw_joint           (parent joint: right_hip_yaw_joint)
+  Frame[27]: right_hip_yaw_link            (parent joint: right_hip_yaw_joint)
+  Frame[28]: right_knee_joint              (parent joint: right_knee_joint)
+  Frame[29]: right_knee_link               (parent joint: right_knee_joint)
+  Frame[30]: right_ankle_pitch_joint       (parent joint: right_ankle_pitch_joint)
+  Frame[31]: right_ankle_pitch_link        (parent joint: right_ankle_pitch_joint)
+  Frame[32]: right_ankle_roll_joint        (parent joint: right_ankle_roll_joint)
+  Frame[33]: right_ankle_roll_link         (parent joint: right_ankle_roll_joint)
+  Frame[34]: right_foot_bottom_frame_joint (parent joint: right_ankle_roll_joint)
+  Frame[35]: right_foot_bottom_frame       (parent joint: right_ankle_roll_joint)
+  Frame[36]: waist_yaw_joint               (parent joint: waist_yaw_joint)
+  Frame[37]: waist_yaw_link                (parent joint: waist_yaw_joint)
+  Frame[38]: waist_roll_joint              (parent joint: waist_roll_joint)
+  Frame[39]: waist_roll_link               (parent joint: waist_roll_joint)
+  Frame[40]: waist_pitch_joint             (parent joint: waist_pitch_joint)
+  Frame[41]: torso_link                    (parent joint: waist_pitch_joint)
+  Frame[42]: d435_joint                    (parent joint: waist_pitch_joint)
+  Frame[43]: d435_link                     (parent joint: waist_pitch_joint)
+  Frame[44]: head_joint                    (parent joint: waist_pitch_joint)
+  Frame[45]: head_link                     (parent joint: waist_pitch_joint)
+  Frame[46]: imu_in_torso_joint            (parent joint: waist_pitch_joint)
+  Frame[47]: imu_in_torso                  (parent joint: waist_pitch_joint)
+  Frame[48]: left_shoulder_pitch_joint     (parent joint: left_shoulder_pitch_joint)
+  Frame[49]: left_shoulder_pitch_link      (parent joint: left_shoulder_pitch_joint)
+  Frame[50]: left_shoulder_roll_joint      (parent joint: left_shoulder_roll_joint)
+  Frame[51]: left_shoulder_roll_link       (parent joint: left_shoulder_roll_joint)
+  Frame[52]: left_shoulder_yaw_joint       (parent joint: left_shoulder_yaw_joint)
+  Frame[53]: left_shoulder_yaw_link        (parent joint: left_shoulder_yaw_joint)
+  Frame[54]: left_elbow_joint              (parent joint: left_elbow_joint)
+  Frame[55]: left_elbow_link               (parent joint: left_elbow_joint)
+  Frame[56]: left_wrist_roll_joint         (parent joint: left_wrist_roll_joint)
+  Frame[57]: left_wrist_roll_link          (parent joint: left_wrist_roll_joint)
+  Frame[58]: left_wrist_pitch_joint        (parent joint: left_wrist_pitch_joint)
+  Frame[59]: left_wrist_pitch_link         (parent joint: left_wrist_pitch_joint)
+  Frame[60]: left_wrist_yaw_joint          (parent joint: left_wrist_yaw_joint)
+  Frame[61]: left_wrist_yaw_link           (parent joint: left_wrist_yaw_joint)
+  Frame[62]: left_hand_palm_joint          (parent joint: left_wrist_yaw_joint)
+  Frame[63]: left_rubber_hand              (parent joint: left_wrist_yaw_joint)
+  Frame[64]: logo_joint                    (parent joint: waist_pitch_joint)
+  Frame[65]: logo_link                     (parent joint: waist_pitch_joint)
+  Frame[66]: mid360_joint                  (parent joint: waist_pitch_joint)
+  Frame[67]: mid360_link                   (parent joint: waist_pitch_joint)
+  Frame[68]: right_shoulder_pitch_joint    (parent joint: right_shoulder_pitch_joint)
+  Frame[69]: right_shoulder_pitch_link     (parent joint: right_shoulder_pitch_joint)
+  Frame[70]: right_shoulder_roll_joint     (parent joint: right_shoulder_roll_joint)
+  Frame[71]: right_shoulder_roll_link      (parent joint: right_shoulder_roll_joint)
+  Frame[72]: right_shoulder_yaw_joint      (parent joint: right_shoulder_yaw_joint)
+  Frame[73]: right_shoulder_yaw_link       (parent joint: right_shoulder_yaw_joint)
+  Frame[74]: right_elbow_joint             (parent joint: right_elbow_joint)
+  Frame[75]: right_elbow_link              (parent joint: right_elbow_joint)
+  Frame[76]: right_wrist_roll_joint        (parent joint: right_wrist_roll_joint)
+  Frame[77]: right_wrist_roll_link         (parent joint: right_wrist_roll_joint)
+  Frame[78]: right_wrist_pitch_joint       (parent joint: right_wrist_pitch_joint)
+  Frame[79]: right_wrist_pitch_link        (parent joint: right_wrist_pitch_joint)
+  Frame[80]: right_wrist_yaw_joint         (parent joint: right_wrist_yaw_joint)
+  Frame[81]: right_wrist_yaw_link          (parent joint: right_wrist_yaw_joint)
+  Frame[82]: right_hand_palm_joint         (parent joint: right_wrist_yaw_joint)
+  Frame[83]: right_rubber_hand             (parent joint: right_wrist_yaw_joint)
+
+============================================================
+Joint Name Mapping (nq vs nv indices):
+============================================================
+Joint ID  Joint Name                    nq_idx          nv_idx          nq_size    nv_size    
+----------------------------------------------------------------------------------------------------
+0         universe                      -1              -1              1          1          
+1         floating_base_joint           0               0               7          6          
+2         left_hip_pitch_joint          7               6               1          1          
+3         left_hip_roll_joint           8               7               1          1          
+4         left_hip_yaw_joint            9               8               1          1          
+5         left_knee_joint               10              9               1          1          
+6         left_ankle_pitch_joint        11              10              1          1          
+7         left_ankle_roll_joint         12              11              1          1          
+8         right_hip_pitch_joint         13              12              1          1          
+9         right_hip_roll_joint          14              13              1          1          
+10        right_hip_yaw_joint           15              14              1          1          
+11        right_knee_joint              16              15              1          1          
+12        right_ankle_pitch_joint       17              16              1          1          
+13        right_ankle_roll_joint        18              17              1          1          
+14        waist_yaw_joint               19              18              1          1          
+15        waist_roll_joint              20              19              1          1          
+16        waist_pitch_joint             21              20              1          1          
+17        left_shoulder_pitch_joint     22              21              1          1          
+18        left_shoulder_roll_joint      23              22              1          1          
+19        left_shoulder_yaw_joint       24              23              1          1          
+20        left_elbow_joint              25              24              1          1          
+21        left_wrist_roll_joint         26              25              1          1          
+22        left_wrist_pitch_joint        27              26              1          1          
+23        left_wrist_yaw_joint          28              27              1          1          
+24        right_shoulder_pitch_joint    29              28              1          1          
+25        right_shoulder_roll_joint     30              29              1          1          
+26        right_shoulder_yaw_joint      31              30              1          1          
+27        right_elbow_joint             32              31              1          1          
+28        right_wrist_roll_joint        33              32              1          1          
+29        right_wrist_pitch_joint       34              33              1          1          
+30        right_wrist_yaw_joint         35              34              1          1          
+============================================================

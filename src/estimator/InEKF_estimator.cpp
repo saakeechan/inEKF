@@ -437,10 +437,10 @@ void InEKFilter::new_measurement()
     IMU_Gyro[frame_count] << TextFileData.gyro_x[j], TextFileData.gyro_y[j], TextFileData.gyro_z[j];
     IMU_Acc[frame_count] << TextFileData.acc_x[j], TextFileData.acc_y[j], TextFileData.acc_z[j];
 
-    if (robot.robot_name == "G1") {
-    // Convert gravity-compensated body IMU to world frame with gravity added back
-    IMU_Acc[frame_count] = filter.getState().getRotation() * IMU_Acc[frame_count] - gravity;
-    }
+    // if (robot.robot_name == "G1") {
+    // // Convert gravity-compensated body IMU to world frame with gravity added back
+    // IMU_Acc[frame_count] = filter.getState().getRotation() * IMU_Acc[frame_count] - gravity;
+    // }
     // IMU_Gyro[frame_count] = filter.getState().getRotation() * IMU_Gyro[frame_count];
 
     // cout << "Frame " << frame_count << " IMU Gyro: " << IMU_Gyro[frame_count].transpose() << endl;
@@ -766,7 +766,7 @@ void InEKFilter::writeSavedData(){
     // }
     
     // Write dv history to CSV
-    writeDvHistory();
+    // writeDvHistory();
 
 }
 
