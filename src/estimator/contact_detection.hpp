@@ -14,7 +14,7 @@ namespace ContactDetection {
     // --- Velocity detection parameters ---
     inline constexpr double dv0          = 0.3;   // midpoint: p = 0.5
 
-    inline constexpr double dv_contact   = 0.10;  // confident contact below dv0
+    inline constexpr double dv_contact   = 1;  // confident contact below dv0
     inline constexpr double p_contact    = 0.95;
 
     inline constexpr double dv_nocontact = 0.7;   // confident NO contact above dv0
@@ -29,8 +29,8 @@ namespace ContactDetection {
     inline constexpr double p_low  = 0.05;
 
     // --- Fusion weights ---
-    inline constexpr double w_torque   = 0.7;
-    inline constexpr double w_velocity = 0.3;
+    inline constexpr double w_torque   = 0.6;
+    inline constexpr double w_velocity = 0.4;
     
     // ---------------------------------------------------------
 
@@ -46,7 +46,8 @@ namespace ContactDetection {
      */
     std::vector<bool> detect_contact(
         const Eigen::VectorXd& leg_torques,
-        const Eigen::VectorXd& d_v
+        const Eigen::VectorXd& d_v,
+        const Eigen::VectorXd& leg_speeds // Optional: could be used for additional logic
     );
 
     /**

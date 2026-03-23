@@ -87,7 +87,7 @@ covariance_exponents:
 # Initial condition (16-dimensional state vector)
 initial_condition:
   position: [0.0, 0.0, 0.0]  # Px, Py, Pz
-  orientation: [0.0, 0.0, 0.0, 0.0]  # Quaternion or Euler (indices 3,4,5 for roll,pitch,yaw)
+  orientation: [1.0, 0.0, 0.0, 0.0]  # Quaternion (Qw, Qx, Qy, Qz)
   velocity: [0.0, 0.0, 0.0]  # Vx, Vy, Vz
   bias_gyro: [0.0, 0.0, 0.0]  # bgx, bgy, bgz
   bias_acc: [0.0, 0.0, 0.0]  # bax, bay, baz

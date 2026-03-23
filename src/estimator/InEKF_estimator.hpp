@@ -28,6 +28,7 @@ public:
 
         Eigen::Matrix3d Rotation;
         Eigen::Vector3d Velocity;
+        Eigen::Vector3d Angular_Velocity;
         Eigen::Vector3d Position;
 
         // Eigen::VectorXd d;        // Dynamic size, set at runtime based on num_legs
@@ -39,6 +40,8 @@ public:
         std::vector<bool> Contact;      // Dynamic size
         std::vector<bool> Hard_Contact;  // Dynamic size
         std::vector<bool> Slip;          // Dynamic size
+
+        Eigen::VectorXd torqueSumSquared; // Dynamic size, set at runtime based on num_legs
 
     }ROBOT_STATES;
 
@@ -69,7 +72,7 @@ public:
     void Propagate_and_Correct();
     std::vector<double> Variable_Contact_Cov(int time);
 
-    void send_states(ROBOT_STATES &state_);
+    // void send_states(ROBOT_STATES &state_);
     void sliding_window();
 
     void SAVE_onestep(int save_index);
@@ -122,6 +125,7 @@ public:
     std::vector<Eigen::Vector3d>    IMU_Acc;
     std::vector<Eigen::VectorXd>   ENCODER;      // Dynamic size, set after robot config loaded
     std::vector<Eigen::VectorXd>   ENCODERDOT;   // Dynamic size, set after robot config loaded
+    std::vector<Eigen::VectorXd>   torqueSumSquared;  // Sliding window buffer for torque sum squared
 
     //SAVE PARAMETER
     std::string estimator_info;

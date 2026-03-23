@@ -378,33 +378,33 @@ Eigen::Vector3d RobotModel::get_foot_velocity(int i_leg) const {
         std::exit(EXIT_FAILURE);
     }
     
-    // Get foot velocity in world frame
-    pinocchio::Motion foot_velocity_world = pinocchio::getFrameVelocity(
+    // Get foot velocity in Base Frame
+    pinocchio::Motion foot_velocity_Base = pinocchio::getFrameVelocity(
         pin_model,
         const_cast<pinocchio::Data&>(pin_data),
         foot_frame_ids[i_leg - 1],
         pinocchio::LOCAL_WORLD_ALIGNED
     );
     
-    // Get IMU velocity in world frame
-    pinocchio::Motion imu_velocity_world = pinocchio::getFrameVelocity(
+    // Get IMU velocity in Base Frame
+    pinocchio::Motion imu_velocity_Base = pinocchio::getFrameVelocity(
         pin_model,
         const_cast<pinocchio::Data&>(pin_data),
         imu_frame_id,
         pinocchio::LOCAL_WORLD_ALIGNED
     );
     
-    // Compute relative velocity in world frame
-    Eigen::Vector3d v_rel_world = 
-        foot_velocity_world.linear() - 
-        imu_velocity_world.linear();
+    // Compute relative velocity in Base Frame
+    Eigen::Vector3d v_rel_base = 
+        foot_velocity_Base.linear() - 
+        imu_velocity_Base.linear();
     
-    // Get IMU rotation matrix from world frame
+    // Get IMU rotation matrix from Base Frame
     const Eigen::Matrix3d R_oi = 
         pin_data.oMf[imu_frame_id].rotation();
     
-    // Transform relative velocity to IMU frame: v_imu = R_oi^T * v_world
-    return R_oi.transpose() * v_rel_world;
+    // Transform relative velocity to IMU frame: v_imu = R_oi^T * v_base
+    return R_oi.transpose() * v_rel_base;
 }
 
 void RobotModel::compute_joint_jacobians() const {
@@ -498,3 +498,44 @@ Eigen::MatrixXd RobotModel::extract_active_encoder_jacobian(const Eigen::MatrixX
     return active_jacobian;
 }
 
+void RobotModel::transform_state_to_base(
+    const Eigen::Matrix3d& R_IMU_world,
+    const Eigen::Vector3d& p_IMU_world,
+    const Eigen::Vector3d& v_IMU_world,
+    const Eigen::Vector3d& w_IMU_world,
+    Eigen::Matrix3d& R_base_World,
+    Eigen::Vector3d& p_base_World,
+    Eigen::Vector3d& v_base_World,
+    Eigen::Vector3d& w_base_World
+) const {
+    // In Pinocchio, the base frame is the world/universe frame (frame 0)
+    // So base_placement = Identity, and we only need IMU placement
+    
+    const pinocchio::SE3& imu_placement = pin_data.oMf[imu_frame_id];
+
+    // Since base is at world origin, the transformation from base to IMU is just the IMU placement
+    const Eigen::Matrix3d R_base_to_IMU = imu_placement.rotation();
+    const Eigen::Vector3d p_base_to_IMU = imu_placement.translation();
+    
+    // Get IMU frame velocity in world-aligned coordinates
+    pinocchio::Motion imu_velocity_world = pinocchio::getFrameVelocity(
+        pin_model,
+        const_cast<pinocchio::Data&>(pin_data),
+        imu_frame_id,
+        pinocchio::LOCAL_WORLD_ALIGNED
+    );
+    
+    const Eigen::Vector3d v_imu_Base = imu_velocity_world.linear();   // Joint-induced linear velocity in Base frame
+    const Eigen::Vector3d w_imu_Base = imu_velocity_world.angular();  // Joint-induced angular velocity in Base frame
+    
+    
+    // Transform rotation: R_world_to_base = R_world_to_IMU * R_IMU_to_base
+    R_base_World = R_IMU_world * R_base_to_IMU.transpose();
+
+    p_base_World = p_IMU_world - R_base_World * p_base_to_IMU;
+
+    w_base_World = w_IMU_world - R_base_World * w_imu_Base; // 
+    v_base_World = v_IMU_world - R_base_World * v_imu_Base; // Get linear velocity in world frame of base
+    
+
+}

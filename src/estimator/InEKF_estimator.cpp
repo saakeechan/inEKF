@@ -119,6 +119,7 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
     IMU_Acc.resize(SLIDING_WINDOW_SIZE);
     ENCODER.resize(SLIDING_WINDOW_SIZE);
     ENCODERDOT.resize(SLIDING_WINDOW_SIZE);
+    torqueSumSquared.resize(SLIDING_WINDOW_SIZE);
     
     // Initialize dv_history for tracking dv norms over time
     dv_history.clear();
@@ -149,6 +150,9 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
         CONTACT_t[i].resize(robot.num_legs, false);
         HARD_CONTACT_t[i].resize(robot.num_legs, false);
         SLIP_t[i].resize(robot.num_legs, false);
+        
+        // Initialize torqueSumSquared
+        torqueSumSquared[i] = Eigen::VectorXd::Zero(robot.num_legs);
     }
         
     robot.SetCovariances(cov_val_setting); // Initialize covariance of the 12x1 vector input
@@ -259,7 +263,10 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
 
 void InEKFilter::InitializeFromYAML(const std::string& config_path) {
     // Load YAML configuration
+
+    std::cout << "Loading estimator configuration from: " << config_path << std::endl;
     YAML::Node config = YAML::LoadFile(config_path);
+    std::cout << "Estimator configuration loaded successfully." << std::endl;
     
     // // Load robot configuration path (only if not already loaded)
     // if (robot.num_legs == 0) {  // Check if robot config already loaded
@@ -577,25 +584,59 @@ void InEKFilter::Propagate_and_Correct()
     // Append dv norms to history
     dv_history.push_back(dv_norms_current);
 
+    Eigen::Vector3d w_IMU_world = filter.getState().getRotation() * (IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias()); // assuming bias is in body frame.
+        robot.transform_state_to_base(
+        filter.getState().getRotation(),
+        filter.getState().getPosition(),
+        filter.getState().getVelocity(),
+        w_IMU_world,
+        robot_state.Rotation,
+        robot_state.Position,
+        robot_state.Velocity,
+        robot_state.Angular_Velocity
+    );
+    
+    // Populate remaining robot_state fields (sensor-specific and contact data)
+    robot_state.Bias_Gyro = filter.getState().getGyroscopeBias();
+    robot_state.Bias_Acc = filter.getState().getAccelerometerBias();
+    robot_state.Contact = CONTACT_t[frame_count];
+    robot_state.Hard_Contact = HARD_CONTACT_t[frame_count];
+    robot_state.Slip = SLIP_t[frame_count];
+    robot_state.d_v = d_v[frame_count];
+    robot_state.torqueSumSquared = torqueSumSquared[frame_count];
+
+
 }
 
-void InEKFilter::send_states(ROBOT_STATES &state_){ 
+// void InEKFilter::send_states(ROBOT_STATES &state_){ 
 
-    //Sending Estimated States----------------------------------------------------------------------------
+//     //Sending Estimated States----------------------------------------------------------------------------
 
-    state_.Position = filter.getState().getPosition();
+//     Eigen::Vector3d w_IMU_world = filter.getState().getRotation() * (IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias()); // assuming bias is in body frame.
+//     robot.transform_state_to_base(
+//         filter.getState().getRotation(),
+//         filter.getState().getPosition(),
+//         filter.getState().getVelocity(),
+//         w_IMU_world,
+//         robot_state.Rotation,
+//         robot_state.Position,
+//         robot_state.Velocity,
+//         robot_state.Angular_Velocity
+//     );
 
-    state_.Velocity = filter.getState().getVelocity();
-    state_.Bias_Gyro = filter.getState().getGyroscopeBias();
-    state_.Bias_Acc = filter.getState().getAccelerometerBias();
-    state_.Rotation= filter.getState().getRotation();
+//     // state_.Position = filter.getState().getPosition();
 
-    state_.Contact = CONTACT_t[frame_count];
-    state_.Hard_Contact = HARD_CONTACT_t[frame_count];
-    state_.Slip = SLIP_t[frame_count];
-    state_.d_v = d_v[frame_count];
+//     // state_.Velocity = filter.getState().getVelocity();
+//     // state_.Bias_Gyro = filter.getState().getGyroscopeBias();
+//     // state_.Bias_Acc = filter.getState().getAccelerometerBias();
+//     // state_.Rotation= filter.getState().getRotation();
 
-}
+//     // state_.Contact = CONTACT_t[frame_count];
+//     // state_.Hard_Contact = HARD_CONTACT_t[frame_count];
+//     // state_.Slip = SLIP_t[frame_count];
+//     // state_.d_v = d_v[frame_count];
+
+// }
 
 void InEKFilter::SAVE_onestep(int save_index){
 
@@ -686,13 +727,13 @@ void InEKFilter::SAVE_onestep(int save_index){
 
 
 
-        Eigen::Vector3d temp_eul = BasicFunctions_Estimator::Rotation_to_EulerZYX(filter.getState().getRotation());
+        Eigen::Vector3d temp_eul = BasicFunctions_Estimator::Rotation_to_EulerZYX(robot_state.Rotation);
         for(int i=0;i<3;i++)
         {
-            SAVE_MATRIX[idx_ESTIMATED_Position+i][save_index] = filter.getState().getPosition()(i);
-            SAVE_MATRIX[idx_ESTIMATED_Velocity+i][save_index] = filter.getState().getVelocity()(i);
-            SAVE_MATRIX[idx_ESTIMATED_Bias_Gyro+i][save_index] = filter.getState().getGyroscopeBias()(i);
-            SAVE_MATRIX[idx_ESTIMATED_Bias_Acc+i][save_index] = filter.getState().getAccelerometerBias()(i);
+            SAVE_MATRIX[idx_ESTIMATED_Position+i][save_index] = robot_state.Position(i);
+            SAVE_MATRIX[idx_ESTIMATED_Velocity+i][save_index] = robot_state.Velocity(i);
+            SAVE_MATRIX[idx_ESTIMATED_Bias_Gyro+i][save_index] = robot_state.Bias_Gyro(i);
+            SAVE_MATRIX[idx_ESTIMATED_Bias_Acc+i][save_index] = robot_state.Bias_Acc(i);
             SAVE_MATRIX[idx_ESTIMATED_rpy+i][save_index] = temp_eul(i);
         }
 
@@ -700,7 +741,7 @@ void InEKFilter::SAVE_onestep(int save_index){
         {
             for(int j=0;j<3;j++)
             {
-                SAVE_MATRIX[idx_ESTIMATED_Rotation+i*3+j][save_index] = filter.getState().getRotation()(i,j);
+                SAVE_MATRIX[idx_ESTIMATED_Rotation+i*3+j][save_index] = robot_state.Rotation(i,j);
             }
         }
 
@@ -724,6 +765,7 @@ void InEKFilter::sliding_window(){
         std::swap(ENCODER[0],ENCODER[1]);
         std::swap(ENCODERDOT[0],ENCODERDOT[1]);
         std::swap(d_v[0], d_v[1]);
+        std::swap(torqueSumSquared[0], torqueSumSquared[1]);
     }
 }
 
@@ -774,11 +816,10 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
 
     new_measurement(imu_i, motor_data_i, Contact_i); // read in new measurement and calculate rotation, velocity updates and slip states
 
-
     Propagate_and_Correct();
-    send_states(robot_state); // update current_state with latest estimates for external use (e.g., logging, visualization)
+    // send_states(robot_state); // update current_state with latest estimates for external use (e.g., logging, visualization)
 
-    if(filter.getState().getVelocity().norm()>10 && dt!=0){
+    if(robot_state.Velocity.norm()>10 && dt!=0){
     //    cout<<"Diverged!! from time "<<time_count<<endl;
         // dt = 0;
     }
@@ -801,24 +842,37 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
     // Extract leg torques into m-row vector
     Eigen::VectorXd leg_torques(robot.num_legs);
     for (int i = 0; i < robot.num_legs; i++) {
-        // Sum torques for all motors in this leg
+        // Sum squared torques for all motors in this leg
         double leg_torque_sum = 0.0;
         for (int idx : robot.Torque_indices_map[i]) {
-            leg_torque_sum += std::abs(motor_torques_i(idx));
+            double torque = motor_torques_i(idx);
+            leg_torque_sum += torque * torque;
         }
         leg_torques(i) = leg_torque_sum;
+    }
+
+    torqueSumSquared[frame_count] = leg_torques;
+
+    // Calculate leg speeds by summing absolute encoder velocities for each leg
+    Eigen::VectorXd leg_speeds(robot.num_legs);
+    for (int i = 0; i < robot.num_legs; i++) {
+        double leg_speed_sum = 0.0;
+        for (int idx : robot.Torque_indices_map[i]) {
+            leg_speed_sum += std::abs(motor_data_i(1, idx));  // Row 1 is velocities
+        }
+        leg_speeds(i) = leg_speed_sum;
     }
     
     // Detect contacts from motor torques and velocity residuals
     // Use previous dv if available (frame_count >= 1), otherwise use current (frame_count = 0)
     Eigen::VectorXd dv_for_detection = d_v[0]; // Use dv from frame 0 for detection, as it is the most recent after sliding window update
-    CONTACT_t[frame_count] = ContactDetection::detect_contact(leg_torques, dv_for_detection);
+    CONTACT_t[frame_count] = ContactDetection::detect_contact(leg_torques, dv_for_detection, leg_speeds);
 
     Propagate_and_Correct();
 
-    send_states(robot_state); // update current_state with latest estimates for external use (e.g., logging, visualization)
+    // send_states(robot_state); // update current_state with latest estimates for external use (e.g., logging, visualization)
 
-    if(filter.getState().getVelocity().norm()>10 && dt!=0){
+    if(robot_state.Velocity.norm()>10 && dt!=0){
     //    cout<<"Diverged!! from time "<<time_count<<endl;
         // dt = 0;
     }
@@ -859,9 +913,11 @@ void InEKFilter::Onestep(){
         }
         leg_torques(i) = leg_torque_sum;
     }
-    
+
+    Eigen::VectorXd leg_speeds = Eigen::VectorXd::Ones(robot.num_legs) * 1000; // Placeholder: set high leg speeds to avoid slip detection in TextFile mode (since we don't have real motor velocity data)
+    torqueSumSquared[frame_count] = leg_torques;
     Eigen::VectorXd dv_for_detection = d_v[0]; // Use dv from frame 0 for detection, as it is the most recent after sliding window update
-    CONTACT_t[frame_count] = ContactDetection::detect_contact(leg_torques, dv_for_detection);
+    CONTACT_t[frame_count] = ContactDetection::detect_contact(leg_torques, dv_for_detection, leg_speeds);
 
     // GroundTruthContact = TextFileData.contact_state[j]; // For evaluation purposes, store ground truth contact from TextFile
 
@@ -882,7 +938,7 @@ void InEKFilter::Onestep(){
     // send_states(current_state); // update current_state with latest estimates for external use (e.g., logging, visualization)
 
     
-    if(filter.getState().getVelocity().norm()>10 && dt!=0){
+    if(robot_state.Velocity.norm()>10 && dt!=0){
     //    cout<<"Diverged!! from time "<<time_count<<endl;
         // dt = 0;
     }

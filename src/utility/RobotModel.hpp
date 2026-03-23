@@ -213,6 +213,28 @@ public:
      */
     Eigen::MatrixXd extract_active_encoder_jacobian(const Eigen::MatrixXd& full_jacobian) const;
 
+    /**
+     * @brief Transform all state quantities from World-IMU frame to World-Base frame
+     * @param R_IMU_world Rotation matrix representing IMU orientation in world frame (from filter)
+     * @param p_IMU_world Position of IMU in world frame (from filter)
+     * @param v_IMU_world Linear velocity of IMU in world frame (from filter)
+     * @param w_IMU_world Angular velocity of IMU in world frame (bias-corrected gyro)
+     * @param R_base_World Output: Base orientation in world frame
+     * @param p_base_World Output: Base position in world frame
+     * @param v_base_World Output: Base linear velocity in world frame
+     * @param w_base_World Output: Base angular velocity in world frame
+     */
+    void transform_state_to_base(
+        const Eigen::Matrix3d& R_IMU_world,
+        const Eigen::Vector3d& p_IMU_world,
+        const Eigen::Vector3d& v_IMU_world,
+        const Eigen::Vector3d& w_IMU_world,
+        Eigen::Matrix3d& R_base_World,
+        Eigen::Vector3d& p_base_World,
+        Eigen::Vector3d& v_base_World,
+        Eigen::Vector3d& w_base_World
+    ) const;
+
 private:
     YAML::Node config;  // Stores the loaded YAML configuration
     

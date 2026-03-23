@@ -54,10 +54,6 @@ int main() {
 
             estimator_IEKF.Onestep();  // Contact detection from torques
 
-            // if (time % 100 == 0) {
-            //     std::cout << estimator_IEKF.robot_state.Position.transpose() << " " << estimator_IEKF.robot_state.Contact[1] << endl;
-            // }
-
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
             step_times.push_back(elapsed.count());

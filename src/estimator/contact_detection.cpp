@@ -10,11 +10,20 @@ namespace ContactDetection {
 
     std::vector<bool> detect_contact(
         const Eigen::VectorXd& leg_torques,
-        const Eigen::VectorXd& d_v
+        const Eigen::VectorXd& d_v,
+        const Eigen::VectorXd& leg_speeds
     ) {
+
         int num_legs = leg_torques.size();
         std::vector<bool> contacts(num_legs, false);
         
+        // If all leg speeds are low (< 15), assume standing (all legs in contact)
+        for (int i = 0; i < leg_speeds.size(); i++) {
+            if (leg_speeds(i) >= 1.0) goto normal_detection;
+        }
+        return std::vector<bool>(num_legs, true);
+        
+        normal_detection:
         // Validate input sizes
         if (d_v.size() != 3 * num_legs) {
             std::cerr << "Warning: d_v size (" << d_v.size() 
