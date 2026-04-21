@@ -16,6 +16,10 @@
 #include "../utility/TextFileDataStruct.hpp"
 // ----------------------------
 
+// ONNX Runtime for contact estimation model
+#include <onnxruntime_cxx_api.h>
+#include <deque>
+
 using namespace Eigen;
 using namespace std;
 
@@ -41,8 +45,6 @@ public:
         std::vector<bool> Hard_Contact;  // Dynamic size
         std::vector<bool> Slip;          // Dynamic size
 
-        Eigen::VectorXd torqueSumSquared; // Dynamic size, set at runtime based on num_legs
-
     }ROBOT_STATES;
 
 
@@ -50,7 +52,8 @@ public:
     InEKFilter() = default;  // Default constructor (no initialization)
     InEKFilter(const std::string& initialization_config_path, const std::string& robot_config_path) {
         load_robot_config(robot_config_path);  // Load robot config FIRST
-        InitializeFromYAML(initialization_config_path);  // Then initialize
+        InitializeFromYAML(initialization_config_path);  // Then initialize (loads contact_model_path)
+        load_contact_model(contact_model_path);  // Load PyTorch contact estimation model with path from YAML
     }
     
     //functions
@@ -58,6 +61,19 @@ public:
         robot.load_config(config_path); 
         compute_indices(); // Compute indices after robot config is loaded
     }
+    
+    // Load ONNX contact estimation model
+    void load_contact_model(const std::string& model_path = "../src/estimator/bipedal_contact_best_val_leg_acc.onnx");
+    
+    // Run contact estimation inference
+    std::vector<bool> predict_contact(const std::vector<float>& input_features);
+    
+    // NN Sliding Window Buffer Management
+    Eigen::VectorXd extract_nn_features();  // Extract 54-element feature vector from current state
+    void update_nn_feature_buffer(const Eigen::VectorXd& features);  // Add new feature vector to buffer
+    std::vector<float> create_nn_input_tensor();  // Create [1, 25, 54] flattened vector from buffer
+    std::vector<bool> nn_predict_contact();  // Convenience method: create tensor and predict
+    
     void LoadTextFileData(const std::string& TextFile_filename);
 
     void Initialize(double _dt, Eigen::Vector<double,12> cov_val_setting, Eigen::Vector<double, 16> initial_condition, int sliding_window_size = 2); // default sliding window size = 2 (filter)
@@ -80,6 +96,7 @@ public:
     void Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const std::vector<bool> &Contact_i);
     void Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const Eigen::VectorXd &motor_torques_i);  // Contact detection from torques
     void Onestep();  // No-argument version for TextFile mode
+    // void Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const Eigen::VectorXd &motor_torques_i);  // Contact detection from torques
 
     void writeSavedData();
     void writeDvHistory();  // Write dv norms to CSV file
@@ -91,6 +108,23 @@ public:
 
     //Necessary classes & variables
     RobotModel robot; // This is where robot model is defined
+    
+    // ONNX Runtime contact estimation model
+    std::unique_ptr<Ort::Session> contact_model_session;
+    std::unique_ptr<Ort::Env> ort_env;
+    Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+    bool contact_model_loaded = false;
+    std::string contact_model_path;  // Path to the contact model loaded from YAML
+    
+    // ONNX model input/output names
+    std::vector<const char*> input_names;
+    std::vector<const char*> output_names;
+    std::vector<int64_t> input_shape;
+    
+    // NN Feature Buffer: stores [timestep][feature_idx] for sliding window
+    static constexpr int NN_WINDOW_SIZE = 15;  // Number of timesteps
+    static constexpr int NN_FEATURE_SIZE = 54;   // Number of features per timestep
+    std::deque<Eigen::VectorXd> nn_feature_window;  // Sliding window buffer
 
     int frame_count=0;
     int time_count=0;
@@ -125,8 +159,8 @@ public:
     std::vector<Eigen::Vector3d>    IMU_Acc;
     std::vector<Eigen::VectorXd>   ENCODER;      // Dynamic size, set after robot config loaded
     std::vector<Eigen::VectorXd>   ENCODERDOT;   // Dynamic size, set after robot config loaded
+    std::vector<Eigen::VectorXd>   MOTOR_TORQUES;     // Raw motor torques for NN features
     std::vector<Eigen::VectorXd>   torqueSumSquared;  // Sliding window buffer for torque sum squared
-
     //SAVE PARAMETER
     std::string estimator_info;
     std::string file_info;
@@ -172,6 +206,8 @@ public:
 
     bool variable_contact_cov_mode = false;
     double cov_amplifier = 2;
+
+    bool contact_nn_enabled = false;  // Whether to use neural network for contact detection
 
     // dv history for CSV logging: [time_step][leg] = dv_norm
     std::vector<std::vector<double>> dv_history;

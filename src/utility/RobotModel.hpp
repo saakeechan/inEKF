@@ -69,7 +69,7 @@ public:
     
     std::vector<int> Encoder_indices_map;     // Indices for mapping TextFile data to encoder vector
     std::vector<int> Encoderdot_indices_map;  // Indices for mapping TextFile data to encoderdot vector
-    std::vector<std::vector<int>> Torque_indices_map;  // 2D array: each row = torque indices for one leg
+    std::vector<std::vector<int>> Leg_indices_map;  // 2D array: each row = indices for one leg
     
     // ========================================================================
     // PINOCCHIO MODEL

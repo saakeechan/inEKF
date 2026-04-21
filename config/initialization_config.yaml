@@ -21,59 +21,22 @@ slip_rejection:
 # Variable contact covariance configuration
 variable_contact_covariance:
   enabled: false  # Variable contact covariance mode
-  amplifier: 5.0  # Multiplied to contact covariance when VCC is enabled
+  amplifier: 1.0  # Multiplied to contact covariance when VCC is enabled
+
+Contact_estimation_NN:
+  enabled: false  # Enable contact estimation using the PyTorch model
+  file_path: "/home/saakee/Research/Saaketh_INEKF/src/contactDetection/bipedal_contact_best_val_leg_acc.onnx"  # Path to the PyTorch contact estimation model
+
 
 # Estimator Covariances (exponents for 10^x) Overrides robot defaults here
 # Order: gyro, acc, slip, contact, encoder, bias_gyro, bias_acc,
 #        prior_ori, prior_vel, prior_pos, prior_bias_gyro, prior_bias_acc
 
-# covariance_exponents:
-#   gyro: -2
-#   acc: -1
-#   slip: -3
-#   contact: -6
-#   encoder: -12
-#   bias_gyro: -3
-#   bias_acc: -3
-#   prior_orientation: -10
-#   prior_velocity: -10
-#   prior_position: -10
-#   prior_bias_gyro: -10
-#   prior_bias_acc: -10
-
-# covariance_exponents:
-#   gyro: -1
-#   acc: -1
-#   slip: -1
-#   contact: -5
-#   encoder: -10
-#   bias_gyro: -10
-#   bias_acc: -7
-#   prior_orientation: -2
-#   prior_velocity: -2
-#   prior_position: -2
-#   prior_bias_gyro: -2
-#   prior_bias_acc: -2
-
-# covariance_exponents:
-#   gyro: -5
-#   acc: -4
-#   slip: -1
-#   contact: -2
-#   encoder: -4
-#   bias_gyro: -10
-#   bias_acc: -10
-#   prior_orientation: -10
-#   prior_velocity: -10
-#   prior_position: -10
-#   prior_bias_gyro: -10
-#   prior_bias_acc: -10
-
 covariance_exponents:
   gyro: -5
   acc: -1
-  slip: -1
-  contact: -4
+  slip: -2
+  contact: -5
   encoder: -8
   bias_gyro: -10
   bias_acc: -10

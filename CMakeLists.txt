@@ -56,6 +56,23 @@ link_directories(${PINOCCHIO_LIBRARY_DIRS})
 
 find_package(yaml-cpp REQUIRED)
 
+# Find ONNX Runtime
+find_library(ONNXRUNTIME_LIB onnxruntime
+    HINTS /usr/local/lib /usr/lib /opt/onnxruntime/lib
+)
+find_path(ONNXRUNTIME_INCLUDE_DIR onnxruntime_cxx_api.h
+    HINTS /usr/local/include /usr/include /opt/onnxruntime/include
+)
+
+if(NOT ONNXRUNTIME_LIB OR NOT ONNXRUNTIME_INCLUDE_DIR)
+    message(FATAL_ERROR "ONNX Runtime not found. Please install ONNX Runtime.")
+else()
+    message(STATUS "Found ONNX Runtime: ${ONNXRUNTIME_LIB}")
+    message(STATUS "ONNX Runtime include: ${ONNXRUNTIME_INCLUDE_DIR}")
+endif()
+
+include_directories(${ONNXRUNTIME_INCLUDE_DIR})
+
 link_directories(
         /usr/lib
         /usr/local/lib
@@ -69,6 +86,7 @@ include_directories(
         src/estimator
         src/utility
         src/InEKF
+        src/contactDetection
 )
 
 
@@ -107,6 +125,7 @@ target_link_libraries(INEKF_Estimator PUBLIC
     urdfdom_world
     console_bridge
     yaml-cpp
+    ${ONNXRUNTIME_LIB}
 )
 
 

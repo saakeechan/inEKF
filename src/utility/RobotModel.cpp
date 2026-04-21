@@ -83,26 +83,26 @@ bool RobotModel::load_config(const std::string& config_file) {
         }
         
         // ====================================================================
-        // TORQUE MAPPING (Optional, but must match num_legs if provided)
+        // LEG MAPPING (Optional, but must match num_legs if provided)
         // ====================================================================
-        if (config["Torque_indices_map"]) {
-            Torque_indices_map = config["Torque_indices_map"].as<std::vector<std::vector<int>>>();
+        if (config["Leg_indices_map"]) {
+            Leg_indices_map = config["Leg_indices_map"].as<std::vector<std::vector<int>>>();
             
             // Validate that the number of rows matches num_legs
-            if (Torque_indices_map.size() != static_cast<size_t>(num_legs)) {
+            if (Leg_indices_map.size() != static_cast<size_t>(num_legs)) {
                 throw std::runtime_error(
-                    "Torque_indices_map has " + std::to_string(Torque_indices_map.size()) + 
+                    "Leg_indices_map has " + std::to_string(Leg_indices_map.size()) + 
                     " rows, but num_legs is " + std::to_string(num_legs) + 
                     ". Number of rows must equal number of legs."
                 );
             }
             
-            std::cout << "Loaded Torque_indices_map with " << Torque_indices_map.size() << " legs:" << std::endl;
-            for (size_t i = 0; i < Torque_indices_map.size(); ++i) {
-                std::cout << "  Leg " << i << ": " << Torque_indices_map[i].size() << " torque indices" << std::endl;
+            std::cout << "Loaded Leg_indices_map with " << Leg_indices_map.size() << " legs:" << std::endl;
+            for (size_t i = 0; i < Leg_indices_map.size(); ++i) {
+                std::cout << "  Leg " << i << ": " << Leg_indices_map[i].size() << " indices" << std::endl;
             }
         } else {
-            std::cout << "Torque_indices_map not provided (optional)" << std::endl;
+            std::cout << "Leg_indices_map not provided (optional)" << std::endl;
         }
         
         // ====================================================================

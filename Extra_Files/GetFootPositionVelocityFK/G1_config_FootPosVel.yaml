@@ -1,0 +1,72 @@
+# G1 Robot Configuration File
+# Created: 2026-01-06
+# This file contains all robot-specific parameters for the G1 biped robot
+
+# ============================================================================
+# ROBOT IDENTIFICATION
+# ============================================================================
+robot_name: "G1"
+
+# ============================================================================
+# ROBOT MODEL CONFIGURATION
+# ============================================================================
+model:
+  # Path to robot model file
+  model_path: "/home/saakee/Research/Saaketh_INEKF/src/utility/G1/g1_29dof_rev_1_0_wFootFrames.urdf"
+  
+  # Model format: "urdf" or "mjcf"
+  format: "urdf"
+
+# ============================================================================
+# ROBOT STRUCTURE
+# ============================================================================
+structure:
+  # Number of legs/contact points
+  num_legs: 2
+  
+  # Contact point frame IDs in the Pinocchio model - size should match num of legs
+  # For G1: Left foot=16, Right foot=32 - open up a visualization tool to verify
+  contact_frame_ids: [16 , 32]
+
+# ============================================================================
+# IMU2BD Frame ID of the IMU in the Pinocchio model - select from the frames in the URDF (run
+# getParameters() to print out frame names and indices) - this is the frame that provides the IMU measurements
+# ============================================================================
+imuFrame_id: 1
+
+# ============================================================================
+# COVARIANCE PARAMETERS for the Robot
+# ============================================================================
+covariance:
+  # Sensor noise covariances
+  gyro: 1.0e-4
+  accelerometer: 1.0e-2
+  encoder: 1.0e-4
+  
+  # Contact estimation covariances
+  contact: 1.0e-6
+  slip: 1.0e-3
+  
+  # Bias covariances
+  bias_gyro: 1.0e-6
+  bias_accelerometer: 1.0e-6
+  
+  # Prior covariances
+  prior_orientation: 1.0e-3
+  prior_velocity: 1.0e-3
+  prior_position: 1.0e-3
+  prior_bias_gyro: 1.0e-6
+  prior_bias_accelerometer: 1.0e-6
+
+# ============================================================================
+# ENCODER MAPPING
+# ============================================================================
+# Indices of encoder and encoderdot that receive actual TextFile data or sensor data (non-zero assignments)
+# Got to put some work into finding these indices for your robot
+
+Encoder_indices_map: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]
+Encoderdot_indices_map: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]
+
+Leg_indices_map:
+  - [0, 1, 2, 3, 4, 5]        # Left leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
+  - [6, 7, 8, 9, 10, 11]       # Right leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll

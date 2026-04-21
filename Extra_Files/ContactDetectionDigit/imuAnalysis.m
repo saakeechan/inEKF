@@ -1,7 +1,7 @@
 clc;close all
 
 %% Load
-T = readtable(fullfile('..','digit_cropped_data_full.csv'));
+T = readtable(fullfile('../..','digit_cropped_data_full.csv'));
 
 tname = 'TimeStamp';
 n = min(height(T), 976);
@@ -24,7 +24,7 @@ dt = 0.005;
 
 
 %% Signal + causal moving average
-imu_signal = T.acc_y(1:n);
+imu_signal = T.gyro_z(1:n);
 
 w = 5;                              % window in samples
 x = movmean(imu_signal, [w-1 0]);    % causal moving average

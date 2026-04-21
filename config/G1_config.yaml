@@ -67,6 +67,6 @@ covariance:
 Encoder_indices_map: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]
 Encoderdot_indices_map: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]
 
-Torque_indices_map:
+Leg_indices_map:
   - [0, 1, 2, 3, 4, 5]        # Left leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
   - [6, 7, 8, 9, 10, 11]       # Right leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
