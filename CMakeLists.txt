@@ -24,19 +24,6 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-#set(CMAKE_BUILD_TYPE "Debug")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-#-DEIGEN_USE_MKL_ALL")
-#set(CMAKE_CXX_FLAGS_RELEASE "-O2 -Wall -g")
-#set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g -flto -march=native")
-#set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g -march=native")
-#set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
-#set(CMAKE_CXX_FLAGS_RELEASE "-O3 -no-pie -march=native -ggdb -Wall \
-#    -Wextra -Wcast-align -Wdisabled-optimization -Wformat=2 \
-#    -Winit-self -Wmissing-include-dirs -Woverloaded-virtual \
-#    -Wshadow -Wsign-promo")
-#set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-
 
 # qmake for PODO
 set(TARGET INEKF_Estimator_Test)
@@ -114,8 +101,7 @@ target_link_options(INEKF_Estimator PRIVATE "LINKER:--no-as-needed,-rpath,/opt/o
 # Link pinocchio libraries (excluding casadi which has version compatibility issues)
 target_link_libraries(INEKF_Estimator PUBLIC 
     pinocchio_default
-    pinocchio_parsers  
-    coal    # Required by pinocchio_parsers
+    pinocchio_parsers
     boost_filesystem
     boost_serialization
     boost_system
@@ -145,10 +131,6 @@ target_link_libraries(${TARGET} INEKF_Estimator)
 # ============================================================
 # Installation rules
 # ============================================================
-install(TARGETS INEKF_Estimator
-    LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
-)
 
 # Install header files
 install(DIRECTORY src/

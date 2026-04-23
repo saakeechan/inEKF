@@ -208,10 +208,13 @@ INEKF_Estimator_BINARY_DIR:STATIC=/home/saakee/Research/Saaketh_INEKF/build
 INEKF_Estimator_IS_TOP_LEVEL:STATIC=ON
 
 //Dependencies for the target
-INEKF_Estimator_LIB_DEPENDS:STATIC=general;pinocchio_default;general;pinocchio_parsers;general;coal;general;boost_filesystem;general;boost_serialization;general;boost_system;general;urdfdom_sensor;general;urdfdom_model_state;general;urdfdom_model;general;urdfdom_world;general;console_bridge;general;yaml-cpp;general;/usr/local/lib/libonnxruntime.so;
+INEKF_Estimator_LIB_DEPENDS:STATIC=general;pinocchio_default;general;pinocchio_parsers;general;boost_filesystem;general;boost_serialization;general;boost_system;general;urdfdom_sensor;general;urdfdom_model_state;general;urdfdom_model;general;urdfdom_world;general;console_bridge;general;yaml-cpp;general;/usr/local/lib/libonnxruntime.so;
 
 //Value Computed by CMake
 INEKF_Estimator_SOURCE_DIR:STATIC=/home/saakee/Research/Saaketh_INEKF
+
+//Dependencies for the target
+INEKF_Estimator_arm64_LIB_DEPENDS:STATIC=general;pinocchio_default;general;pinocchio_parsers;general;coal;general;boost_filesystem;general;boost_serialization;general;boost_system;general;urdfdom_sensor;general;urdfdom_model_state;general;urdfdom_model;general;urdfdom_world;general;console_bridge;general;yaml-cpp;general;/usr/local/lib/libonnxruntime.so;
 
 //The directory containing a CMake configuration file for MKLDNN.
 MKLDNN_DIR:PATH=MKLDNN_DIR-NOTFOUND
