@@ -339,6 +339,9 @@ void InEKFilter::InitializeFromYAML(const std::string& config_path) {
             time_length = config["textfile"]["time_length"].as<int>();
         }
     }
+    else {
+        textfile_flag = false;
+    }
     
     // Load contact model path
     if (config["Contact_estimation_NN"]) {
@@ -387,18 +390,18 @@ void InEKFilter::load_contact_model(const std::string& model_path) {
         // Output: "output" with shape [batch, num_classes] = [1, 4]
         output_names = {"output"};
         
-        contact_model_loaded = true;
+        contact_nn_enabled = true;
         std::cout << "Contact model loaded successfully!" << std::endl;
         std::cout << "Input shape: [" << input_shape[0] << ", " << input_shape[1] << ", " << input_shape[2] << "]" << std::endl;
         
     } catch (const Ort::Exception& e) {
         std::cerr << "Error loading ONNX contact model: " << e.what() << std::endl;
-        contact_model_loaded = false;
+        contact_nn_enabled = false;
     }
 }
 
 std::vector<bool> InEKFilter::predict_contact(const std::vector<float>& input_features) {
-    if (!contact_model_loaded) {
+    if (!contact_nn_enabled) {
         std::cerr << "Warning: Contact model not loaded. Using default contact detection." << std::endl;
         return std::vector<bool>(robot.num_legs, false);
     }

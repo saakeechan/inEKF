@@ -52,8 +52,10 @@ public:
     InEKFilter() = default;  // Default constructor (no initialization)
     InEKFilter(const std::string& initialization_config_path, const std::string& robot_config_path) {
         load_robot_config(robot_config_path);  // Load robot config FIRST
-        InitializeFromYAML(initialization_config_path);  // Then initialize (loads contact_model_path)
-        load_contact_model(contact_model_path);  // Load PyTorch contact estimation model with path from YAML
+        InitializeFromYAML(initialization_config_path);  // Then initialize (loads contact_model_path and sets contact_nn_enabled)
+        if (contact_nn_enabled) {
+            load_contact_model(contact_model_path);  // Load ONNX contact estimation model only if enabled
+        }
     }
     
     //functions

@@ -24,7 +24,7 @@ variable_contact_covariance:
   amplifier: 1.0  # Multiplied to contact covariance when VCC is enabled
 
 Contact_estimation_NN:
-  enabled: false  # Enable contact estimation using the PyTorch model
+  enabled: true  # Enable contact estimation using the PyTorch model
   file_path: "/home/saakee/Research/Saaketh_INEKF/src/contactDetection/bipedal_contact_best_val_leg_acc.onnx"  # Path to the PyTorch contact estimation model
 
 
