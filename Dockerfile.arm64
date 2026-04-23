@@ -18,22 +18,29 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install ONNX Runtime for ARM64
-RUN wget https://github.com/microsoft/onnxruntime/releases/download/v1.22.0/onnxruntime-linux-aarch64-1.22.0.tgz \
-    && tar -xzf onnxruntime-linux-aarch64-1.22.0.tgz \
-    && cp -r onnxruntime-linux-aarch64-1.22.0/include/* /usr/local/include/ \
-    && cp -r onnxruntime-linux-aarch64-1.22.0/lib/* /usr/local/lib/ \
-    && ldconfig \
-    && rm -rf onnxruntime-linux-aarch64-1.22.0*
-
-# Install Pinocchio from source
-RUN git clone --recursive https://github.com/stack-of-tasks/pinocchio /tmp/pinocchio && \
+# build pinocchio
+RUN git clone --recursive --depth 1 --branch v3.3.0 https://github.com/stack-of-tasks/pinocchio.git /tmp/pinocchio && \
     cd /tmp/pinocchio && mkdir build && cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release \
-             -DCMAKE_INSTALL_PREFIX=/usr/local \
-             -DBUILD_PYTHON_INTERFACE=OFF \
-             -DBUILD_WITH_COLLISION_SUPPORT=OFF && \
-    make -j2 && make install && ldconfig
+    cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr/local \
+    -DCMAKE_CXX_FLAGS="-Wno-maybe-uninitialized -Wno-psabi" \
+    -DBUILD_PYTHON_INTERFACE=OFF \
+    -DBUILD_TESTING=OFF \
+    -DBUILD_WITH_COLLISION_SUPPORT=OFF \
+    -DBUILD_WITH_CASADI_SUPPORT=OFF && \
+    cmake --build . --parallel 2 && \
+    cmake --install .
+RUN rm -rf /tmp/pinocchio
+
+# Install ONNX Runtime for ARM64
+ENV ONNXRUNTIME_VERSION=1.24.2
+RUN wget https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-linux-aarch64-${ONNXRUNTIME_VERSION}.tgz \
+    && tar -xzf onnxruntime-linux-aarch64-${ONNXRUNTIME_VERSION}.tgz \
+    && cp -r onnxruntime-linux-aarch64-${ONNXRUNTIME_VERSION}/include/* /usr/local/include/ \
+    && cp -r onnxruntime-linux-aarch64-${ONNXRUNTIME_VERSION}/lib/* /usr/local/lib/ \
+    && ldconfig \
+    && rm -rf onnxruntime-linux-aarch64-${ONNXRUNTIME_VERSION}*
 
 WORKDIR /workspace
 

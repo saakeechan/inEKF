@@ -16,3 +16,7 @@ CMakeCache.txt
 
 # Output images (generated)
 output_images/
+
+
+# INEKF build directory 
+build_arm64_docker
