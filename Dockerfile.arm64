@@ -26,14 +26,28 @@ RUN wget https://github.com/microsoft/onnxruntime/releases/download/v1.22.0/onnx
     && ldconfig \
     && rm -rf onnxruntime-linux-aarch64-1.22.0*
 
-# Install Pinocchio from source
-RUN git clone --recursive https://github.com/stack-of-tasks/pinocchio /tmp/pinocchio && \
+# # Install Pinocchio from source
+# RUN git clone --recursive https://github.com/stack-of-tasks/pinocchio /tmp/pinocchio && \
+#     cd /tmp/pinocchio && mkdir build && cd build && \
+#     cmake .. -DCMAKE_BUILD_TYPE=Release \
+#     -DCMAKE_INSTALL_PREFIX=/usr/local \
+#     -DBUILD_PYTHON_INTERFACE=OFF \
+#     -DBUILD_WITH_COLLISION_SUPPORT=OFF && \
+#     make -j2 && make install && ldconfig
+
+RUN git clone --recursive --depth 1 --branch v3.3.0 https://github.com/stack-of-tasks/pinocchio.git /tmp/pinocchio && \
     cd /tmp/pinocchio && mkdir build && cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release \
-             -DCMAKE_INSTALL_PREFIX=/usr/local \
-             -DBUILD_PYTHON_INTERFACE=OFF \
-             -DBUILD_WITH_COLLISION_SUPPORT=OFF && \
-    make -j2 && make install && ldconfig
+    cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr/local \
+    -DCMAKE_CXX_FLAGS="-Wno-maybe-uninitialized -Wno-psabi" \
+    -DBUILD_PYTHON_INTERFACE=OFF \
+    -DBUILD_TESTING=OFF \
+    -DBUILD_WITH_COLLISION_SUPPORT=OFF \
+    -DBUILD_WITH_CASADI_SUPPORT=OFF && \
+    cmake --build . --parallel 2 && \
+    cmake --install .
+RUN rm -rf /tmp/pinocchio
 
 WORKDIR /workspace
 

@@ -16,7 +16,10 @@ check_build_type_macro(CMAKE_BUILD_TYPE)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_COMPILER_LAUNCHER ccache)
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set(CMAKE_CXX_COMPILER_LAUNCHER ccache)
+endif()
 set(CMAKE_UNITY_BUILD OFF)  # Disabled to avoid symbol conflicts between robot implementations
 
 # Set default build type to Release if not specified
