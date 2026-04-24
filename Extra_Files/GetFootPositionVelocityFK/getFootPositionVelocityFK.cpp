@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
         csv_filename = argv[1];
     } else {
         // Default CSV file path
-        csv_filename = "/home/saakee/Research/deep-contact-estimator/Data/CSVFiles/robotstate_0_env4.csv";
+        csv_filename = "/home/saakee/Research/deep-contact-estimator/Data/CSVFiles/robotstate_40000_env8.csv";
         cout << "No CSV file specified. Using default: " << csv_filename << endl;
     }
     

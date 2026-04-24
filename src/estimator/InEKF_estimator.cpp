@@ -1066,6 +1066,9 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
     new_measurement(imu_i, motor_data_i); // read motor and IMU data first
 
     if (contact_nn_enabled) {
+        // Run NN detection at 0.02s intervals or on first frame
+        if (time_count % static_cast<int>(0.02 / dt) == 0 || frame_count == 0) {
+
         // Store raw motor torques for NN feature extraction
         MOTOR_TORQUES[frame_count] = motor_torques_i;
 
@@ -1096,8 +1099,13 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
         
         // Predict contacts using neural network
         CONTACT_t[frame_count] = nn_predict_contact();
+    }
+    else {
 
-            }
+        // Use previous frame's contact detection result
+        CONTACT_t[frame_count] = CONTACT_t[frame_count - 1];
+    }
+    }
     else
     {
         
@@ -1161,70 +1169,76 @@ void InEKFilter::Onestep(){
     int j = time_count + TextFile_Skip_Data;
 
     if(contact_nn_enabled) {
-    
-    // Store raw motor torques for NN features
-    MOTOR_TORQUES[frame_count] = Eigen::VectorXd::Zero(robot.encoder_size);
-    for (int i = 0; i < robot.num_legs; i++) {
-        for (int idx : robot.Leg_indices_map[i]) {
-            MOTOR_TORQUES[frame_count](idx) = TextFileData.motor_torques[j][idx];
+        
+        // Apply time-division logic: only run NN every 0.02s or on first frame
+        if (time_count % static_cast<int>(0.02 / dt) == 0 || frame_count == 0) {
+            // Store raw motor torques for NN features
+            MOTOR_TORQUES[frame_count] = Eigen::VectorXd::Zero(robot.encoder_size);
+            for (int i = 0; i < robot.num_legs; i++) {
+                for (int idx : robot.Leg_indices_map[i]) {
+                    MOTOR_TORQUES[frame_count](idx) = TextFileData.motor_torques[j][idx];
+                }
+            }
+
+            // Compute sum of squared torques for each leg
+            for (int leg = 0; leg < robot.num_legs; ++leg) {
+                double sum_sq = 0.0;
+                for (int joint_idx : robot.Leg_indices_map[leg]) {
+                    sum_sq += MOTOR_TORQUES[frame_count](joint_idx) * MOTOR_TORQUES[frame_count](joint_idx);
+                }
+                torqueSumSquared[frame_count](leg) = sum_sq;
+            }
+
+
+            // Calculate leg speeds by summing absolute encoder velocities for each leg
+            Eigen::VectorXd leg_speeds(robot.num_legs);
+            for (int i = 0; i < robot.num_legs; i++) {
+                double leg_speed_sum = 0.0;
+                for (int idx : robot.Leg_indices_map[i]) {
+                    leg_speed_sum += std::abs(ENCODERDOT[frame_count](idx));
+                }
+                leg_speeds(i) = leg_speed_sum;
+            }
+
+            // Extract NN features from current state (includes q, qd, acc, omega, p, v, tau)
+            Eigen::VectorXd features = extract_nn_features();
+
+            
+            // Update sliding window buffer with new features
+            update_nn_feature_buffer(features);
+
+            
+            // Create input tensor from buffer (flattened float vector)
+            auto input_features = create_nn_input_tensor();
+
+            
+            // Predict contacts using ONNX Runtime model
+            CONTACT_t[frame_count] = predict_contact(input_features);
+
+            // If torque sum squared exceeds threshold for any leg, set contact to true for that leg
+            for (int leg = 0; leg < robot.num_legs; ++leg) {
+                if (torqueSumSquared[frame_count](leg) >= 1500) {
+                    CONTACT_t[frame_count][leg] = true;
+                }
+            }
+
+            // If all leg speeds are low (< 1.0), assume standing (all legs in contact)
+            bool all_legs_slow = true;
+            for (int i = 0; i < robot.num_legs; i++) {
+                if (leg_speeds(i) >= 1.0) {
+                    all_legs_slow = false;
+                    break;
+                }
+            }
+            if (all_legs_slow) {
+                for (int i = 0; i < robot.num_legs; i++) {
+                    CONTACT_t[frame_count][i] = true;
+                }
+            }
+        } else {
+            // Use previous frame's contact detection result
+            CONTACT_t[frame_count] = CONTACT_t[frame_count - 1];
         }
-    }
-
-    // Compute sum of squared torques for each leg
-    for (int leg = 0; leg < robot.num_legs; ++leg) {
-        double sum_sq = 0.0;
-        for (int joint_idx : robot.Leg_indices_map[leg]) {
-            sum_sq += MOTOR_TORQUES[frame_count](joint_idx) * MOTOR_TORQUES[frame_count](joint_idx);
-        }
-        torqueSumSquared[frame_count](leg) = sum_sq;
-    }
-
-
-    // Calculate leg speeds by summing absolute encoder velocities for each leg
-    Eigen::VectorXd leg_speeds(robot.num_legs);
-    for (int i = 0; i < robot.num_legs; i++) {
-        double leg_speed_sum = 0.0;
-        for (int idx : robot.Leg_indices_map[i]) {
-            leg_speed_sum += std::abs(ENCODERDOT[frame_count](idx));
-        }
-        leg_speeds(i) = leg_speed_sum;
-    }
-
-    // Extract NN features from current state (includes q, qd, acc, omega, p, v, tau)
-    Eigen::VectorXd features = extract_nn_features();
-
-    
-    // Update sliding window buffer with new features
-    update_nn_feature_buffer(features);
-
-    
-    // Create input tensor from buffer (flattened float vector)
-    auto input_features = create_nn_input_tensor();
-
-    
-    // Predict contacts using ONNX Runtime model
-    CONTACT_t[frame_count] = predict_contact(input_features);
-
-    // If torque sum squared exceeds threshold for any leg, set contact to true for that leg
-    for (int leg = 0; leg < robot.num_legs; ++leg) {
-        if (torqueSumSquared[frame_count](leg) >= 1500) {
-            CONTACT_t[frame_count][leg] = true;
-        }
-    }
-
-    // If all leg speeds are low (< 1.0), assume standing (all legs in contact)
-    bool all_legs_slow = true;
-    for (int i = 0; i < robot.num_legs; i++) {
-        if (leg_speeds(i) >= 1.0) {
-            all_legs_slow = false;
-            break;
-        }
-    }
-    if (all_legs_slow) {
-        for (int i = 0; i < robot.num_legs; i++) {
-            CONTACT_t[frame_count][i] = true;
-        }
-    }
     }
     else
     {

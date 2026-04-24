@@ -49,18 +49,25 @@ docker build -t inekf-arm64 -f Dockerfile.arm64 .
 # Run the build inside Docker
 echo ""
 echo "Building INEKF library for ARM64..."
-docker run --rm --platform linux/arm64 \
+echo "Note: Using multi-threaded build ($(nproc) cores)"
+docker run --rm \
     -v "$(pwd):/workspace" \
     inekf-arm64 \
-    bash -c "cd /workspace && mkdir -p build_arm64_docker && cd build_arm64_docker && \
+    bash -c "cd /workspace && \
+             sed -i 's/set(CMAKE_CXX_COMPILER_LAUNCHER ccache)/#set(CMAKE_CXX_COMPILER_LAUNCHER ccache)/' CMakeLists.txt && \
+             rm -rf build_arm64_docker && mkdir -p build_arm64_docker && cd build_arm64_docker && \
              cmake .. -DCMAKE_BUILD_TYPE=Release && \
-             cmake --build . -j2 && \
+             cmake --build . -j$(nproc) && \
+             mv libINEKF_Estimator.so libINEKF_Estimator_arm64.so && \
+             cd /workspace && \
+             sed -i 's/#set(CMAKE_CXX_COMPILER_LAUNCHER ccache)/set(CMAKE_CXX_COMPILER_LAUNCHER ccache)/' CMakeLists.txt && \
+             cd build_arm64_docker && \
              echo '' && \
              echo 'Build complete!' && \
-             file libINEKF_Estimator.so"
+             file libINEKF_Estimator_arm64.so"
 
 echo ""
 echo "================================================"
 echo "✓ ARM64 library built successfully!"
-echo "Output: build_arm64_docker/libINEKF_Estimator.so"
+echo "Output: build_arm64_docker/libINEKF_Estimator_arm64.so"
 echo "================================================"
