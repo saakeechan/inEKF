@@ -3917,3 +3917,105 @@ events:
       CMAKE_SYSTEM_INCLUDE_PATH:
         - "/usr/include/X11"
 ...
+
+---
+events:
+  -
+    kind: "find-v1"
+    backtrace:
+      - "CMakeLists.txt:19 (find_program)"
+    mode: "program"
+    variable: "CCACHE_PROGRAM"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "ccache"
+    candidate_directories:
+      - "/opt/openrobots/bin/"
+      - "/opt/openrobots/sbin/"
+      - "/opt/openrobots/"
+      - "/opt/openrobots/bin/"
+      - "/opt/ros/humble/bin/"
+      - "/home/saakee/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
+      - "/home/saakee/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
+      - "/home/saakee/.local/bin/"
+      - "/usr/local/sbin/"
+      - "/usr/local/bin/"
+      - "/usr/sbin/"
+      - "/usr/bin/"
+      - "/sbin/"
+      - "/bin/"
+      - "/usr/games/"
+      - "/usr/local/games/"
+      - "/snap/bin/"
+      - "/home/saakee/.vscode/extensions/ms-python.debugpy-2025.18.0-linux-x64/bundled/scripts/noConfigScripts/"
+      - "/usr/local/bin/"
+      - "/usr/local/sbin/"
+      - "/usr/local/"
+      - "/usr/bin/"
+      - "/usr/sbin/"
+      - "/usr/"
+      - "/bin/"
+      - "/sbin/"
+      - "/usr/X11R6/bin/"
+      - "/usr/X11R6/sbin/"
+      - "/usr/X11R6/"
+      - "/usr/pkg/bin/"
+      - "/usr/pkg/sbin/"
+      - "/usr/pkg/"
+      - "/opt/bin/"
+      - "/opt/sbin/"
+      - "/opt/"
+    searched_directories:
+      - "/opt/openrobots/bin/ccache"
+      - "/opt/openrobots/sbin/ccache"
+      - "/opt/openrobots/ccache"
+      - "/opt/openrobots/bin/ccache"
+      - "/opt/ros/humble/bin/ccache"
+      - "/home/saakee/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/ccache"
+      - "/home/saakee/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/ccache"
+      - "/home/saakee/.local/bin/ccache"
+      - "/usr/local/sbin/ccache"
+      - "/usr/local/bin/ccache"
+      - "/usr/sbin/ccache"
+    found: "/usr/bin/ccache"
+    search_context:
+      ENV{CMAKE_PREFIX_PATH}:
+        - "/opt/openrobots"
+      ENV{PATH}:
+        - "/opt/openrobots/bin"
+        - "/opt/ros/humble/bin"
+        - "/home/saakee/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
+        - "/home/saakee/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/saakee/.local/bin"
+        - "/opt/openrobots/bin"
+        - "/home/saakee/.local/bin"
+        - "/usr/local/sbin"
+        - "/usr/local/bin"
+        - "/usr/sbin"
+        - "/usr/bin"
+        - "/sbin"
+        - "/bin"
+        - "/usr/games"
+        - "/usr/local/games"
+        - "/snap/bin"
+        - "/snap/bin"
+        - "/home/saakee/.vscode/extensions/ms-python.debugpy-2025.18.0-linux-x64/bundled/scripts/noConfigScripts"
+      CMAKE_INSTALL_PREFIX: "/usr/local"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/usr/local"
+        - "/usr"
+        - "/"
+        - "/usr"
+        - "/usr/local"
+        - "/usr/X11R6"
+        - "/usr/pkg"
+        - "/opt"
+...
