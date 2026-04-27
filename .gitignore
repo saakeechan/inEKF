@@ -17,6 +17,9 @@ CMakeCache.txt
 # Output images (generated)
 output_images/
 
+# INEKF build directories
+build_arm64_docker/
 
-# INEKF build directory 
-build_arm64_docker
+# Additional files/folders
+digit_mujoco-main/
+unitree_ros/

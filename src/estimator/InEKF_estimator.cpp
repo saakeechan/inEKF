@@ -118,6 +118,8 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
     ENCODER.resize(SLIDING_WINDOW_SIZE);
     ENCODERDOT.resize(SLIDING_WINDOW_SIZE);
     MOTOR_TORQUES.resize(SLIDING_WINDOW_SIZE);
+    MOTOR_TORQUES_CMD.resize(SLIDING_WINDOW_SIZE);
+    CMD_V.resize(SLIDING_WINDOW_SIZE);
     torqueSumSquared.resize(SLIDING_WINDOW_SIZE);
     
     // Initialize dv_history for tracking dv norms over time
@@ -139,11 +141,14 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
         Bias_Acc_s[i] = Eigen::Vector3d::Zero();
         IMU_Gyro[i] = Eigen::Vector3d::Zero();
         IMU_Acc[i] = Eigen::Vector3d::Zero();
-        
+        CMD_V[i] = Eigen::Vector3d::Zero();
+
         // Dynamic-size types based on robot model
         ENCODER[i] = Eigen::VectorXd::Zero(robot.encoder_size);
         ENCODERDOT[i] = Eigen::VectorXd::Zero(robot.encoderdot_size);
         MOTOR_TORQUES[i] = Eigen::VectorXd::Zero(robot.encoder_size);  // Same size as encoder
+        MOTOR_TORQUES_CMD[i] = Eigen::VectorXd::Zero(robot.encoder_size);  // Same size as encoder
+        
         d_v[i] = Eigen::VectorXd::Constant(3 * robot.num_legs, std::numeric_limits<double>::infinity());
         torqueSumSquared[i] = Eigen::VectorXd::Zero(robot.num_legs);  // 3 components per leg
         
@@ -874,7 +879,8 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
 
 
 }
-void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const Eigen::VectorXd &motor_torques_i){
+void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i,
+     const Eigen::VectorXd &motor_torques_i, const Eigen ::VectorXd &motor_torques_cmd_i, const Eigen::VectorXd &Cmd_Velocity_i){
 
     new_measurement(imu_i, motor_data_i); // read motor and IMU data first
 
@@ -884,6 +890,8 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
 
         // Store raw motor torques for NN feature extraction
         MOTOR_TORQUES[frame_count] = motor_torques_i;
+        MOTOR_TORQUES_CMD[frame_count] = motor_torques_cmd_i; // Store commanded torques for potential future use/analysis
+        CMD_V[frame_count] = Cmd_Velocity_i; // Store commanded velocities for potential future use/analysis
 
         // Compute sum of squared torques for each leg
         for (int leg = 0; leg < robot.num_legs; ++leg) {
@@ -910,7 +918,9 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
             ENCODERDOT[frame_count],
             IMU_Acc[frame_count],
             IMU_Gyro[frame_count],
-            MOTOR_TORQUES[frame_count]
+            MOTOR_TORQUES[frame_count],
+            MOTOR_TORQUES_CMD[frame_count],
+            CMD_V[frame_count]
         );
         
         // Update sliding window buffer with new features
@@ -999,6 +1009,17 @@ void InEKFilter::Onestep(){
                 }
             }
 
+            // Store commanded motor torques for NN features
+            MOTOR_TORQUES_CMD[frame_count] = Eigen::VectorXd::Zero(robot.encoder_size);
+            for (int i = 0; i < robot.num_legs; i++) {
+                for (int idx : robot.Leg_indices_map[i]) {
+                    MOTOR_TORQUES_CMD[frame_count](idx) = TextFileData.motor_torques_cmd[j][idx];
+                }
+            }
+
+            // Store commanded velocity from TextFile data
+            CMD_V[frame_count] = Eigen::Vector3d(TextFileData.CMD_V[j][0], TextFileData.CMD_V[j][1], TextFileData.CMD_V[j][2]);
+
             // Compute sum of squared torques for each leg
             for (int leg = 0; leg < robot.num_legs; ++leg) {
                 double sum_sq = 0.0;
@@ -1025,7 +1046,9 @@ void InEKFilter::Onestep(){
                 ENCODERDOT[frame_count],
                 IMU_Acc[frame_count],
                 IMU_Gyro[frame_count],
-                MOTOR_TORQUES[frame_count]
+                MOTOR_TORQUES[frame_count],
+                MOTOR_TORQUES_CMD[frame_count],
+                CMD_V[frame_count]
             );
             
             // Update sliding window buffer with new features

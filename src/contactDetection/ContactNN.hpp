@@ -12,13 +12,13 @@
 #include <string>
 #include <eigen3/Eigen/Dense>
 #include <onnxruntime_cxx_api.h>
-#include "RobotModel.hpp"
+#include "../utility/RobotModel.hpp"
 
 class ContactNN {
 public:
     // Constants for NN input shape
     static constexpr int NN_WINDOW_SIZE = 10;  // Number of timesteps
-    static constexpr int NN_FEATURE_SIZE = 54;  // Number of features per timestep (q, qd, acc, omega, p, v, tau)
+    static constexpr int NN_FEATURE_SIZE = 67;  // Number of features per timestep (q, qd, acc, omega, p, v, tau)
     
     // Constructor
     ContactNN(RobotModel& robot_ref);
@@ -29,13 +29,15 @@ public:
     // Load ONNX contact estimation model
     void load_contact_model(const std::string& model_path);
     
-    // Extract 54-element feature vector from current robot state
+    // Extract 67-element feature vector from current robot state
     Eigen::VectorXd extract_nn_features(
         const Eigen::VectorXd& encoder,
         const Eigen::VectorXd& encoderdot,
         const Eigen::Vector3d& imu_acc,
         const Eigen::Vector3d& imu_gyro,
-        const Eigen::VectorXd& motor_torques
+        const Eigen::VectorXd& motor_torques,
+        const Eigen::VectorXd& motor_torques_cmd,  // Uncomment if using commanded torques as features
+        const Eigen::VectorXd& cmd_velocity         // Uncomment if using commanded velocity as a feature
     );
     
     // Add new feature vector to sliding window buffer

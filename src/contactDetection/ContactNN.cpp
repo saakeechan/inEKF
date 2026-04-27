@@ -30,7 +30,7 @@ void ContactNN::load_contact_model(const std::string& model_path) {
         // Get input/output names and shape
         Ort::AllocatorWithDefaultOptions allocator;
         
-        // Input: "input" with shape [batch, seq_len, features] = [1, 25, 54]
+        // Input: "input" with shape [batch, seq_len, features] = [1, 10, 67]
         input_names = {"input"};
         input_shape = {1, NN_WINDOW_SIZE, NN_FEATURE_SIZE};
         
@@ -113,11 +113,13 @@ Eigen::VectorXd ContactNN::extract_nn_features(
     const Eigen::VectorXd& encoderdot,
     const Eigen::Vector3d& imu_acc,
     const Eigen::Vector3d& imu_gyro,
-    const Eigen::VectorXd& motor_torques
+    const Eigen::VectorXd& motor_torques,
+    const Eigen::VectorXd& motor_torques_cmd,
+    const Eigen::VectorXd& cmd_velocity
 ) {
-    // Extract 54-element feature vector
-    // Order: q, qd, acc, omega, p, v, tau
-    // For G1: 12 + 12 + 3 + 3 + 6 + 6 + 12 = 54
+    // Extract 67-element feature vector
+    // Order: q, qd, acc, omega, p, v, tau, tau_cmd, v_cmd
+    // For G1: 12 + 12 + 3 + 3 + 6 + 6 + 12 + 12 + 1 = 67 features
     
     Eigen::VectorXd features(NN_FEATURE_SIZE);
     int idx = 0;
@@ -169,7 +171,17 @@ Eigen::VectorXd ContactNN::extract_nn_features(
         }
     }
     
-    // Validate that we filled exactly 54 elements
+    // tau_cmd: commanded joint torques (left leg first, right leg second)
+    for (int leg = 0; leg < robot.num_legs; ++leg) {
+        for (int joint_idx : robot.Leg_indices_map[leg]) {
+            features(idx++) = motor_torques_cmd(joint_idx);
+        }
+    }
+    
+    // v_cmd: commanded velocity (1 element)
+    features(idx++) = cmd_velocity(0);
+    
+    // Validate that we filled exactly 67 elements
     if (idx != NN_FEATURE_SIZE) {
         std::cerr << "Warning: Extracted " << idx << " features, expected " 
                   << NN_FEATURE_SIZE << std::endl;
@@ -190,7 +202,7 @@ void ContactNN::update_nn_feature_buffer(const Eigen::VectorXd& features) {
 
 std::vector<float> ContactNN::create_nn_input_tensor() {
     // Create flattened float vector [1 * NN_WINDOW_SIZE * NN_FEATURE_SIZE]
-    // Total size: 1 * 25 * 54 = 1350 elements
+    // Total size: 1 * 10 * 67 = 670 elements
     int total_size = NN_WINDOW_SIZE * NN_FEATURE_SIZE;
     std::vector<float> input_tensor(total_size, 0.0f);
     
@@ -213,9 +225,9 @@ std::vector<float> ContactNN::create_nn_input_tensor() {
 
 void ContactNN::normalize_nn_input(std::vector<float>& input_features) {
     // Normalize input features: (data - mean) / std per feature across time dimension
-    // input_features shape: [1, NN_WINDOW_SIZE, NN_FEATURE_SIZE] = [1, 25, 54]
-    // Flattened as: batch * window * features = 1 * 25 * 54 = 1350 elements
-    // Layout: [t0_f0, t0_f1, ..., t0_f53, t1_f0, t1_f1, ..., t1_f53, ..., t24_f53]
+    // input_features shape: [1, NN_WINDOW_SIZE, NN_FEATURE_SIZE] = [1, 10, 67]
+    // Flattened as: batch * window * features = 1 * 10 * 67 = 670 elements
+    // Layout: [t0_f0, t0_f1, ..., t0_f66, t1_f0, t1_f1, ..., t1_f66, ..., t9_f66]
     
     // For each feature dimension
     for (int f = 0; f < NN_FEATURE_SIZE; ++f) {
@@ -254,7 +266,7 @@ std::vector<bool> ContactNN::nn_predict_contact() {
     auto input_features = create_nn_input_tensor();
     
     // Normalize features
-    normalize_nn_input(input_features);
+    // normalize_nn_input(input_features);
     
     // Run prediction
     return predict_contact(input_features);

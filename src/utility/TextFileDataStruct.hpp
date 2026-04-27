@@ -47,6 +47,10 @@ public:
     std::vector<std::vector<double>> encoderdots;
 
     std::vector<std::vector<double>> motor_torques; // 2D array [num_rows x num_motors]
+
+    std::vector<std::vector<double>> motor_torques_cmd; // 2D array [num_rows x num_motors] - if available, for NN features
+
+    std::vector<std::vector<double>> CMD_V; // 2D array [num_rows x cmd_velocity_dim] - if available, for NN features
     
     // Base position data
     std::vector<double> pos_x, pos_y, pos_z;
@@ -95,6 +99,8 @@ public:
         encoders.resize(num_rows, std::vector<double>(num_encoders));
         encoderdots.resize(num_rows, std::vector<double>(num_encoders));
         motor_torques.resize(num_rows, std::vector<double>(num_encoders)); // Assuming 1 torque per motor, adjust if different
+        motor_torques_cmd.resize(num_rows, std::vector<double>(num_encoders)); // Assuming 1 torque command per motor, adjust if different
+        CMD_V.resize(num_rows, std::vector<double>(3)); // 3D velocity command (x, y, z)
 
         
         std::cout << "  Resized encoders to " << encoders.size() << " rows x " << num_encoders << " cols" << std::endl;
@@ -211,6 +217,40 @@ public:
             motor_torques[i][27] = robot_data.joint_torque_right_wrist_pitch[i];
             motor_torques[i][28] = robot_data.joint_torque_right_wrist_yaw[i];
 
+            motor_torques_cmd[i][0] = robot_data.joint_action_left_hip_pitch[i];
+            motor_torques_cmd[i][1] = robot_data.joint_action_left_hip_roll[i];
+            motor_torques_cmd[i][2] = robot_data.joint_action_left_hip_yaw[i];
+            motor_torques_cmd[i][3] = robot_data.joint_action_left_knee[i];
+            motor_torques_cmd[i][4] = robot_data.joint_action_left_ankle_pitch[i];
+            motor_torques_cmd[i][5] = robot_data.joint_action_left_ankle_roll[i];
+            motor_torques_cmd[i][6] = robot_data.joint_action_right_hip_pitch[i];
+            motor_torques_cmd[i][7] = robot_data.joint_action_right_hip_roll[i];
+            motor_torques_cmd[i][8] = robot_data.joint_action_right_hip_yaw[i];
+            motor_torques_cmd[i][9] = robot_data.joint_action_right_knee[i];
+            motor_torques_cmd[i][10] = robot_data.joint_action_right_ankle_pitch[i];
+            motor_torques_cmd[i][11] = robot_data.joint_action_right_ankle_roll[i];
+            motor_torques_cmd[i][12] = robot_data.joint_action_waist_yaw[i];
+            motor_torques_cmd[i][13] = robot_data.joint_action_waist_roll[i];
+            motor_torques_cmd[i][14] = robot_data.joint_action_waist_pitch[i];   
+            motor_torques_cmd[i][15] = robot_data.joint_action_left_shoulder_pitch[i];
+            motor_torques_cmd[i][16] = robot_data.joint_action_left_shoulder_roll[i];
+            motor_torques_cmd[i][17] = robot_data.joint_action_left_shoulder_yaw[i];
+            motor_torques_cmd[i][18] = robot_data.joint_action_left_elbow[i];
+            motor_torques_cmd[i][19] = robot_data.joint_action_left_wrist_roll[i];
+            motor_torques_cmd[i][20] = robot_data.joint_action_left_wrist_pitch[i];
+            motor_torques_cmd[i][21] = robot_data.joint_action_left_wrist_yaw[i];
+            motor_torques_cmd[i][22] = robot_data.joint_action_right_shoulder_pitch[i];
+            motor_torques_cmd[i][23] = robot_data.joint_action_right_shoulder_roll[i];
+            motor_torques_cmd[i][24] = robot_data.joint_action_right_shoulder_yaw[i];
+            motor_torques_cmd[i][25] = robot_data.joint_action_right_elbow[i];
+            motor_torques_cmd[i][26] = robot_data.joint_action_right_wrist_roll[i];
+            motor_torques_cmd[i][27] = robot_data.joint_action_right_wrist_pitch[i];
+            motor_torques_cmd[i][28] = robot_data.joint_action_right_wrist_yaw[i];
+
+            CMD_V[i][0] = robot_data.cmd_vel_x[i];
+            CMD_V[i][1] = robot_data.cmd_vel_y[i];
+            CMD_V[i][2] = robot_data.cmd_vel_z[i];
+
         }
         
         // Contact states - 2D array [num_rows x num_contacts]
@@ -219,7 +259,9 @@ public:
             contact_state[i][0] = robot_data.lfoot_contact[i];
             contact_state[i][1] = robot_data.rfoot_contact[i];
         }
+
+
     }
 };
 
-#endif // TextFileDataStruct_HPP
+#endif // TextFileDataStructG1_HPP
