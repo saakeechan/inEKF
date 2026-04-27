@@ -1,7 +1,0 @@
-<?xml version="1.0"?>
-<launch>
-
-  <node name="digit_main" pkg="digit_mujoco" type="digit_main.py" output="screen" />
-  <node name="keyboard_control" pkg="digit_mujoco" type="keyinput.py" output="screen"></node>
-
-</launch>
