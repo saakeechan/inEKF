@@ -93,6 +93,17 @@ build CMakeFiles/INEKF_Estimator.dir/src/InEKF/RobotState.cpp.o: CXX_COMPILER__I
   OBJECT_FILE_DIR = CMakeFiles/INEKF_Estimator.dir/src/InEKF
   TARGET_SUPPORT_DIR = CMakeFiles/INEKF_Estimator.dir
 
+build CMakeFiles/INEKF_Estimator.dir/src/contactDetection/ContactNN.cpp.o: CXX_COMPILER__INEKF_Estimator_unscanned_Release /home/saakee/Research/Saaketh_INEKF/src/contactDetection/ContactNN.cpp || cmake_object_order_depends_target_INEKF_Estimator
+  CONFIG = Release
+  DEFINES = -DINEKF_Estimator_EXPORTS
+  DEP_FILE = CMakeFiles/INEKF_Estimator.dir/src/contactDetection/ContactNN.cpp.o.d
+  FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -O3
+  INCLUDES = -I/usr/include/eigen3 -I/opt/openrobots/lib/pkgconfig/../../include -I/opt/openrobots/include -I/home/saakee/Research/Saaketh_INEKF -I/home/saakee/Research/Saaketh_INEKF/src -I/home/saakee/Research/Saaketh_INEKF/src/estimator -I/home/saakee/Research/Saaketh_INEKF/src/utility -I/home/saakee/Research/Saaketh_INEKF/src/InEKF -I/home/saakee/Research/Saaketh_INEKF/src/contactDetection
+  LAUNCHER = ccache 
+  OBJECT_DIR = CMakeFiles/INEKF_Estimator.dir
+  OBJECT_FILE_DIR = CMakeFiles/INEKF_Estimator.dir/src/contactDetection
+  TARGET_SUPPORT_DIR = CMakeFiles/INEKF_Estimator.dir
+
 build CMakeFiles/INEKF_Estimator.dir/src/contactDetection/contact_detection.cpp.o: CXX_COMPILER__INEKF_Estimator_unscanned_Release /home/saakee/Research/Saaketh_INEKF/src/contactDetection/contact_detection.cpp || cmake_object_order_depends_target_INEKF_Estimator
   CONFIG = Release
   DEFINES = -DINEKF_Estimator_EXPORTS
@@ -167,7 +178,7 @@ build CMakeFiles/INEKF_Estimator.dir/src/utility/getParameters.cpp.o: CXX_COMPIL
 #############################################
 # Link the shared library libINEKF_Estimator.so
 
-build libINEKF_Estimator.so: CXX_SHARED_LIBRARY_LINKER__INEKF_Estimator_Release CMakeFiles/INEKF_Estimator.dir/src/InEKF/InEKF.cpp.o CMakeFiles/INEKF_Estimator.dir/src/InEKF/LieGroup.cpp.o CMakeFiles/INEKF_Estimator.dir/src/InEKF/NoiseParams.cpp.o CMakeFiles/INEKF_Estimator.dir/src/InEKF/RobotState.cpp.o CMakeFiles/INEKF_Estimator.dir/src/contactDetection/contact_detection.cpp.o CMakeFiles/INEKF_Estimator.dir/src/estimator/InEKF_estimator.cpp.o CMakeFiles/INEKF_Estimator.dir/src/utility/Digit/csvParserDigit.cpp.o CMakeFiles/INEKF_Estimator.dir/src/utility/G1/csvParserG1.cpp.o CMakeFiles/INEKF_Estimator.dir/src/utility/RobotModel.cpp.o CMakeFiles/INEKF_Estimator.dir/src/utility/getParameters.cpp.o | /usr/lib/x86_64-linux-gnu/libyaml-cpp.so.0.7.0 /usr/local/lib/libonnxruntime.so
+build libINEKF_Estimator.so: CXX_SHARED_LIBRARY_LINKER__INEKF_Estimator_Release CMakeFiles/INEKF_Estimator.dir/src/InEKF/InEKF.cpp.o CMakeFiles/INEKF_Estimator.dir/src/InEKF/LieGroup.cpp.o CMakeFiles/INEKF_Estimator.dir/src/InEKF/NoiseParams.cpp.o CMakeFiles/INEKF_Estimator.dir/src/InEKF/RobotState.cpp.o CMakeFiles/INEKF_Estimator.dir/src/contactDetection/ContactNN.cpp.o CMakeFiles/INEKF_Estimator.dir/src/contactDetection/contact_detection.cpp.o CMakeFiles/INEKF_Estimator.dir/src/estimator/InEKF_estimator.cpp.o CMakeFiles/INEKF_Estimator.dir/src/utility/Digit/csvParserDigit.cpp.o CMakeFiles/INEKF_Estimator.dir/src/utility/G1/csvParserG1.cpp.o CMakeFiles/INEKF_Estimator.dir/src/utility/RobotModel.cpp.o CMakeFiles/INEKF_Estimator.dir/src/utility/getParameters.cpp.o | /usr/lib/x86_64-linux-gnu/libyaml-cpp.so.0.7.0 /usr/local/lib/libonnxruntime.so
   CONFIG = Release
   LANGUAGE_COMPILE_FLAGS = -O3 -DNDEBUG
   LINK_FLAGS = -shared -Wl,--no-as-needed,-rpath,/opt/openrobots/lib

@@ -16,8 +16,8 @@
 #include "../utility/TextFileDataStruct.hpp"
 // ----------------------------
 
-// ONNX Runtime for contact estimation model
-#include <onnxruntime_cxx_api.h>
+// Include ContactNN for neural network-based contact detection
+#include "../contactDetection/ContactNN.hpp"
 #include <deque>
 
 using namespace Eigen;
@@ -64,17 +64,8 @@ public:
         compute_indices(); // Compute indices after robot config is loaded
     }
     
-    // Load ONNX contact estimation model
+    // Load ONNX contact estimation model (delegates to ContactNN)
     void load_contact_model(const std::string& model_path = "../src/estimator/bipedal_contact_best_val_leg_acc.onnx");
-    
-    // Run contact estimation inference
-    std::vector<bool> predict_contact(const std::vector<float>& input_features);
-    
-    // NN Sliding Window Buffer Management
-    Eigen::VectorXd extract_nn_features();  // Extract 54-element feature vector from current state
-    void update_nn_feature_buffer(const Eigen::VectorXd& features);  // Add new feature vector to buffer
-    std::vector<float> create_nn_input_tensor();  // Create [1, 25, 54] flattened vector from buffer
-    std::vector<bool> nn_predict_contact();  // Convenience method: create tensor and predict
     
     void LoadTextFileData(const std::string& TextFile_filename);
 
@@ -111,22 +102,10 @@ public:
     //Necessary classes & variables
     RobotModel robot; // This is where robot model is defined
     
-    // ONNX Runtime contact estimation model
-    std::unique_ptr<Ort::Session> contact_model_session;
-    std::unique_ptr<Ort::Env> ort_env;
-    Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
-    bool contact_model_loaded = false;
+    // Neural network contact estimator
+    std::unique_ptr<ContactNN> contact_nn;
     std::string contact_model_path;  // Path to the contact model loaded from YAML
-    
-    // ONNX model input/output names
-    std::vector<const char*> input_names;
-    std::vector<const char*> output_names;
-    std::vector<int64_t> input_shape;
-    
-    // NN Feature Buffer: stores [timestep][feature_idx] for sliding window
-    static constexpr int NN_WINDOW_SIZE = 15;  // Number of timesteps
-    static constexpr int NN_FEATURE_SIZE = 54;   // Number of features per timestep
-    std::deque<Eigen::VectorXd> nn_feature_window;  // Sliding window buffer
+    bool contact_nn_enabled = false;  // Flag to enable/disable NN contact detection
 
     int frame_count=0;
     int time_count=0;
@@ -208,8 +187,6 @@ public:
 
     bool variable_contact_cov_mode = false;
     double cov_amplifier = 2;
-
-    bool contact_nn_enabled = false;  // Whether to use neural network for contact detection
 
     // dv history for CSV logging: [time_step][leg] = dv_norm
     std::vector<std::vector<double>> dv_history;
