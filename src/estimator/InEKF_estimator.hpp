@@ -127,6 +127,7 @@ public:
     std::vector<Matrix3d>                   Rotation_s;
     std::vector<Vector3d>                   Velocity_s;
     std::vector<Eigen::VectorXd>            d_v;
+    std::vector<Eigen::VectorXd>            dv_norm;     // Scalar velocity norms per leg
 
     std::vector<Vector3d>                   Bias_Acc_s;
     std::vector<Vector3d>                   Bias_Gyro_s;

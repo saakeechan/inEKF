@@ -47,6 +47,19 @@ int main() {
     //     torque_values(i) = static_cast<double>(rand()) / RAND_MAX;
     // }
 
+    // Eigen::VectorXd motor_torque_cmd(29);
+    // Eigen::VectorXd cmd_vel(3);
+
+    // // Initialize random motor torque commands
+    // for (int i = 0; i < 29; i++) {
+    //     motor_torque_cmd(i) = static_cast<double>(rand()) / RAND_MAX;
+    // }
+    
+    // // Initialize random command velocities
+    // for (int i = 0; i < 3; i++) {
+    //     cmd_vel(i) = static_cast<double>(rand()) / RAND_MAX;
+    // }
+
     std::vector<double> step_times;
 
         for (int time = 0; time < (estimator_IEKF.time_length - estimator_IEKF.TextFile_Skip_Data); time++) {

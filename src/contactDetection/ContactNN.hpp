@@ -18,7 +18,7 @@ class ContactNN {
 public:
     // Constants for NN input shape
     static constexpr int NN_WINDOW_SIZE = 10;  // Number of timesteps
-    static constexpr int NN_FEATURE_SIZE = 67;  // Number of features per timestep (q, qd, acc, omega, p, v, tau)
+    static constexpr int NN_FEATURE_SIZE = 32;  // Number of features per timestep (q, qd, acc, omega, p, v, tau)
     
     // Constructor
     ContactNN(RobotModel& robot_ref);
@@ -29,7 +29,7 @@ public:
     // Load ONNX contact estimation model
     void load_contact_model(const std::string& model_path);
     
-    // Extract 67-element feature vector from current robot state
+    // Extract 30-element feature vector from current robot state
     Eigen::VectorXd extract_nn_features(
         const Eigen::VectorXd& encoder,
         const Eigen::VectorXd& encoderdot,
@@ -46,14 +46,14 @@ public:
     // Create [1, NN_WINDOW_SIZE, NN_FEATURE_SIZE] flattened tensor from buffer
     std::vector<float> create_nn_input_tensor();
     
-    // Normalize input: (data - mean) / std per feature across time dimension
-    void normalize_nn_input(std::vector<float>& input_features);
+    // // Normalize input: (data - mean) / std per feature across time dimension
+    // void normalize_nn_input(std::vector<float>& input_features);
     
-    // Run contact prediction inference
-    std::vector<bool> predict_contact(const std::vector<float>& input_features);
+    // Run contact prediction inference (returns contacts and foot velocities)
+    std::pair<Eigen::VectorXd, Eigen::VectorXd> predict_contact(const std::vector<float>& input_features);
     
-    // Convenience method: create tensor, normalize, and predict
-    std::vector<bool> nn_predict_contact();
+    // Convenience method: create tensor, normalize, and predict (returns contacts and foot velocities)
+    std::pair<Eigen::VectorXd, Eigen::VectorXd> nn_predict_contact();
     
     // Check if model is loaded and enabled
     bool is_enabled() const { return contact_nn_enabled; }
@@ -75,6 +75,10 @@ private:
     std::vector<const char*> output_names;
     std::vector<int64_t> input_shape;
     bool contact_nn_enabled = false;
+    
+    // Storage for dynamically allocated names
+    std::string input_name_storage;
+    std::vector<std::string> output_name_storage;
     
     // Sliding window buffer for feature history
     std::deque<Eigen::VectorXd> nn_feature_window;
