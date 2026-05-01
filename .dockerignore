@@ -1,0 +1,11 @@
+build/
+build_arm64_docker/
+g1_env/
+.git/
+.vscode/
+*.pyc
+__pycache__/
+*.o
+*.so
+*.a
+.DS_Store
