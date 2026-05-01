@@ -650,6 +650,7 @@ void InEKFilter::Propagate_and_Correct()
     robot_state.Hard_Contact = HARD_CONTACT_t[frame_count];
     robot_state.Slip = SLIP_t[frame_count];
     robot_state.d_v = d_v[frame_count];
+    robot_state.dv_norm = dv_norm[frame_count];
 
 
 }
@@ -945,7 +946,16 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
                 }
             }
             // Store predicted velocity norm in dv_norm
-            dv_norm[frame_count](0) = predicted_foot_velocities(0);  // Left leg dv_norm from NN
+            // dv_norm[frame_count](0) = predicted_foot_velocities(0);  // Left leg dv_norm from NN
+
+            for (int k=0; k<robot.num_legs; k++){
+            
+            d_v[frame_count].block(3*k,0,3,1) = filter.getState().getVelocity()
+                    + filter.getState().getRotation()*robot.get_foot_velocity(k+1)
+                    + filter.getState().getRotation()*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias())*robot.get_foot_position(k+1);
+
+            dv_norm[frame_count](k) = d_v[frame_count].block(3*k,0,3,1).norm();
+            }
 
             // If torque sum squared exceeds threshold for any leg, set contact to true for that leg
             for (int leg = 0; leg < robot.num_legs; ++leg) {

@@ -37,6 +37,7 @@ public:
 
         // Eigen::VectorXd d;        // Dynamic size, set at runtime based on num_legs
         Eigen::VectorXd d_v;      // Dynamic size, set at runtime based on num_legs
+        Eigen::VectorXd dv_norm;  // Dynamic size, set at runtime based on num_legs
 
         Eigen::Vector3d Bias_Gyro;
         Eigen::Vector3d Bias_Acc;
