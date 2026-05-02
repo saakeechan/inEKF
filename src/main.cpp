@@ -8,6 +8,7 @@
 #include <eigen3/Eigen/Dense>
 #include <vector>
 #include "estimator/InEKF_estimator.hpp"
+#include "utility/inekf_save_utils.hpp"
 #include <iomanip>
 #include "utility/RobotModel.hpp"
 
@@ -92,8 +93,8 @@ int main() {
         std::cout << "  Total time:            " << std::fixed 
                   << std::setprecision(8) << total_time << " s" << std::endl;
 
-        estimator_IEKF.writeSavedData();
-        cout << "Reached after estimator_IEKF.writeSavedData(cov_info)" << endl;
+        InEKF_SaveUtils::write_saved_data_impl(estimator_IEKF);
+        cout << "Reached after InEKF_SaveUtils::write_saved_data_impl()" << endl;
 
     return 0;
 }

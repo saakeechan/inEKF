@@ -1,0 +1,15 @@
+Estimator Info: (SR5)H(adj)
+Covariance Info: (-5-1-2-5-8 -10 -10-10)
+Initial Condition Info: (0.00_0.00_0.00_1.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00)
+File Info: 
+Time Count: 990
+Timestamp: 2026-05-02_06-04-24
+dt: 0.02
+Robot Name: G1
+Number of Legs: 2
+Slip Rejection Mode: true
+Slip Threshold: 5
+Variable Contact Cov Mode: false
+Cov Amplifier: 1
+Contact NN Enabled: true
+Contact Model Path: ../src/contactDetection/bipedal_contact_best_val_leg_acc.onnx
