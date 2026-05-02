@@ -65,17 +65,19 @@ ENV PATH="/opt/openrobots/bin:${PATH}" \
     LD_LIBRARY_PATH="/opt/openrobots/lib" \
     CMAKE_PREFIX_PATH="/opt/openrobots"
 
-# Install ONNX Runtime (cached layer)
-WORKDIR /tmp
-RUN wget https://github.com/microsoft/onnxruntime/releases/download/v1.18.0/onnxruntime-linux-x64-1.18.0.tgz && \
-    tar -xzf onnxruntime-linux-x64-1.18.0.tgz && \
-    cp -r onnxruntime-linux-x64-1.18.0/include/* /usr/local/include/ && \
-    cp -r onnxruntime-linux-x64-1.18.0/lib/* /usr/local/lib/ && \
-    ldconfig && \
-    rm -rf onnxruntime-linux-x64-1.18.0*
+
 
 # Install Ninja build system (after GTSAM to preserve cache)
 RUN apt-get update && apt-get install -y ninja-build && rm -rf /var/lib/apt/lists/*
+
+# Install ONNX Runtime (cached layer)
+WORKDIR /tmp
+RUN wget https://github.com/microsoft/onnxruntime/releases/download/v1.25.1/onnxruntime-linux-x64-1.25.1.tgz && \
+    tar -xzf onnxruntime-linux-x64-1.25.1.tgz && \
+    cp -r onnxruntime-linux-x64-1.25.1/include/* /usr/local/include/ && \
+    cp -r onnxruntime-linux-x64-1.25.1/lib/* /usr/local/lib/ && \
+    ldconfig && \
+    rm -rf onnxruntime-linux-x64-1.25.1*
 
 # Enable ccache for faster rebuilds
 ENV CCACHE_DIR=/ccache
@@ -92,7 +94,7 @@ COPY config/ config/
 # Build the project with Ninja
 RUN mkdir -p build && cd build && \
     cmake -GNinja .. && \
-    ninja -j$(nproc)
+    ninja -j6
 
 # Install GTSAM Python package
 RUN pip3 install gtsam
