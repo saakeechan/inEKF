@@ -13,6 +13,8 @@ textfile:
   time_length: 990 # Total number of data points to process from the TextFile
   starting_point: 0 # Number of initial data points to skip in TextFile
 
+saved_results_folder: "../results"  # Name of the folder to save estimation results
+
 # Slip rejection configuration
 slip_rejection:
   enabled: true  # Slip rejection mode

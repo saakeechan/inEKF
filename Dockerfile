@@ -94,4 +94,7 @@ RUN mkdir -p build && cd build && \
     cmake -GNinja .. && \
     ninja -j$(nproc)
 
+# Install GTSAM Python package
+RUN pip3 install gtsam
+
 CMD ["/bin/bash"]
