@@ -134,7 +134,10 @@ set_target_properties(${TARGET} PROPERTIES
 target_link_libraries(${TARGET} INEKF_Estimator)
 
 # mainSmoother executable: LeggedCombinedFixedLagSmoother for G1 biped
-add_executable(mainSmoother convex/mainSmoother.cpp)
+add_executable(mainSmoother 
+    convex/mainSmoother.cpp
+    src/utility/csvParser.cpp
+)
 
 set_target_properties(mainSmoother PROPERTIES
     BUILD_RPATH "${PINOCCHIO_LIBRARY_DIRS}:${GTSAM_LIBRARY_DIRS}"

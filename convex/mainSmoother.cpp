@@ -44,6 +44,7 @@
 #include <gtsam/slam/dataset.h>
 
 #include "LeggedEstimatorReplayUtils.h"
+#include "src/utility/csvParser.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -82,6 +83,8 @@
 // ------------------------------------------------------------
 
 
+
+
 namespace gtsam {
 namespace {
 
@@ -97,14 +100,14 @@ struct ReplayConfig : public LeggedEstimatorParams {
       (Vector(9) << 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10)
           .finished();
   // Gyro noise: sqrt(10^-5) ≈ 3.162e-3
-  double sigmaGyro = 3.162e-3;
-  double sigmaIntegration = 1e-3;
+  double sigmaGyro = std::sqrt(1e-5);
+  double sigmaIntegration = 1e-5;
   // Accelerometer noise: sqrt(10^-1) ≈ 3.162e-1
-  double sigmaAcc = 3.162e-1;
+  double sigmaAcc = std::sqrt(1e-2);
   // Bias random walk sigmas: sqrt(10^-10) = 1e-5
   double biasAccRandomWalkSigma = 1e-5;  // bias_acc: -10
   double biasOmegaRandomWalkSigma = 1e-5;  // bias_gyro: -10
-  double lagSeconds = 1.0;
+  double lagSeconds = 10;
   double maxDeadReckoningSeconds = 0.04;
   
   // Constructor to initialize contact covariance (contact: -5 → variance = 10^-5)
@@ -113,6 +116,58 @@ struct ReplayConfig : public LeggedEstimatorParams {
     contactCovariance = Vector3(contactVariance, contactVariance, contactVariance).asDiagonal();
   }
 };
+
+// Structure to hold ground truth initial state from CSV
+struct GroundTruthInitialState {
+  Point3 position;
+  Rot3 orientation;
+  Vector3 velocity;
+  
+  GroundTruthInitialState() 
+    : position(0.0, 0.0, 0.0), 
+      orientation(Rot3()), 
+      velocity(Vector3::Zero()) {}
+};
+
+// Load ground truth initial state from CSV file
+GroundTruthInitialState loadGroundTruthInitialState(const fs::path& datasetDir) {
+  GroundTruthInitialState gtState;
+  
+  fs::path gtPath = datasetDir / "groundtruth.csv";
+  if (!fs::exists(gtPath)) {
+    std::cout << "Warning: Ground truth file not found at " << gtPath.string() 
+              << ", using default initial state\n";
+    return gtState;
+  }
+  
+  // Parse the ground truth CSV
+  DataStruct gtData = ParseCSV(gtPath.string());
+  
+  if (gtData.num_rows == 0) {
+    std::cout << "Warning: Ground truth CSV is empty, using default initial state\n";
+    return gtState;
+  }
+  
+  // Extract first timestep data (index 0)
+  gtState.position = Point3(gtData.pos_x[0], gtData.pos_y[0], gtData.pos_z[0]);
+  gtState.velocity = Vector3(gtData.vel_x[0], gtData.vel_y[0], gtData.vel_z[0]);
+  
+  // Convert quaternion to Rot3
+  // DataStruct has: quat_w, quat_i, quat_j, quat_k
+  Eigen::Quaterniond quat(gtData.quat_w[0], gtData.quat_i[0], 
+                          gtData.quat_j[0], gtData.quat_k[0]);
+  gtState.orientation = Rot3(quat);
+  
+  std::cout << "Loaded ground truth initial state from " << gtPath.string() << ":\n";
+  std::cout << "  Position: [" << gtState.position.x() << ", " 
+            << gtState.position.y() << ", " << gtState.position.z() << "]\n";
+  std::cout << "  Velocity: [" << gtState.velocity(0) << ", " 
+            << gtState.velocity(1) << ", " << gtState.velocity(2) << "]\n";
+  std::cout << "  Roll: " << gtData.roll[0] << " rad, Pitch: " 
+            << gtData.pitch[0] << " rad, Yaw: " << gtData.yaw[0] << " rad\n";
+  
+  return gtState;
+}
 
 // 
 
@@ -343,9 +398,14 @@ LeggedEstimatorParams makeParams(const ReplayConfig& replayConfig,
   return params;
 }
 
-NavState makeInitialState(const ReplayConfig& replayConfig) {
-  return NavState(Rot3(), replayConfig.initialPosition,
-                  replayConfig.initialVelocity);
+NavState makeInitialState(const ReplayConfig& replayConfig, 
+                          const GroundTruthInitialState& gtState) {
+  // Use ground truth if available, otherwise use default from config
+  const Point3& position = gtState.position.norm() > 0 ? gtState.position : replayConfig.initialPosition;
+  const Vector3& velocity = gtState.velocity.norm() > 0 ? gtState.velocity : replayConfig.initialVelocity;
+  const Rot3& orientation = gtState.orientation;
+  
+  return NavState(orientation, position, velocity);
 }
 
 Matrix makeInitialCovariance(size_t numFeet, const ReplayConfig& replayConfig) {
@@ -494,8 +554,9 @@ ReplayOutputs replayFilter(const std::string& filterName,
                            std::ofstream& trajectoryOutput,
                            const double maxDurationSeconds,
                            const bool disableFullContactInitialization,
-                           const imuBias::ConstantBias& imuBiasEstimate) {
-  const NavState initialState = makeInitialState(replayConfig);
+                           const imuBias::ConstantBias& imuBiasEstimate,
+                           const GroundTruthInitialState& gtState) {
+  const NavState initialState = makeInitialState(replayConfig, gtState);
   const Matrix footholds =
       makeInitialFootholds(dataset.metadata.footNames.size());
   const Matrix covariance =
@@ -652,9 +713,9 @@ struct CommandLineArgs {
   std::optional<double> biasOmegaRandomWalkSigma;
   std::optional<double> contactSigmaXY;
   std::optional<double> contactSigmaZ;
-  bool useRobustContactNoise = false;
+  bool useRobustContactNoise = true;
   std::optional<double> robustContactHuberK;
-  bool marginalizeLeavingFoot = true;
+  bool marginalizeLeavingFoot = false;
   std::vector<std::string> filterNames;
   bool disableFullContactInitialization = true;
 };
@@ -743,7 +804,7 @@ CommandLineArgs parseCommandLine(int argc, char* argv[]) {
     args.outputDir = fs::path(__FILE__).parent_path() / "results";
   }
   if (args.filterNames.empty()) {
-    args.filterNames = {"fixed_lag_combined_bias"};
+    args.filterNames = {"fixed_lag_single_bias"};
   }
   for (std::string& filterName : args.filterNames) {
     filterName = canonicalFilterName(filterName);
@@ -793,7 +854,12 @@ int main(int argc, char* argv[]) {
   const CommandLineArgs args = parseCommandLine(argc, argv);
   const ReplayConfig replayConfig = makeReplayConfig(args);
   const Dataset dataset = loadDataset(args.datasetDir);
-  const InitialBiasEstimate imuBiasEstimate = estimateInitialImuBias(dataset);
+  
+  // Load ground truth initial state from CSV
+  const GroundTruthInitialState gtInitialState = loadGroundTruthInitialState(args.datasetDir);
+  
+  // const InitialBiasEstimate imuBiasEstimate = estimateInitialImuBias(dataset);
+  const InitialBiasEstimate imuBiasEstimate = {imuBias::ConstantBias(), "zero initialization", 0};
   const double maxDeadReckoningSeconds = replayConfig.maxDeadReckoningSeconds;
   if (maxDeadReckoningSeconds > 0.0 && !dataset.metadata.denseContactStream) {
     throw std::runtime_error(
@@ -849,7 +915,7 @@ int main(int argc, char* argv[]) {
     const ReplayOutputs outputs = replayFilter(
         filterName, dataset, contactReplayPlan, replayConfig, trajectoryOutput,
         args.maxDurationSeconds, args.disableFullContactInitialization,
-        imuBiasEstimate.bias);
+        imuBiasEstimate.bias, gtInitialState);
     writeMetricsRow(metricsOutput, outputs);
     std::cout << filterName
               << ": wall_time_ms=" << toString(outputs.metrics.wallTimeMs, 3)
