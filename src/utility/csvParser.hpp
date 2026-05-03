@@ -58,6 +58,14 @@ struct DataStruct {
     std::vector<double> acc_body_x, acc_body_y, acc_body_z;
     std::vector<double> gyro_body_x, gyro_body_y, gyro_body_z;
     
+    // Forward kinematics foot positions
+    std::vector<double> fk_left_foot_pos_x, fk_left_foot_pos_y, fk_left_foot_pos_z;
+    std::vector<double> fk_right_foot_pos_x, fk_right_foot_pos_y, fk_right_foot_pos_z;
+    
+    // Forward kinematics foot velocities
+    std::vector<double> fk_left_foot_vel_x, fk_left_foot_vel_y, fk_left_foot_vel_z;
+    std::vector<double> fk_right_foot_vel_x, fk_right_foot_vel_y, fk_right_foot_vel_z;
+    
     // Joint positions (columns 61-103) - 43 joints total
     std::vector<double> joint_pos_left_hip_pitch, joint_pos_right_hip_pitch, joint_pos_waist_yaw;
     std::vector<double> joint_pos_left_hip_roll, joint_pos_right_hip_roll, joint_pos_waist_roll;

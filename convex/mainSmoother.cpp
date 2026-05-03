@@ -62,30 +62,24 @@
 #include <utility>
 #include <vector>
 
-// covariance_exponents:
-//   gyro: -5
-//   acc: -1
-//   slip: -2
-//   contact: -5
-//   encoder: -8
-//   bias_gyro: -10
-//   bias_acc: -10
-//   prior_orientation: -10
-//   prior_velocity: -10
-//   prior_position: -10
-//   prior_bias_gyro: -10
-//   prior_bias_acc: -10
-
-
-// # Initial condition (16-dimensional state vector)
-// initial_condition:
-//   position: [0.0, 0.0, 0.0]  # Px, Py, Pz
-//   orientation: [1.0, 0.0, 0.0, 0.0]  # Quaternion (Qw, Qx, Qy, Qz)
-//   velocity: [0.0, 0.0, 0.0]  # Vx, Vy, Vz
-//   bias_gyro: [0.0, 0.0, 0.0]  # bgx, bgy, bgz
-//   bias_acc: [0.0, 0.0, 0.0]  # bax, bay, baz
-
-// # ------------------------------------------------------------
+// Covariance values populated from config/initialization_config.yaml
+// covariance_exponents (converted to sigma = sqrt(10^exponent)):
+//   gyro: -5 → sigmaGyro = 3.162e-3
+//   acc: -1 → sigmaAcc = 3.162e-1
+//   contact: -5 → contactSigma = 3.162e-3
+//   bias_gyro: -10 → biasOmegaRandomWalkSigma = 1e-5
+//   bias_acc: -10 → biasAccRandomWalkSigma = 1e-5
+//   prior_orientation: -10 → 1e-10 (in initialBaseCovarianceDiagonal)
+//   prior_velocity: -10 → 1e-10 (in initialBaseCovarianceDiagonal)
+//   prior_position: -10 → 1e-10 (in initialBaseCovarianceDiagonal)
+//
+// Initial condition (values set in ReplayConfig):
+//   position: [0.0, 0.0, 0.0] → initialPosition
+//   orientation: [1.0, 0.0, 0.0, 0.0] → Rot3() (identity quaternion)
+//   velocity: [0.0, 0.0, 0.0] → initialVelocity
+//   bias_gyro: [0.0, 0.0, 0.0] → estimated from data
+//   bias_acc: [0.0, 0.0, 0.0] → estimated from data
+// ------------------------------------------------------------
 
 
 namespace gtsam {
@@ -95,16 +89,29 @@ namespace fs = std::filesystem;
 
 struct ReplayConfig : public LeggedEstimatorParams {
   Vector3 gravity = Vector3(0.0, 0.0, -9.81);
-  Point3 initialPosition = Point3(0.0, 0.0, 0.76);
-  Vector3 initialVelocity = Vector3::Zero();
+  Point3 initialPosition = Point3(0.0, 0.0, 0.0);  // [Px, Py, Pz] from config
+  Vector3 initialVelocity = Vector3::Zero();  // [Vx, Vy, Vz] from config
+  // Prior covariances: [position(3), orientation(3), velocity(3)]
+  // All set to 10^-10 as per prior_position, prior_orientation, prior_velocity
   Vector initialBaseCovarianceDiagonal =
-      (Vector(9) << 1e-2, 1e-2, 1e-6, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05)
+      (Vector(9) << 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10)
           .finished();
-  double sigmaGyro = 8e-4;
+  // Gyro noise: sqrt(10^-5) ≈ 3.162e-3
+  double sigmaGyro = 3.162e-3;
   double sigmaIntegration = 1e-3;
-  double sigmaAcc = 2e-2;
+  // Accelerometer noise: sqrt(10^-1) ≈ 3.162e-1
+  double sigmaAcc = 3.162e-1;
+  // Bias random walk sigmas: sqrt(10^-10) = 1e-5
+  double biasAccRandomWalkSigma = 1e-5;  // bias_acc: -10
+  double biasOmegaRandomWalkSigma = 1e-5;  // bias_gyro: -10
   double lagSeconds = 1.0;
-  double maxDeadReckoningSeconds = 0.100;
+  double maxDeadReckoningSeconds = 0.04;
+  
+  // Constructor to initialize contact covariance (contact: -5 → variance = 10^-5)
+  ReplayConfig() {
+    const double contactVariance = 1e-5;  // 10^-5 from config
+    contactCovariance = Vector3(contactVariance, contactVariance, contactVariance).asDiagonal();
+  }
 };
 
 // 
@@ -667,7 +674,7 @@ std::vector<std::string> splitCommaSeparated(const std::string& value) {
 std::string canonicalFilterName(const std::string& name) { return name; }
 
 fs::path defaultDatasetDir() {
-  return fs::path(__FILE__).parent_path() / "Data_example";
+  return fs::path(__FILE__).parent_path() / "Data";
 }
 
 CommandLineArgs parseCommandLine(int argc, char* argv[]) {
@@ -733,7 +740,7 @@ CommandLineArgs parseCommandLine(int argc, char* argv[]) {
     args.datasetDir = defaultDatasetDir();
   }
   if (args.outputDir.empty()) {
-    args.outputDir = fs::current_path() / "legged_estimator_outputs";
+    args.outputDir = fs::path(__FILE__).parent_path() / "results";
   }
   if (args.filterNames.empty()) {
     args.filterNames = {"fixed_lag_combined_bias"};

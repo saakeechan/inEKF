@@ -164,6 +164,22 @@ DataStruct ParseCSV(const std::string& csv_filename) {
         data.gyro_body_y.push_back(getColumnIndex(header_map, "gyro_body_y") >= 0 ? getValue(row_values, header_map, "gyro_body_y") : NaN);
         data.gyro_body_z.push_back(getColumnIndex(header_map, "gyro_body_z") >= 0 ? getValue(row_values, header_map, "gyro_body_z") : NaN);
         
+        // Forward kinematics foot positions
+        data.fk_left_foot_pos_x.push_back(SAFE_GET_VALUE(row_values, header_map, "fk_left_foot_pos_x", NaN));
+        data.fk_left_foot_pos_y.push_back(SAFE_GET_VALUE(row_values, header_map, "fk_left_foot_pos_y", NaN));
+        data.fk_left_foot_pos_z.push_back(SAFE_GET_VALUE(row_values, header_map, "fk_left_foot_pos_z", NaN));
+        data.fk_right_foot_pos_x.push_back(SAFE_GET_VALUE(row_values, header_map, "fk_right_foot_pos_x", NaN));
+        data.fk_right_foot_pos_y.push_back(SAFE_GET_VALUE(row_values, header_map, "fk_right_foot_pos_y", NaN));
+        data.fk_right_foot_pos_z.push_back(SAFE_GET_VALUE(row_values, header_map, "fk_right_foot_pos_z", NaN));
+        
+        // Forward kinematics foot velocities
+        data.fk_left_foot_vel_x.push_back(SAFE_GET_VALUE(row_values, header_map, "fk_left_foot_vel_x", NaN));
+        data.fk_left_foot_vel_y.push_back(SAFE_GET_VALUE(row_values, header_map, "fk_left_foot_vel_y", NaN));
+        data.fk_left_foot_vel_z.push_back(SAFE_GET_VALUE(row_values, header_map, "fk_left_foot_vel_z", NaN));
+        data.fk_right_foot_vel_x.push_back(SAFE_GET_VALUE(row_values, header_map, "fk_right_foot_vel_x", NaN));
+        data.fk_right_foot_vel_y.push_back(SAFE_GET_VALUE(row_values, header_map, "fk_right_foot_vel_y", NaN));
+        data.fk_right_foot_vel_z.push_back(SAFE_GET_VALUE(row_values, header_map, "fk_right_foot_vel_z", NaN));
+        
         // Contact planning and phase
         data.lfoot_contact_plan.push_back(getColumnIndex(header_map, "lfoot-contact-plan") >= 0 ? getValue(row_values, header_map, "lfoot-contact-plan") : NaN);
         data.lfoot_contact.push_back(getColumnIndex(header_map, "lfoot-contact") >= 0 ? getValue(row_values, header_map, "lfoot-contact") : NaN);

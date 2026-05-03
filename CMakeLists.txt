@@ -150,6 +150,13 @@ target_link_libraries(mainSmoother
     yaml-cpp
 )
 
+# csvOrganizer executable: Organize CSV data into imu.csv, metadata.csv, contacts.csv
+# Standalone executable - no dependencies on INEKF_Estimator or Pinocchio
+add_executable(csvOrganizer 
+    convex/csvOrganizer.cpp
+    src/utility/csvParser.cpp
+)
+
 
 # ============================================================
 # Installation rules
