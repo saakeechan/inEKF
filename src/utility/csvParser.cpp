@@ -13,6 +13,7 @@
 #include <map>
 #include <algorithm>
 #include <cstdlib>
+#include <limits>
 #include "csvParser.hpp"
 
 using namespace std;
@@ -36,13 +37,20 @@ static int getColumnIndex(const std::map<std::string, int>& header_map, const st
 
 // Helper function to safely get value from row by column name
 static double getValue(const std::vector<double>& row, const std::map<std::string, int>& header_map, 
-                       const std::string& column_name, double default_value = 0.0) {
+                       const std::string& column_name, double default_value = std::numeric_limits<double>::quiet_NaN()) {
     int idx = getColumnIndex(header_map, column_name);
     if (idx >= 0 && idx < static_cast<int>(row.size())) {
         return row[idx];
     }
     return default_value;
 }
+
+// Helper macro for conditional getValue (checks if column exists first)
+#define SAFE_GET_VALUE(row, header, col_name, default_val) \
+    (getColumnIndex(header, col_name) >= 0 ? getValue(row, header, col_name, default_val) : default_val)
+
+// Convenience constant for NaN
+static const double NaN = std::numeric_limits<double>::quiet_NaN();
 
 DataStruct ParseCSV(const std::string& csv_filename) {
     
@@ -95,285 +103,294 @@ DataStruct ParseCSV(const std::string& csv_filename) {
                 row_values.push_back(std::stod(value));
             } catch (const std::exception& e) {
                 std::cerr << "Warning: Could not parse value '" << value << "' at row " << row_count << std::endl;
-                row_values.push_back(0.0);
+                row_values.push_back(NaN);
             }
         }
         
-        // Extract values by column name using the header map
-        data.count.push_back(getValue(row_values, header_map, "count"));
-        data.timestamp.push_back(getValue(row_values, header_map, "timestamp"));
+        // Extract values by column name using the header map (only if columns exist)
+        if (getColumnIndex(header_map, "count") >= 0) {
+            data.count.push_back(getValue(row_values, header_map, "count"));
+        } else {
+            data.count.push_back(NaN);
+        }
+        
+        if (getColumnIndex(header_map, "timestamp") >= 0) {
+            data.timestamp.push_back(getValue(row_values, header_map, "timestamp"));
+        } else {
+            data.timestamp.push_back(NaN);
+        }
         
         // Base position
-        data.pos_x.push_back(getValue(row_values, header_map, "pos_x"));
-        data.pos_y.push_back(getValue(row_values, header_map, "pos_y"));
-        data.pos_z.push_back(getValue(row_values, header_map, "pos_z"));
+        data.pos_x.push_back(getColumnIndex(header_map, "pos_x") >= 0 ? getValue(row_values, header_map, "pos_x") : NaN);
+        data.pos_y.push_back(getColumnIndex(header_map, "pos_y") >= 0 ? getValue(row_values, header_map, "pos_y") : NaN);
+        data.pos_z.push_back(getColumnIndex(header_map, "pos_z") >= 0 ? getValue(row_values, header_map, "pos_z") : NaN);
         
         // Base orientation quaternion
-        data.quat_w.push_back(getValue(row_values, header_map, "quat_w"));
-        data.quat_i.push_back(getValue(row_values, header_map, "quat_i"));
-        data.quat_j.push_back(getValue(row_values, header_map, "quat_j"));
-        data.quat_k.push_back(getValue(row_values, header_map, "quat_k"));
+        data.quat_w.push_back(getColumnIndex(header_map, "quat_w") >= 0 ? getValue(row_values, header_map, "quat_w") : 1.0);
+        data.quat_i.push_back(getColumnIndex(header_map, "quat_i") >= 0 ? getValue(row_values, header_map, "quat_i") : NaN);
+        data.quat_j.push_back(getColumnIndex(header_map, "quat_j") >= 0 ? getValue(row_values, header_map, "quat_j") : NaN);
+        data.quat_k.push_back(getColumnIndex(header_map, "quat_k") >= 0 ? getValue(row_values, header_map, "quat_k") : NaN);
         
         // Orientation angles
-        data.roll.push_back(getValue(row_values, header_map, "roll"));
-        data.pitch.push_back(getValue(row_values, header_map, "pitch"));
-        data.yaw.push_back(getValue(row_values, header_map, "yaw"));
+        data.roll.push_back(getColumnIndex(header_map, "roll") >= 0 ? getValue(row_values, header_map, "roll") : NaN);
+        data.pitch.push_back(getColumnIndex(header_map, "pitch") >= 0 ? getValue(row_values, header_map, "pitch") : NaN);
+        data.yaw.push_back(getColumnIndex(header_map, "yaw") >= 0 ? getValue(row_values, header_map, "yaw") : NaN);
         
         // Base velocity
-        data.vel_x.push_back(getValue(row_values, header_map, "vel_x"));
-        data.vel_y.push_back(getValue(row_values, header_map, "vel_y"));
-        data.vel_z.push_back(getValue(row_values, header_map, "vel_z"));
+        data.vel_x.push_back(getColumnIndex(header_map, "vel_x") >= 0 ? getValue(row_values, header_map, "vel_x") : NaN);
+        data.vel_y.push_back(getColumnIndex(header_map, "vel_y") >= 0 ? getValue(row_values, header_map, "vel_y") : NaN);
+        data.vel_z.push_back(getColumnIndex(header_map, "vel_z") >= 0 ? getValue(row_values, header_map, "vel_z") : NaN);
         
         // Angular velocity
-        data.omega_x.push_back(getValue(row_values, header_map, "omega_x"));
-        data.omega_y.push_back(getValue(row_values, header_map, "omega_y"));
-        data.omega_z.push_back(getValue(row_values, header_map, "omega_z"));
+        data.omega_x.push_back(getColumnIndex(header_map, "omega_x") >= 0 ? getValue(row_values, header_map, "omega_x") : NaN);
+        data.omega_y.push_back(getColumnIndex(header_map, "omega_y") >= 0 ? getValue(row_values, header_map, "omega_y") : NaN);
+        data.omega_z.push_back(getColumnIndex(header_map, "omega_z") >= 0 ? getValue(row_values, header_map, "omega_z") : NaN);
         
         // Linear acceleration
-        data.acc_x.push_back(getValue(row_values, header_map, "acc_x"));
-        data.acc_y.push_back(getValue(row_values, header_map, "acc_y"));
-        data.acc_z.push_back(getValue(row_values, header_map, "acc_z"));
+        data.acc_x.push_back(getColumnIndex(header_map, "acc_x") >= 0 ? getValue(row_values, header_map, "acc_x") : NaN);
+        data.acc_y.push_back(getColumnIndex(header_map, "acc_y") >= 0 ? getValue(row_values, header_map, "acc_y") : NaN);
+        data.acc_z.push_back(getColumnIndex(header_map, "acc_z") >= 0 ? getValue(row_values, header_map, "acc_z") : NaN);
         
         // Angular acceleration
-        data.alpha_x.push_back(getValue(row_values, header_map, "alpha_x"));
-        data.alpha_y.push_back(getValue(row_values, header_map, "alpha_y"));
-        data.alpha_z.push_back(getValue(row_values, header_map, "alpha_z"));
+        data.alpha_x.push_back(getColumnIndex(header_map, "alpha_x") >= 0 ? getValue(row_values, header_map, "alpha_x") : NaN);
+        data.alpha_y.push_back(getColumnIndex(header_map, "alpha_y") >= 0 ? getValue(row_values, header_map, "alpha_y") : NaN);
+        data.alpha_z.push_back(getColumnIndex(header_map, "alpha_z") >= 0 ? getValue(row_values, header_map, "alpha_z") : NaN);
         
         // Body frame IMU data
-        data.acc_body_x.push_back(getValue(row_values, header_map, "acc_body_x"));
-        data.acc_body_y.push_back(getValue(row_values, header_map, "acc_body_y"));
-        data.acc_body_z.push_back(getValue(row_values, header_map, "acc_body_z"));
-        data.gyro_body_x.push_back(getValue(row_values, header_map, "gyro_body_x"));
-        data.gyro_body_y.push_back(getValue(row_values, header_map, "gyro_body_y"));
-        data.gyro_body_z.push_back(getValue(row_values, header_map, "gyro_body_z"));
+        data.acc_body_x.push_back(getColumnIndex(header_map, "acc_body_x") >= 0 ? getValue(row_values, header_map, "acc_body_x") : NaN);
+        data.acc_body_y.push_back(getColumnIndex(header_map, "acc_body_y") >= 0 ? getValue(row_values, header_map, "acc_body_y") : NaN);
+        data.acc_body_z.push_back(getColumnIndex(header_map, "acc_body_z") >= 0 ? getValue(row_values, header_map, "acc_body_z") : NaN);
+        data.gyro_body_x.push_back(getColumnIndex(header_map, "gyro_body_x") >= 0 ? getValue(row_values, header_map, "gyro_body_x") : NaN);
+        data.gyro_body_y.push_back(getColumnIndex(header_map, "gyro_body_y") >= 0 ? getValue(row_values, header_map, "gyro_body_y") : NaN);
+        data.gyro_body_z.push_back(getColumnIndex(header_map, "gyro_body_z") >= 0 ? getValue(row_values, header_map, "gyro_body_z") : NaN);
         
         // Contact planning and phase
-        data.lfoot_contact_plan.push_back(getValue(row_values, header_map, "lfoot-contact-plan"));
-        data.lfoot_contact.push_back(getValue(row_values, header_map, "lfoot-contact"));
-        data.rfoot_contact_plan.push_back(getValue(row_values, header_map, "rfoot-contact-plan"));
-        data.rfoot_contact.push_back(getValue(row_values, header_map, "rfoot-contact"));
-        data.phase_variable.push_back(getValue(row_values, header_map, "phase-variable"));
+        data.lfoot_contact_plan.push_back(getColumnIndex(header_map, "lfoot-contact-plan") >= 0 ? getValue(row_values, header_map, "lfoot-contact-plan") : NaN);
+        data.lfoot_contact.push_back(getColumnIndex(header_map, "lfoot-contact") >= 0 ? getValue(row_values, header_map, "lfoot-contact") : NaN);
+        data.rfoot_contact_plan.push_back(getColumnIndex(header_map, "rfoot-contact-plan") >= 0 ? getValue(row_values, header_map, "rfoot-contact-plan") : NaN);
+        data.rfoot_contact.push_back(getColumnIndex(header_map, "rfoot-contact") >= 0 ? getValue(row_values, header_map, "rfoot-contact") : NaN);
+        data.phase_variable.push_back(getColumnIndex(header_map, "phase-variable") >= 0 ? getValue(row_values, header_map, "phase-variable") : NaN);
         
         // Right foot ground reaction forces
-        data.rfoot_grf_x.push_back(getValue(row_values, header_map, "rfoot_grf_x"));
-        data.rfoot_grf_y.push_back(getValue(row_values, header_map, "rfoot_grf_y"));
-        data.rfoot_grf_z.push_back(getValue(row_values, header_map, "rfoot_grf_z"));
-        data.rfoot_grt_x.push_back(getValue(row_values, header_map, "rfoot_grt_x"));
-        data.rfoot_grt_y.push_back(getValue(row_values, header_map, "rfoot_grt_y"));
-        data.rfoot_grt_z.push_back(getValue(row_values, header_map, "rfoot_grt_z"));
+        data.rfoot_grf_x.push_back(getColumnIndex(header_map, "rfoot_grf_x") >= 0 ? getValue(row_values, header_map, "rfoot_grf_x") : NaN);
+        data.rfoot_grf_y.push_back(getColumnIndex(header_map, "rfoot_grf_y") >= 0 ? getValue(row_values, header_map, "rfoot_grf_y") : NaN);
+        data.rfoot_grf_z.push_back(getColumnIndex(header_map, "rfoot_grf_z") >= 0 ? getValue(row_values, header_map, "rfoot_grf_z") : NaN);
+        data.rfoot_grt_x.push_back(getColumnIndex(header_map, "rfoot_grt_x") >= 0 ? getValue(row_values, header_map, "rfoot_grt_x") : NaN);
+        data.rfoot_grt_y.push_back(getColumnIndex(header_map, "rfoot_grt_y") >= 0 ? getValue(row_values, header_map, "rfoot_grt_y") : NaN);
+        data.rfoot_grt_z.push_back(getColumnIndex(header_map, "rfoot_grt_z") >= 0 ? getValue(row_values, header_map, "rfoot_grt_z") : NaN);
         
         // Left foot ground reaction forces
-        data.lfoot_grf_x.push_back(getValue(row_values, header_map, "lfoot_grf_x"));
-        data.lfoot_grf_y.push_back(getValue(row_values, header_map, "lfoot_grf_y"));
-        data.lfoot_grf_z.push_back(getValue(row_values, header_map, "lfoot_grf_z"));
-        data.lfoot_grt_x.push_back(getValue(row_values, header_map, "lfoot_grt_x"));
-        data.lfoot_grt_y.push_back(getValue(row_values, header_map, "lfoot_grt_y"));
-        data.lfoot_grt_z.push_back(getValue(row_values, header_map, "lfoot_grt_z"));
+        data.lfoot_grf_x.push_back(getColumnIndex(header_map, "lfoot_grf_x") >= 0 ? getValue(row_values, header_map, "lfoot_grf_x") : NaN);
+        data.lfoot_grf_y.push_back(getColumnIndex(header_map, "lfoot_grf_y") >= 0 ? getValue(row_values, header_map, "lfoot_grf_y") : NaN);
+        data.lfoot_grf_z.push_back(getColumnIndex(header_map, "lfoot_grf_z") >= 0 ? getValue(row_values, header_map, "lfoot_grf_z") : NaN);
+        data.lfoot_grt_x.push_back(getColumnIndex(header_map, "lfoot_grt_x") >= 0 ? getValue(row_values, header_map, "lfoot_grt_x") : NaN);
+        data.lfoot_grt_y.push_back(getColumnIndex(header_map, "lfoot_grt_y") >= 0 ? getValue(row_values, header_map, "lfoot_grt_y") : NaN);
+        data.lfoot_grt_z.push_back(getColumnIndex(header_map, "lfoot_grt_z") >= 0 ? getValue(row_values, header_map, "lfoot_grt_z") : NaN);
         
         // Right foot pose
-        data.rfoot_pos_x.push_back(getValue(row_values, header_map, "rfoot_pos_x"));
-        data.rfoot_pos_y.push_back(getValue(row_values, header_map, "rfoot_pos_y"));
-        data.rfoot_pos_z.push_back(getValue(row_values, header_map, "rfoot_pos_z"));
-        data.rfoot_quat_w.push_back(getValue(row_values, header_map, "rfoot_quat_w"));
-        data.rfoot_quat_i.push_back(getValue(row_values, header_map, "rfoot_quat_i"));
-        data.rfoot_quat_j.push_back(getValue(row_values, header_map, "rfoot_quat_j"));
-        data.rfoot_quat_k.push_back(getValue(row_values, header_map, "rfoot_quat_k"));
+        data.rfoot_pos_x.push_back(getColumnIndex(header_map, "rfoot_pos_x") >= 0 ? getValue(row_values, header_map, "rfoot_pos_x") : NaN);
+        data.rfoot_pos_y.push_back(getColumnIndex(header_map, "rfoot_pos_y") >= 0 ? getValue(row_values, header_map, "rfoot_pos_y") : NaN);
+        data.rfoot_pos_z.push_back(getColumnIndex(header_map, "rfoot_pos_z") >= 0 ? getValue(row_values, header_map, "rfoot_pos_z") : NaN);
+        data.rfoot_quat_w.push_back(getColumnIndex(header_map, "rfoot_quat_w") >= 0 ? getValue(row_values, header_map, "rfoot_quat_w") : 1.0);
+        data.rfoot_quat_i.push_back(getColumnIndex(header_map, "rfoot_quat_i") >= 0 ? getValue(row_values, header_map, "rfoot_quat_i") : NaN);
+        data.rfoot_quat_j.push_back(getColumnIndex(header_map, "rfoot_quat_j") >= 0 ? getValue(row_values, header_map, "rfoot_quat_j") : NaN);
+        data.rfoot_quat_k.push_back(getColumnIndex(header_map, "rfoot_quat_k") >= 0 ? getValue(row_values, header_map, "rfoot_quat_k") : NaN);
         
         // Left foot pose
-        data.lfoot_pos_x.push_back(getValue(row_values, header_map, "lfoot_pos_x"));
-        data.lfoot_pos_y.push_back(getValue(row_values, header_map, "lfoot_pos_y"));
-        data.lfoot_pos_z.push_back(getValue(row_values, header_map, "lfoot_pos_z"));
-        data.lfoot_quat_w.push_back(getValue(row_values, header_map, "lfoot_quat_w"));
-        data.lfoot_quat_i.push_back(getValue(row_values, header_map, "lfoot_quat_i"));
-        data.lfoot_quat_j.push_back(getValue(row_values, header_map, "lfoot_quat_j"));
-        data.lfoot_quat_k.push_back(getValue(row_values, header_map, "lfoot_quat_k"));
+        data.lfoot_pos_x.push_back(getColumnIndex(header_map, "lfoot_pos_x") >= 0 ? getValue(row_values, header_map, "lfoot_pos_x") : NaN);
+        data.lfoot_pos_y.push_back(getColumnIndex(header_map, "lfoot_pos_y") >= 0 ? getValue(row_values, header_map, "lfoot_pos_y") : NaN);
+        data.lfoot_pos_z.push_back(getColumnIndex(header_map, "lfoot_pos_z") >= 0 ? getValue(row_values, header_map, "lfoot_pos_z") : NaN);
+        data.lfoot_quat_w.push_back(getColumnIndex(header_map, "lfoot_quat_w") >= 0 ? getValue(row_values, header_map, "lfoot_quat_w") : 1.0);
+        data.lfoot_quat_i.push_back(getColumnIndex(header_map, "lfoot_quat_i") >= 0 ? getValue(row_values, header_map, "lfoot_quat_i") : NaN);
+        data.lfoot_quat_j.push_back(getColumnIndex(header_map, "lfoot_quat_j") >= 0 ? getValue(row_values, header_map, "lfoot_quat_j") : NaN);
+        data.lfoot_quat_k.push_back(getColumnIndex(header_map, "lfoot_quat_k") >= 0 ? getValue(row_values, header_map, "lfoot_quat_k") : NaN);
         
-        // Joint positions
-        data.joint_pos_left_hip_pitch.push_back(getValue(row_values, header_map, "joint_pos_left_hip_pitch_joint"));
-        data.joint_pos_right_hip_pitch.push_back(getValue(row_values, header_map, "joint_pos_right_hip_pitch_joint"));
-        data.joint_pos_waist_yaw.push_back(getValue(row_values, header_map, "joint_pos_waist_yaw_joint"));
-        data.joint_pos_left_hip_roll.push_back(getValue(row_values, header_map, "joint_pos_left_hip_roll_joint"));
-        data.joint_pos_right_hip_roll.push_back(getValue(row_values, header_map, "joint_pos_right_hip_roll_joint"));
-        data.joint_pos_waist_roll.push_back(getValue(row_values, header_map, "joint_pos_waist_roll_joint"));
-        data.joint_pos_left_hip_yaw.push_back(getValue(row_values, header_map, "joint_pos_left_hip_yaw_joint"));
-        data.joint_pos_right_hip_yaw.push_back(getValue(row_values, header_map, "joint_pos_right_hip_yaw_joint"));
-        data.joint_pos_waist_pitch.push_back(getValue(row_values, header_map, "joint_pos_waist_pitch_joint"));
-        data.joint_pos_left_knee.push_back(getValue(row_values, header_map, "joint_pos_left_knee_joint"));
-        data.joint_pos_right_knee.push_back(getValue(row_values, header_map, "joint_pos_right_knee_joint"));
-        data.joint_pos_left_shoulder_pitch.push_back(getValue(row_values, header_map, "joint_pos_left_shoulder_pitch_joint"));
-        data.joint_pos_right_shoulder_pitch.push_back(getValue(row_values, header_map, "joint_pos_right_shoulder_pitch_joint"));
-        data.joint_pos_left_ankle_pitch.push_back(getValue(row_values, header_map, "joint_pos_left_ankle_pitch_joint"));
-        data.joint_pos_right_ankle_pitch.push_back(getValue(row_values, header_map, "joint_pos_right_ankle_pitch_joint"));
-        data.joint_pos_left_shoulder_roll.push_back(getValue(row_values, header_map, "joint_pos_left_shoulder_roll_joint"));
-        data.joint_pos_right_shoulder_roll.push_back(getValue(row_values, header_map, "joint_pos_right_shoulder_roll_joint"));
-        data.joint_pos_left_ankle_roll.push_back(getValue(row_values, header_map, "joint_pos_left_ankle_roll_joint"));
-        data.joint_pos_right_ankle_roll.push_back(getValue(row_values, header_map, "joint_pos_right_ankle_roll_joint"));
-        data.joint_pos_left_shoulder_yaw.push_back(getValue(row_values, header_map, "joint_pos_left_shoulder_yaw_joint"));
-        data.joint_pos_right_shoulder_yaw.push_back(getValue(row_values, header_map, "joint_pos_right_shoulder_yaw_joint"));
-        data.joint_pos_left_elbow.push_back(getValue(row_values, header_map, "joint_pos_left_elbow_joint"));
-        data.joint_pos_right_elbow.push_back(getValue(row_values, header_map, "joint_pos_right_elbow_joint"));
-        data.joint_pos_left_wrist_roll.push_back(getValue(row_values, header_map, "joint_pos_left_wrist_roll_joint"));
-        data.joint_pos_right_wrist_roll.push_back(getValue(row_values, header_map, "joint_pos_right_wrist_roll_joint"));
-        data.joint_pos_left_wrist_pitch.push_back(getValue(row_values, header_map, "joint_pos_left_wrist_pitch_joint"));
-        data.joint_pos_right_wrist_pitch.push_back(getValue(row_values, header_map, "joint_pos_right_wrist_pitch_joint"));
-        data.joint_pos_left_wrist_yaw.push_back(getValue(row_values, header_map, "joint_pos_left_wrist_yaw_joint"));
-        data.joint_pos_right_wrist_yaw.push_back(getValue(row_values, header_map, "joint_pos_right_wrist_yaw_joint"));
-        data.joint_pos_left_hand_index_0.push_back(getValue(row_values, header_map, "joint_pos_left_hand_index_0_joint"));
-        data.joint_pos_left_hand_middle_0.push_back(getValue(row_values, header_map, "joint_pos_left_hand_middle_0_joint"));
-        data.joint_pos_left_hand_thumb_0.push_back(getValue(row_values, header_map, "joint_pos_left_hand_thumb_0_joint"));
-        data.joint_pos_right_hand_index_0.push_back(getValue(row_values, header_map, "joint_pos_right_hand_index_0_joint"));
-        data.joint_pos_right_hand_middle_0.push_back(getValue(row_values, header_map, "joint_pos_right_hand_middle_0_joint"));
-        data.joint_pos_right_hand_thumb_0.push_back(getValue(row_values, header_map, "joint_pos_right_hand_thumb_0_joint"));
-        data.joint_pos_left_hand_index_1.push_back(getValue(row_values, header_map, "joint_pos_left_hand_index_1_joint"));
-        data.joint_pos_left_hand_middle_1.push_back(getValue(row_values, header_map, "joint_pos_left_hand_middle_1_joint"));
-        data.joint_pos_left_hand_thumb_1.push_back(getValue(row_values, header_map, "joint_pos_left_hand_thumb_1_joint"));
-        data.joint_pos_right_hand_index_1.push_back(getValue(row_values, header_map, "joint_pos_right_hand_index_1_joint"));
-        data.joint_pos_right_hand_middle_1.push_back(getValue(row_values, header_map, "joint_pos_right_hand_middle_1_joint"));
-        data.joint_pos_right_hand_thumb_1.push_back(getValue(row_values, header_map, "joint_pos_right_hand_thumb_1_joint"));
-        data.joint_pos_left_hand_thumb_2.push_back(getValue(row_values, header_map, "joint_pos_left_hand_thumb_2_joint"));
-        data.joint_pos_right_hand_thumb_2.push_back(getValue(row_values, header_map, "joint_pos_right_hand_thumb_2_joint"));
+        // Joint positions (with existence checks)
+        data.joint_pos_left_hip_pitch.push_back(getColumnIndex(header_map, "joint_pos_left_hip_pitch_joint") >= 0 ? getValue(row_values, header_map, "joint_pos_left_hip_pitch_joint") : NaN);
+        data.joint_pos_right_hip_pitch.push_back(getColumnIndex(header_map, "joint_pos_right_hip_pitch_joint") >= 0 ? getValue(row_values, header_map, "joint_pos_right_hip_pitch_joint") : NaN);
+        data.joint_pos_waist_yaw.push_back(getColumnIndex(header_map, "joint_pos_waist_yaw_joint") >= 0 ? getValue(row_values, header_map, "joint_pos_waist_yaw_joint") : NaN);
+        data.joint_pos_left_hip_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_left_hip_roll_joint", NaN));
+        data.joint_pos_right_hip_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_right_hip_roll_joint", NaN));
+        data.joint_pos_waist_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_waist_roll_joint", NaN));
+        data.joint_pos_left_hip_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_left_hip_yaw_joint", NaN));
+        data.joint_pos_right_hip_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_right_hip_yaw_joint", NaN));
+        data.joint_pos_waist_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_waist_pitch_joint", NaN));
+        data.joint_pos_left_knee.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_left_knee_joint", NaN));
+        data.joint_pos_right_knee.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_right_knee_joint", NaN));
+        data.joint_pos_left_shoulder_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_left_shoulder_pitch_joint", NaN));
+        data.joint_pos_right_shoulder_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_right_shoulder_pitch_joint", NaN));
+        data.joint_pos_left_ankle_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_left_ankle_pitch_joint", NaN));
+        data.joint_pos_right_ankle_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_right_ankle_pitch_joint", NaN));
+        data.joint_pos_left_shoulder_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_left_shoulder_roll_joint", NaN));
+        data.joint_pos_right_shoulder_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_right_shoulder_roll_joint", NaN));
+        data.joint_pos_left_ankle_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_left_ankle_roll_joint", NaN));
+        data.joint_pos_right_ankle_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_right_ankle_roll_joint", NaN));
+        data.joint_pos_left_shoulder_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_left_shoulder_yaw_joint", NaN));
+        data.joint_pos_right_shoulder_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_right_shoulder_yaw_joint", NaN));
+        data.joint_pos_left_elbow.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_left_elbow_joint", NaN));
+        data.joint_pos_right_elbow.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_right_elbow_joint", NaN));
+        data.joint_pos_left_wrist_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_left_wrist_roll_joint", NaN));
+        data.joint_pos_right_wrist_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_right_wrist_roll_joint", NaN));
+        data.joint_pos_left_wrist_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_left_wrist_pitch_joint", NaN));
+        data.joint_pos_right_wrist_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_right_wrist_pitch_joint", NaN));
+        data.joint_pos_left_wrist_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_left_wrist_yaw_joint", NaN));
+        data.joint_pos_right_wrist_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_right_wrist_yaw_joint", NaN));
+        data.joint_pos_left_hand_index_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_left_hand_index_0_joint", NaN));
+        data.joint_pos_left_hand_middle_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_left_hand_middle_0_joint", NaN));
+        data.joint_pos_left_hand_thumb_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_left_hand_thumb_0_joint", NaN));
+        data.joint_pos_right_hand_index_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_right_hand_index_0_joint", NaN));
+        data.joint_pos_right_hand_middle_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_right_hand_middle_0_joint", NaN));
+        data.joint_pos_right_hand_thumb_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_right_hand_thumb_0_joint", NaN));
+        data.joint_pos_left_hand_index_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_left_hand_index_1_joint", NaN));
+        data.joint_pos_left_hand_middle_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_left_hand_middle_1_joint", NaN));
+        data.joint_pos_left_hand_thumb_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_left_hand_thumb_1_joint", NaN));
+        data.joint_pos_right_hand_index_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_right_hand_index_1_joint", NaN));
+        data.joint_pos_right_hand_middle_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_right_hand_middle_1_joint", NaN));
+        data.joint_pos_right_hand_thumb_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_right_hand_thumb_1_joint", NaN));
+        data.joint_pos_left_hand_thumb_2.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_left_hand_thumb_2_joint", NaN));
+        data.joint_pos_right_hand_thumb_2.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_pos_right_hand_thumb_2_joint", NaN));
         
-        // Joint velocities
-        data.joint_vel_left_hip_pitch.push_back(getValue(row_values, header_map, "joint_vel_left_hip_pitch_joint"));
-        data.joint_vel_right_hip_pitch.push_back(getValue(row_values, header_map, "joint_vel_right_hip_pitch_joint"));
-        data.joint_vel_waist_yaw.push_back(getValue(row_values, header_map, "joint_vel_waist_yaw_joint"));
-        data.joint_vel_left_hip_roll.push_back(getValue(row_values, header_map, "joint_vel_left_hip_roll_joint"));
-        data.joint_vel_right_hip_roll.push_back(getValue(row_values, header_map, "joint_vel_right_hip_roll_joint"));
-        data.joint_vel_waist_roll.push_back(getValue(row_values, header_map, "joint_vel_waist_roll_joint"));
-        data.joint_vel_left_hip_yaw.push_back(getValue(row_values, header_map, "joint_vel_left_hip_yaw_joint"));
-        data.joint_vel_right_hip_yaw.push_back(getValue(row_values, header_map, "joint_vel_right_hip_yaw_joint"));
-        data.joint_vel_waist_pitch.push_back(getValue(row_values, header_map, "joint_vel_waist_pitch_joint"));
-        data.joint_vel_left_knee.push_back(getValue(row_values, header_map, "joint_vel_left_knee_joint"));
-        data.joint_vel_right_knee.push_back(getValue(row_values, header_map, "joint_vel_right_knee_joint"));
-        data.joint_vel_left_shoulder_pitch.push_back(getValue(row_values, header_map, "joint_vel_left_shoulder_pitch_joint"));
-        data.joint_vel_right_shoulder_pitch.push_back(getValue(row_values, header_map, "joint_vel_right_shoulder_pitch_joint"));
-        data.joint_vel_left_ankle_pitch.push_back(getValue(row_values, header_map, "joint_vel_left_ankle_pitch_joint"));
-        data.joint_vel_right_ankle_pitch.push_back(getValue(row_values, header_map, "joint_vel_right_ankle_pitch_joint"));
-        data.joint_vel_left_shoulder_roll.push_back(getValue(row_values, header_map, "joint_vel_left_shoulder_roll_joint"));
-        data.joint_vel_right_shoulder_roll.push_back(getValue(row_values, header_map, "joint_vel_right_shoulder_roll_joint"));
-        data.joint_vel_left_ankle_roll.push_back(getValue(row_values, header_map, "joint_vel_left_ankle_roll_joint"));
-        data.joint_vel_right_ankle_roll.push_back(getValue(row_values, header_map, "joint_vel_right_ankle_roll_joint"));
-        data.joint_vel_left_shoulder_yaw.push_back(getValue(row_values, header_map, "joint_vel_left_shoulder_yaw_joint"));
-        data.joint_vel_right_shoulder_yaw.push_back(getValue(row_values, header_map, "joint_vel_right_shoulder_yaw_joint"));
-        data.joint_vel_left_elbow.push_back(getValue(row_values, header_map, "joint_vel_left_elbow_joint"));
-        data.joint_vel_right_elbow.push_back(getValue(row_values, header_map, "joint_vel_right_elbow_joint"));
-        data.joint_vel_left_wrist_roll.push_back(getValue(row_values, header_map, "joint_vel_left_wrist_roll_joint"));
-        data.joint_vel_right_wrist_roll.push_back(getValue(row_values, header_map, "joint_vel_right_wrist_roll_joint"));
-        data.joint_vel_left_wrist_pitch.push_back(getValue(row_values, header_map, "joint_vel_left_wrist_pitch_joint"));
-        data.joint_vel_right_wrist_pitch.push_back(getValue(row_values, header_map, "joint_vel_right_wrist_pitch_joint"));
-        data.joint_vel_left_wrist_yaw.push_back(getValue(row_values, header_map, "joint_vel_left_wrist_yaw_joint"));
-        data.joint_vel_right_wrist_yaw.push_back(getValue(row_values, header_map, "joint_vel_right_wrist_yaw_joint"));
-        data.joint_vel_left_hand_index_0.push_back(getValue(row_values, header_map, "joint_vel_left_hand_index_0_joint"));
-        data.joint_vel_left_hand_middle_0.push_back(getValue(row_values, header_map, "joint_vel_left_hand_middle_0_joint"));
-        data.joint_vel_left_hand_thumb_0.push_back(getValue(row_values, header_map, "joint_vel_left_hand_thumb_0_joint"));
-        data.joint_vel_right_hand_index_0.push_back(getValue(row_values, header_map, "joint_vel_right_hand_index_0_joint"));
-        data.joint_vel_right_hand_middle_0.push_back(getValue(row_values, header_map, "joint_vel_right_hand_middle_0_joint"));
-        data.joint_vel_right_hand_thumb_0.push_back(getValue(row_values, header_map, "joint_vel_right_hand_thumb_0_joint"));
-        data.joint_vel_left_hand_index_1.push_back(getValue(row_values, header_map, "joint_vel_left_hand_index_1_joint"));
-        data.joint_vel_left_hand_middle_1.push_back(getValue(row_values, header_map, "joint_vel_left_hand_middle_1_joint"));
-        data.joint_vel_left_hand_thumb_1.push_back(getValue(row_values, header_map, "joint_vel_left_hand_thumb_1_joint"));
-        data.joint_vel_right_hand_index_1.push_back(getValue(row_values, header_map, "joint_vel_right_hand_index_1_joint"));
-        data.joint_vel_right_hand_middle_1.push_back(getValue(row_values, header_map, "joint_vel_right_hand_middle_1_joint"));
-        data.joint_vel_right_hand_thumb_1.push_back(getValue(row_values, header_map, "joint_vel_right_hand_thumb_1_joint"));
-        data.joint_vel_left_hand_thumb_2.push_back(getValue(row_values, header_map, "joint_vel_left_hand_thumb_2_joint"));
-        data.joint_vel_right_hand_thumb_2.push_back(getValue(row_values, header_map, "joint_vel_right_hand_thumb_2_joint"));
+        // Joint velocities (with column existence checks via SAFE_GET_VALUE macro)
+        data.joint_vel_left_hip_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_hip_pitch_joint", NaN));
+        data.joint_vel_right_hip_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_hip_pitch_joint", NaN));
+        data.joint_vel_waist_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_waist_yaw_joint", NaN));
+        data.joint_vel_left_hip_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_hip_roll_joint", NaN));
+        data.joint_vel_right_hip_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_hip_roll_joint", NaN));
+        data.joint_vel_waist_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_waist_roll_joint", NaN));
+        data.joint_vel_left_hip_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_hip_yaw_joint", NaN));
+        data.joint_vel_right_hip_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_hip_yaw_joint", NaN));
+        data.joint_vel_waist_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_waist_pitch_joint", NaN));
+        data.joint_vel_left_knee.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_knee_joint", NaN));
+        data.joint_vel_right_knee.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_knee_joint", NaN));
+        data.joint_vel_left_shoulder_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_shoulder_pitch_joint", NaN));
+        data.joint_vel_right_shoulder_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_shoulder_pitch_joint", NaN));
+        data.joint_vel_left_ankle_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_ankle_pitch_joint", NaN));
+        data.joint_vel_right_ankle_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_ankle_pitch_joint", NaN));
+        data.joint_vel_left_shoulder_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_shoulder_roll_joint", NaN));
+        data.joint_vel_right_shoulder_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_shoulder_roll_joint", NaN));
+        data.joint_vel_left_ankle_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_ankle_roll_joint", NaN));
+        data.joint_vel_right_ankle_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_ankle_roll_joint", NaN));
+        data.joint_vel_left_shoulder_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_shoulder_yaw_joint", NaN));
+        data.joint_vel_right_shoulder_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_shoulder_yaw_joint", NaN));
+        data.joint_vel_left_elbow.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_elbow_joint", NaN));
+        data.joint_vel_right_elbow.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_elbow_joint", NaN));
+        data.joint_vel_left_wrist_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_wrist_roll_joint", NaN));
+        data.joint_vel_right_wrist_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_wrist_roll_joint", NaN));
+        data.joint_vel_left_wrist_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_wrist_pitch_joint", NaN));
+        data.joint_vel_right_wrist_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_wrist_pitch_joint", NaN));
+        data.joint_vel_left_wrist_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_wrist_yaw_joint", NaN));
+        data.joint_vel_right_wrist_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_wrist_yaw_joint", NaN));
+        data.joint_vel_left_hand_index_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_hand_index_0_joint", NaN));
+        data.joint_vel_left_hand_middle_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_hand_middle_0_joint", NaN));
+        data.joint_vel_left_hand_thumb_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_hand_thumb_0_joint", NaN));
+        data.joint_vel_right_hand_index_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_hand_index_0_joint", NaN));
+        data.joint_vel_right_hand_middle_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_hand_middle_0_joint", NaN));
+        data.joint_vel_right_hand_thumb_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_hand_thumb_0_joint", NaN));
+        data.joint_vel_left_hand_index_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_hand_index_1_joint", NaN));
+        data.joint_vel_left_hand_middle_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_hand_middle_1_joint", NaN));
+        data.joint_vel_left_hand_thumb_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_hand_thumb_1_joint", NaN));
+        data.joint_vel_right_hand_index_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_hand_index_1_joint", NaN));
+        data.joint_vel_right_hand_middle_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_hand_middle_1_joint", NaN));
+        data.joint_vel_right_hand_thumb_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_hand_thumb_1_joint", NaN));
+        data.joint_vel_left_hand_thumb_2.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_left_hand_thumb_2_joint", NaN));
+        data.joint_vel_right_hand_thumb_2.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_vel_right_hand_thumb_2_joint", NaN));
         
         // Joint torques
-        data.joint_torque_left_hip_pitch.push_back(getValue(row_values, header_map, "joint_torque_left_hip_pitch_joint"));
-        data.joint_torque_right_hip_pitch.push_back(getValue(row_values, header_map, "joint_torque_right_hip_pitch_joint"));
-        data.joint_torque_waist_yaw.push_back(getValue(row_values, header_map, "joint_torque_waist_yaw_joint"));
-        data.joint_torque_left_hip_roll.push_back(getValue(row_values, header_map, "joint_torque_left_hip_roll_joint"));
-        data.joint_torque_right_hip_roll.push_back(getValue(row_values, header_map, "joint_torque_right_hip_roll_joint"));
-        data.joint_torque_waist_roll.push_back(getValue(row_values, header_map, "joint_torque_waist_roll_joint"));
-        data.joint_torque_left_hip_yaw.push_back(getValue(row_values, header_map, "joint_torque_left_hip_yaw_joint"));
-        data.joint_torque_right_hip_yaw.push_back(getValue(row_values, header_map, "joint_torque_right_hip_yaw_joint"));
-        data.joint_torque_waist_pitch.push_back(getValue(row_values, header_map, "joint_torque_waist_pitch_joint"));
-        data.joint_torque_left_knee.push_back(getValue(row_values, header_map, "joint_torque_left_knee_joint"));
-        data.joint_torque_right_knee.push_back(getValue(row_values, header_map, "joint_torque_right_knee_joint"));
-        data.joint_torque_left_shoulder_pitch.push_back(getValue(row_values, header_map, "joint_torque_left_shoulder_pitch_joint"));
-        data.joint_torque_right_shoulder_pitch.push_back(getValue(row_values, header_map, "joint_torque_right_shoulder_pitch_joint"));
-        data.joint_torque_left_ankle_pitch.push_back(getValue(row_values, header_map, "joint_torque_left_ankle_pitch_joint"));
-        data.joint_torque_right_ankle_pitch.push_back(getValue(row_values, header_map, "joint_torque_right_ankle_pitch_joint"));
-        data.joint_torque_left_shoulder_roll.push_back(getValue(row_values, header_map, "joint_torque_left_shoulder_roll_joint"));
-        data.joint_torque_right_shoulder_roll.push_back(getValue(row_values, header_map, "joint_torque_right_shoulder_roll_joint"));
-        data.joint_torque_left_ankle_roll.push_back(getValue(row_values, header_map, "joint_torque_left_ankle_roll_joint"));
-        data.joint_torque_right_ankle_roll.push_back(getValue(row_values, header_map, "joint_torque_right_ankle_roll_joint"));
-        data.joint_torque_left_shoulder_yaw.push_back(getValue(row_values, header_map, "joint_torque_left_shoulder_yaw_joint"));
-        data.joint_torque_right_shoulder_yaw.push_back(getValue(row_values, header_map, "joint_torque_right_shoulder_yaw_joint"));
-        data.joint_torque_left_elbow.push_back(getValue(row_values, header_map, "joint_torque_left_elbow_joint"));
-        data.joint_torque_right_elbow.push_back(getValue(row_values, header_map, "joint_torque_right_elbow_joint"));
-        data.joint_torque_left_wrist_roll.push_back(getValue(row_values, header_map, "joint_torque_left_wrist_roll_joint"));
-        data.joint_torque_right_wrist_roll.push_back(getValue(row_values, header_map, "joint_torque_right_wrist_roll_joint"));
-        data.joint_torque_left_wrist_pitch.push_back(getValue(row_values, header_map, "joint_torque_left_wrist_pitch_joint"));
-        data.joint_torque_right_wrist_pitch.push_back(getValue(row_values, header_map, "joint_torque_right_wrist_pitch_joint"));
-        data.joint_torque_left_wrist_yaw.push_back(getValue(row_values, header_map, "joint_torque_left_wrist_yaw_joint"));
-        data.joint_torque_right_wrist_yaw.push_back(getValue(row_values, header_map, "joint_torque_right_wrist_yaw_joint"));
-        data.joint_torque_left_hand_index_0.push_back(getValue(row_values, header_map, "joint_torque_left_hand_index_0_joint"));
-        data.joint_torque_left_hand_middle_0.push_back(getValue(row_values, header_map, "joint_torque_left_hand_middle_0_joint"));
-        data.joint_torque_left_hand_thumb_0.push_back(getValue(row_values, header_map, "joint_torque_left_hand_thumb_0_joint"));
-        data.joint_torque_right_hand_index_0.push_back(getValue(row_values, header_map, "joint_torque_right_hand_index_0_joint"));
-        data.joint_torque_right_hand_middle_0.push_back(getValue(row_values, header_map, "joint_torque_right_hand_middle_0_joint"));
-        data.joint_torque_right_hand_thumb_0.push_back(getValue(row_values, header_map, "joint_torque_right_hand_thumb_0_joint"));
-        data.joint_torque_left_hand_index_1.push_back(getValue(row_values, header_map, "joint_torque_left_hand_index_1_joint"));
-        data.joint_torque_left_hand_middle_1.push_back(getValue(row_values, header_map, "joint_torque_left_hand_middle_1_joint"));
-        data.joint_torque_left_hand_thumb_1.push_back(getValue(row_values, header_map, "joint_torque_left_hand_thumb_1_joint"));
-        data.joint_torque_right_hand_index_1.push_back(getValue(row_values, header_map, "joint_torque_right_hand_index_1_joint"));
-        data.joint_torque_right_hand_middle_1.push_back(getValue(row_values, header_map, "joint_torque_right_hand_middle_1_joint"));
-        data.joint_torque_right_hand_thumb_1.push_back(getValue(row_values, header_map, "joint_torque_right_hand_thumb_1_joint"));
-        data.joint_torque_left_hand_thumb_2.push_back(getValue(row_values, header_map, "joint_torque_left_hand_thumb_2_joint"));
-        data.joint_torque_right_hand_thumb_2.push_back(getValue(row_values, header_map, "joint_torque_right_hand_thumb_2_joint"));
+        data.joint_torque_left_hip_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_hip_pitch_joint", NaN));
+        data.joint_torque_right_hip_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_hip_pitch_joint", NaN));
+        data.joint_torque_waist_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_waist_yaw_joint", NaN));
+        data.joint_torque_left_hip_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_hip_roll_joint", NaN));
+        data.joint_torque_right_hip_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_hip_roll_joint", NaN));
+        data.joint_torque_waist_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_waist_roll_joint", NaN));
+        data.joint_torque_left_hip_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_hip_yaw_joint", NaN));
+        data.joint_torque_right_hip_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_hip_yaw_joint", NaN));
+        data.joint_torque_waist_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_waist_pitch_joint", NaN));
+        data.joint_torque_left_knee.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_knee_joint", NaN));
+        data.joint_torque_right_knee.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_knee_joint", NaN));
+        data.joint_torque_left_shoulder_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_shoulder_pitch_joint", NaN));
+        data.joint_torque_right_shoulder_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_shoulder_pitch_joint", NaN));
+        data.joint_torque_left_ankle_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_ankle_pitch_joint", NaN));
+        data.joint_torque_right_ankle_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_ankle_pitch_joint", NaN));
+        data.joint_torque_left_shoulder_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_shoulder_roll_joint", NaN));
+        data.joint_torque_right_shoulder_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_shoulder_roll_joint", NaN));
+        data.joint_torque_left_ankle_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_ankle_roll_joint", NaN));
+        data.joint_torque_right_ankle_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_ankle_roll_joint", NaN));
+        data.joint_torque_left_shoulder_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_shoulder_yaw_joint", NaN));
+        data.joint_torque_right_shoulder_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_shoulder_yaw_joint", NaN));
+        data.joint_torque_left_elbow.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_elbow_joint", NaN));
+        data.joint_torque_right_elbow.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_elbow_joint", NaN));
+        data.joint_torque_left_wrist_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_wrist_roll_joint", NaN));
+        data.joint_torque_right_wrist_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_wrist_roll_joint", NaN));
+        data.joint_torque_left_wrist_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_wrist_pitch_joint", NaN));
+        data.joint_torque_right_wrist_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_wrist_pitch_joint", NaN));
+        data.joint_torque_left_wrist_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_wrist_yaw_joint", NaN));
+        data.joint_torque_right_wrist_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_wrist_yaw_joint", NaN));
+        data.joint_torque_left_hand_index_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_hand_index_0_joint", NaN));
+        data.joint_torque_left_hand_middle_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_hand_middle_0_joint", NaN));
+        data.joint_torque_left_hand_thumb_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_hand_thumb_0_joint", NaN));
+        data.joint_torque_right_hand_index_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_hand_index_0_joint", NaN));
+        data.joint_torque_right_hand_middle_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_hand_middle_0_joint", NaN));
+        data.joint_torque_right_hand_thumb_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_hand_thumb_0_joint", NaN));
+        data.joint_torque_left_hand_index_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_hand_index_1_joint", NaN));
+        data.joint_torque_left_hand_middle_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_hand_middle_1_joint", NaN));
+        data.joint_torque_left_hand_thumb_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_hand_thumb_1_joint", NaN));
+        data.joint_torque_right_hand_index_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_hand_index_1_joint", NaN));
+        data.joint_torque_right_hand_middle_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_hand_middle_1_joint", NaN));
+        data.joint_torque_right_hand_thumb_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_hand_thumb_1_joint", NaN));
+        data.joint_torque_left_hand_thumb_2.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_left_hand_thumb_2_joint", NaN));
+        data.joint_torque_right_hand_thumb_2.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_torque_right_hand_thumb_2_joint", NaN));
         
         // Joint actions
-        data.joint_action_left_hip_pitch.push_back(getValue(row_values, header_map, "joint_action_left_hip_pitch_joint"));
-        data.joint_action_right_hip_pitch.push_back(getValue(row_values, header_map, "joint_action_right_hip_pitch_joint"));
-        data.joint_action_waist_yaw.push_back(getValue(row_values, header_map, "joint_action_waist_yaw_joint"));
-        data.joint_action_left_hip_roll.push_back(getValue(row_values, header_map, "joint_action_left_hip_roll_joint"));
-        data.joint_action_right_hip_roll.push_back(getValue(row_values, header_map, "joint_action_right_hip_roll_joint"));
-        data.joint_action_waist_roll.push_back(getValue(row_values, header_map, "joint_action_waist_roll_joint"));
-        data.joint_action_left_hip_yaw.push_back(getValue(row_values, header_map, "joint_action_left_hip_yaw_joint"));
-        data.joint_action_right_hip_yaw.push_back(getValue(row_values, header_map, "joint_action_right_hip_yaw_joint"));
-        data.joint_action_waist_pitch.push_back(getValue(row_values, header_map, "joint_action_waist_pitch_joint"));
-        data.joint_action_left_knee.push_back(getValue(row_values, header_map, "joint_action_left_knee_joint"));
-        data.joint_action_right_knee.push_back(getValue(row_values, header_map, "joint_action_right_knee_joint"));
-        data.joint_action_left_shoulder_pitch.push_back(getValue(row_values, header_map, "joint_action_left_shoulder_pitch_joint"));
-        data.joint_action_right_shoulder_pitch.push_back(getValue(row_values, header_map, "joint_action_right_shoulder_pitch_joint"));
-        data.joint_action_left_ankle_pitch.push_back(getValue(row_values, header_map, "joint_action_left_ankle_pitch_joint"));
-        data.joint_action_right_ankle_pitch.push_back(getValue(row_values, header_map, "joint_action_right_ankle_pitch_joint"));
-        data.joint_action_left_shoulder_roll.push_back(getValue(row_values, header_map, "joint_action_left_shoulder_roll_joint"));
-        data.joint_action_right_shoulder_roll.push_back(getValue(row_values, header_map, "joint_action_right_shoulder_roll_joint"));
-        data.joint_action_left_ankle_roll.push_back(getValue(row_values, header_map, "joint_action_left_ankle_roll_joint"));
-        data.joint_action_right_ankle_roll.push_back(getValue(row_values, header_map, "joint_action_right_ankle_roll_joint"));
-        data.joint_action_left_shoulder_yaw.push_back(getValue(row_values, header_map, "joint_action_left_shoulder_yaw_joint"));
-        data.joint_action_right_shoulder_yaw.push_back(getValue(row_values, header_map, "joint_action_right_shoulder_yaw_joint"));
-        data.joint_action_left_elbow.push_back(getValue(row_values, header_map, "joint_action_left_elbow_joint"));
-        data.joint_action_right_elbow.push_back(getValue(row_values, header_map, "joint_action_right_elbow_joint"));
-        data.joint_action_left_wrist_roll.push_back(getValue(row_values, header_map, "joint_action_left_wrist_roll_joint"));
-        data.joint_action_right_wrist_roll.push_back(getValue(row_values, header_map, "joint_action_right_wrist_roll_joint"));
-        data.joint_action_left_wrist_pitch.push_back(getValue(row_values, header_map, "joint_action_left_wrist_pitch_joint"));
-        data.joint_action_right_wrist_pitch.push_back(getValue(row_values, header_map, "joint_action_right_wrist_pitch_joint"));
-        data.joint_action_left_wrist_yaw.push_back(getValue(row_values, header_map, "joint_action_left_wrist_yaw_joint"));
-        data.joint_action_right_wrist_yaw.push_back(getValue(row_values, header_map, "joint_action_right_wrist_yaw_joint"));
-        data.joint_action_left_hand_index_0.push_back(getValue(row_values, header_map, "joint_action_left_hand_index_0_joint"));
-        data.joint_action_left_hand_middle_0.push_back(getValue(row_values, header_map, "joint_action_left_hand_middle_0_joint"));
-        data.joint_action_left_hand_thumb_0.push_back(getValue(row_values, header_map, "joint_action_left_hand_thumb_0_joint"));
-        data.joint_action_right_hand_index_0.push_back(getValue(row_values, header_map, "joint_action_right_hand_index_0_joint"));
-        data.joint_action_right_hand_middle_0.push_back(getValue(row_values, header_map, "joint_action_right_hand_middle_0_joint"));
-        data.joint_action_right_hand_thumb_0.push_back(getValue(row_values, header_map, "joint_action_right_hand_thumb_0_joint"));
-        data.joint_action_left_hand_index_1.push_back(getValue(row_values, header_map, "joint_action_left_hand_index_1_joint"));
-        data.joint_action_left_hand_middle_1.push_back(getValue(row_values, header_map, "joint_action_left_hand_middle_1_joint"));
-        data.joint_action_left_hand_thumb_1.push_back(getValue(row_values, header_map, "joint_action_left_hand_thumb_1_joint"));
-        data.joint_action_right_hand_index_1.push_back(getValue(row_values, header_map, "joint_action_right_hand_index_1_joint"));
-        data.joint_action_right_hand_middle_1.push_back(getValue(row_values, header_map, "joint_action_right_hand_middle_1_joint"));
-        data.joint_action_right_hand_thumb_1.push_back(getValue(row_values, header_map, "joint_action_right_hand_thumb_1_joint"));
-        data.joint_action_left_hand_thumb_2.push_back(getValue(row_values, header_map, "joint_action_left_hand_thumb_2_joint"));
-        data.joint_action_right_hand_thumb_2.push_back(getValue(row_values, header_map, "joint_action_right_hand_thumb_2_joint"));
+        data.joint_action_left_hip_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_hip_pitch_joint", NaN));
+        data.joint_action_right_hip_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_hip_pitch_joint", NaN));
+        data.joint_action_waist_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_waist_yaw_joint", NaN));
+        data.joint_action_left_hip_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_hip_roll_joint", NaN));
+        data.joint_action_right_hip_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_hip_roll_joint", NaN));
+        data.joint_action_waist_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_waist_roll_joint", NaN));
+        data.joint_action_left_hip_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_hip_yaw_joint", NaN));
+        data.joint_action_right_hip_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_hip_yaw_joint", NaN));
+        data.joint_action_waist_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_waist_pitch_joint", NaN));
+        data.joint_action_left_knee.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_knee_joint", NaN));
+        data.joint_action_right_knee.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_knee_joint", NaN));
+        data.joint_action_left_shoulder_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_shoulder_pitch_joint", NaN));
+        data.joint_action_right_shoulder_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_shoulder_pitch_joint", NaN));
+        data.joint_action_left_ankle_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_ankle_pitch_joint", NaN));
+        data.joint_action_right_ankle_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_ankle_pitch_joint", NaN));
+        data.joint_action_left_shoulder_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_shoulder_roll_joint", NaN));
+        data.joint_action_right_shoulder_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_shoulder_roll_joint", NaN));
+        data.joint_action_left_ankle_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_ankle_roll_joint", NaN));
+        data.joint_action_right_ankle_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_ankle_roll_joint", NaN));
+        data.joint_action_left_shoulder_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_shoulder_yaw_joint", NaN));
+        data.joint_action_right_shoulder_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_shoulder_yaw_joint", NaN));
+        data.joint_action_left_elbow.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_elbow_joint", NaN));
+        data.joint_action_right_elbow.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_elbow_joint", NaN));
+        data.joint_action_left_wrist_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_wrist_roll_joint", NaN));
+        data.joint_action_right_wrist_roll.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_wrist_roll_joint", NaN));
+        data.joint_action_left_wrist_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_wrist_pitch_joint", NaN));
+        data.joint_action_right_wrist_pitch.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_wrist_pitch_joint", NaN));
+        data.joint_action_left_wrist_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_wrist_yaw_joint", NaN));
+        data.joint_action_right_wrist_yaw.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_wrist_yaw_joint", NaN));
+        data.joint_action_left_hand_index_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_hand_index_0_joint", NaN));
+        data.joint_action_left_hand_middle_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_hand_middle_0_joint", NaN));
+        data.joint_action_left_hand_thumb_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_hand_thumb_0_joint", NaN));
+        data.joint_action_right_hand_index_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_hand_index_0_joint", NaN));
+        data.joint_action_right_hand_middle_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_hand_middle_0_joint", NaN));
+        data.joint_action_right_hand_thumb_0.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_hand_thumb_0_joint", NaN));
+        data.joint_action_left_hand_index_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_hand_index_1_joint", NaN));
+        data.joint_action_left_hand_middle_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_hand_middle_1_joint", NaN));
+        data.joint_action_left_hand_thumb_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_hand_thumb_1_joint", NaN));
+        data.joint_action_right_hand_index_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_hand_index_1_joint", NaN));
+        data.joint_action_right_hand_middle_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_hand_middle_1_joint", NaN));
+        data.joint_action_right_hand_thumb_1.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_hand_thumb_1_joint", NaN));
+        data.joint_action_left_hand_thumb_2.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_left_hand_thumb_2_joint", NaN));
+        data.joint_action_right_hand_thumb_2.push_back(SAFE_GET_VALUE(row_values, header_map, "joint_action_right_hand_thumb_2_joint", NaN));
         
         // Command velocities and stability
-        data.cmd_vel_x.push_back(getValue(row_values, header_map, "cmd_vel_x"));
-        data.cmd_vel_y.push_back(getValue(row_values, header_map, "cmd_vel_y"));
-        data.cmd_vel_z.push_back(getValue(row_values, header_map, "cmd_vel_z"));
-        data.cmd_w.push_back(getValue(row_values, header_map, "cmd_turning"));
-        data.stability.push_back(getValue(row_values, header_map, "stability"));
+        data.cmd_vel_x.push_back(SAFE_GET_VALUE(row_values, header_map, "cmd_vel_x", NaN));
+        data.cmd_vel_y.push_back(SAFE_GET_VALUE(row_values, header_map, "cmd_vel_y", NaN));
+        data.cmd_vel_z.push_back(SAFE_GET_VALUE(row_values, header_map, "cmd_vel_z", NaN));
+        data.cmd_w.push_back(SAFE_GET_VALUE(row_values, header_map, "cmd_turning", NaN));
+        data.stability.push_back(SAFE_GET_VALUE(row_values, header_map, "stability", NaN));
         
         row_count++;
     }

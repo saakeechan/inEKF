@@ -83,6 +83,9 @@ RUN wget https://github.com/microsoft/onnxruntime/releases/download/v1.25.1/onnx
 ENV CCACHE_DIR=/ccache
 ENV PATH="/usr/lib/ccache:${PATH}"
 
+# Install GTSAM Python package
+RUN pip3 install gtsam pandas
+
 # Set working directory
 WORKDIR /workspace
 
@@ -90,13 +93,12 @@ WORKDIR /workspace
 COPY CMakeLists.txt .
 COPY src/ src/
 COPY config/ config/
+COPY convex/ convex/
 
 # Build the project with Ninja
 RUN mkdir -p build && cd build && \
     cmake -GNinja .. && \
-    ninja -j6
+    ninja -j4
 
-# Install GTSAM Python package
-RUN pip3 install gtsam
 
 CMD ["/bin/bash"]

@@ -46,6 +46,9 @@ link_directories(${PINOCCHIO_LIBRARY_DIRS})
 
 find_package(yaml-cpp REQUIRED)
 
+# Find GTSAM for legged estimation
+find_package(GTSAM REQUIRED)
+
 # Find ONNX Runtime
 find_library(ONNXRUNTIME_LIB onnxruntime
     HINTS /usr/local/lib /usr/lib /opt/onnxruntime/lib
@@ -129,6 +132,23 @@ set_target_properties(${TARGET} PROPERTIES
 )
 
 target_link_libraries(${TARGET} INEKF_Estimator)
+
+# mainSmoother executable: LeggedCombinedFixedLagSmoother for G1 biped
+add_executable(mainSmoother convex/mainSmoother.cpp)
+
+set_target_properties(mainSmoother PROPERTIES
+    BUILD_RPATH "${PINOCCHIO_LIBRARY_DIRS}:${GTSAM_LIBRARY_DIRS}"
+    INSTALL_RPATH "${PINOCCHIO_LIBRARY_DIRS}:${GTSAM_LIBRARY_DIRS}"
+)
+
+target_link_libraries(mainSmoother
+    gtsam
+    pinocchio_default
+    pinocchio_parsers
+    boost_filesystem
+    console_bridge
+    yaml-cpp
+)
 
 
 # ============================================================
