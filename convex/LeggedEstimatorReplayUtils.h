@@ -302,4 +302,81 @@ inline void writeContactPacketUsage(const fs::path& path,
   }
 }
 
+/// Structure to hold all three types of foot velocity data
+struct FootVelocityData {
+  double timestampS = 0.0;
+  std::vector<Vector3> groundTruthVelocities;    // From finite diff of GT foot positions
+  std::vector<Vector3> estimatedVelocities;      // From finite diff of estimated footholds
+  std::vector<Vector3> fkVelocities;             // From FK velocities in CSV
+  std::vector<bool> contactStates;               // Contact state for each foot
+};
+
+/// Write the enhanced foot velocity CSV header with all three velocity types.
+inline void writeFootVelocityHeader(std::ofstream& output,
+                                    const std::vector<std::string>& footNames) {
+  output << "timestamp_s";
+  
+  // Ground truth velocities (from CSV position finite differencing)
+  for (const std::string& footName : footNames) {
+    output << ',' << footName << "_gt_vx"
+           << ',' << footName << "_gt_vy"
+           << ',' << footName << "_gt_vz";
+  }
+  
+  // Estimated velocities (from factor graph foothold finite differencing)
+  for (const std::string& footName : footNames) {
+    output << ',' << footName << "_est_vx"
+           << ',' << footName << "_est_vy"
+           << ',' << footName << "_est_vz";
+  }
+  
+  // Forward kinematics velocities (from CSV FK data)
+  for (const std::string& footName : footNames) {
+    output << ',' << footName << "_fk_vx"
+           << ',' << footName << "_fk_vy"
+           << ',' << footName << "_fk_vz";
+  }
+  
+  // Contact states
+  for (const std::string& footName : footNames) {
+    output << ',' << footName << "_contact";
+  }
+  
+  output << '\n';
+}
+
+/// Write one enhanced foot velocity CSV row with all three velocity types.
+inline void writeFootVelocityRow(std::ofstream& output, 
+                                         const FootVelocityData& data) {
+  output << toString(data.timestampS);
+  
+  // Ground truth velocities
+  for (const Vector3& velocity : data.groundTruthVelocities) {
+    output << ',' << toString(velocity.x())
+           << ',' << toString(velocity.y())
+           << ',' << toString(velocity.z());
+  }
+  
+  // Estimated velocities
+  for (const Vector3& velocity : data.estimatedVelocities) {
+    output << ',' << toString(velocity.x())
+           << ',' << toString(velocity.y())
+           << ',' << toString(velocity.z());
+  }
+  
+  // Forward kinematics velocities
+  for (const Vector3& velocity : data.fkVelocities) {
+    output << ',' << toString(velocity.x())
+           << ',' << toString(velocity.y())
+           << ',' << toString(velocity.z());
+  }
+  
+  // Contact states
+  for (bool contact : data.contactStates) {
+    output << ',' << (contact ? "1" : "0");
+  }
+  
+  output << '\n';
+}
+
 }  // namespace gtsam

@@ -216,16 +216,16 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
         ba0 << initial_condition(13), initial_condition(14), initial_condition(15);
 
         // Convert quaternion from CSV to rotation matrix
-        Eigen::Vector4d quat;
-        quat << CSVData.quat_w[idx], CSVData.quat_i[idx], CSVData.quat_j[idx], CSVData.quat_k[idx];
-        R0 = BasicFunctions_Estimator::Quaternion_to_Rotation_Matrix(quat);
+        Eigen::Vector4d quat_csv;
+        quat_csv << CSVData.quat_w[idx], CSVData.quat_i[idx], CSVData.quat_j[idx], CSVData.quat_k[idx];
+        Eigen::Matrix3d R_csv = BasicFunctions_Estimator::Quaternion_to_Rotation_Matrix(quat_csv);
 
-        Vector3d Euler = BasicFunctions_Estimator::Rotation_to_EulerZYX(R0);
-        // add initial condition offset
-        Euler(0) = Euler(0) + initial_condition[3];
-        Euler(1) = Euler(1) + initial_condition[4];
-        Euler(2) = Euler(2) + initial_condition[5];
-        R0 = BasicFunctions_Estimator::EulerZYX_to_R_bw(Euler);
+        // Get rotation offset from initial condition (quaternion: w, x, y, z)
+        Eigen::Vector4d quat_offset = initial_condition.block(3, 0, 4, 1);
+        Eigen::Matrix3d R_offset = BasicFunctions_Estimator::Quaternion_to_Rotation_Matrix(quat_offset);
+
+        // Compose rotations: R0 = R_offset * R_csv (applies offset in body frame)
+        R0 = R_offset * R_csv;
 
     }else{ // Initialize for sensor readings
 
@@ -486,7 +486,10 @@ void InEKFilter::new_measurement()
 
     if (robot.robot_name == "G1") {
     // Convert gravity-compensated body IMU to world frame with gravity added back
-    IMU_Acc[frame_count] = filter.getState().getRotation() * IMU_Acc[frame_count] - gravity;
+    // Eigen::Vector4d quat_gt;
+    // quat_gt << CSVData.quat_w[j], CSVData.quat_i[j], CSVData.quat_j[j], CSVData.quat_k[j];
+    // Eigen::Matrix3d R_gt = BasicFunctions_Estimator::Quaternion_to_Rotation_Matrix(quat_gt);
+    // IMU_Acc[frame_count] = R_gt * IMU_Acc[frame_count] - gravity;
     }
     // IMU_Gyro[frame_count] = filter.getState().getRotation() * IMU_Gyro[frame_count];
 
@@ -617,22 +620,22 @@ void InEKFilter::Propagate_and_Correct()
     // Append dv norms to history
     dv_history.push_back(dv_norms_current);
 
-    Eigen::Vector3d w_IMU_world = filter.getState().getRotation() * (IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias()); // assuming bias is in body frame.
-        robot.transform_state_to_base(
-        filter.getState().getRotation(),
-        filter.getState().getPosition(),
-        filter.getState().getVelocity(),
-        w_IMU_world,
-        robot_state.Rotation,
-        robot_state.Position,
-        robot_state.Velocity,
-        robot_state.Angular_Velocity
-    );
+    // Eigen::Vector3d w_IMU_world = filter.getState().getRotation() * (IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias()); // assuming bias is in body frame.
+    //     robot.transform_state_to_base(
+    //     filter.getState().getRotation(),
+    //     filter.getState().getPosition(),
+    //     filter.getState().getVelocity(),
+    //     w_IMU_world,
+    //     robot_state.Rotation,
+    //     robot_state.Position,
+    //     robot_state.Velocity,
+    //     robot_state.Angular_Velocity
+    // );
 
-    // robot_state.Rotation = filter.getState().getRotation();
-    // robot_state.Position = filter.getState().getPosition();
-    // robot_state.Velocity = filter.getState().getVelocity();
-    // robot_state.Angular_Velocity = IMU_Gyro[frame_count]; // assuming bias is in body frame.
+    robot_state.Rotation = filter.getState().getRotation();
+    robot_state.Position = filter.getState().getPosition();
+    robot_state.Velocity = filter.getState().getVelocity();
+    robot_state.Angular_Velocity = IMU_Gyro[frame_count]; // assuming bias is in body frame.
 
     
     // Populate remaining robot_state fields (sensor-specific and contact data)
@@ -790,7 +793,7 @@ void InEKFilter::Onestep(){
         Eigen::VectorXd leg_speeds = Eigen::VectorXd::Ones(robot.num_legs) * 1000; // Placeholder: set high leg speeds to avoid slip detection in CSV mode (since we don't have real motor velocity data)
         torqueSumSquared[frame_count] = leg_torques;
         Eigen::VectorXd dv_for_detection = d_v[0]; // Use dv from frame 0 for detection, as it is the most recent after sliding window update
-        CONTACT_t[frame_count] = ContactDetection::detect_contact(leg_torques, dv_for_detection, leg_speeds);
+        // CONTACT_t[frame_count] = ContactDetection::detect_contact(leg_torques, dv_for_detection, leg_speeds);
     }
     GroundTruthContact = CSVData.contact_state[j]; // For evaluation purposes, store ground truth contact from CSV
     

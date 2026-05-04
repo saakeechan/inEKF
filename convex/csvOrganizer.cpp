@@ -60,21 +60,54 @@ void writeIMUData(const DataStruct& data, const string& output_path) {
     // Write header
     file << "sample_index,timestamp_s,omega_x,omega_y,omega_z,acc_x,acc_y,acc_z" << endl;
     
+    // Gravity vector (world frame, pointing down)
+    double gravity[3] = {0.0, 0.0, -9.81};
+    
     // Write data rows
     file << fixed << setprecision(12);
     for (size_t i = 0; i < data.num_rows; i++) {
+        // Get ground truth rotation from quaternion
+        double qw = data.quat_w[i];
+        double qx = data.quat_i[i];
+        double qy = data.quat_j[i];
+        double qz = data.quat_k[i];
+        
+        // Convert quaternion to rotation matrix
+        double R[3][3];
+        R[0][0] = 1.0 - 2.0*(qy*qy + qz*qz);
+        R[0][1] = 2.0*(qx*qy - qw*qz);
+        R[0][2] = 2.0*(qx*qz + qw*qy);
+        R[1][0] = 2.0*(qx*qy + qw*qz);
+        R[1][1] = 1.0 - 2.0*(qx*qx + qz*qz);
+        R[1][2] = 2.0*(qy*qz - qw*qx);
+        R[2][0] = 2.0*(qx*qz - qw*qy);
+        R[2][1] = 2.0*(qy*qz + qw*qx);
+        R[2][2] = 1.0 - 2.0*(qx*qx + qy*qy);
+        
+        // Current gravity-compensated IMU reading
+        double acc_body[3] = {data.acc_body_x[i], data.acc_body_y[i], data.acc_body_z[i]};
+        
+        // Apply transformation: acc_with_gravity = R_gt * acc_body - gravity
+        double acc_with_gravity[3];
+        for (int row = 0; row < 3; row++) {
+            acc_with_gravity[row] = R[row][0] * acc_body[0] + 
+                                    R[row][1] * acc_body[1] + 
+                                    R[row][2] * acc_body[2] - 
+                                    gravity[row];
+        }
+        
         file << i << ","
              << data.timestamp[i] << ","
              << data.gyro_body_x[i] << ","
              << data.gyro_body_y[i] << ","
              << data.gyro_body_z[i] << ","
-             << data.acc_body_x[i] << ","
-             << data.acc_body_y[i] << ","
-             << data.acc_body_z[i] << endl;
+             << acc_with_gravity[0] << ","
+             << acc_with_gravity[1] << ","
+             << acc_with_gravity[2] << endl;
     }
     
     file.close();
-    cout << "Successfully created imu.csv with " << data.num_rows << " samples" << endl;
+    cout << "Successfully created imu.csv with " << data.num_rows << " samples (gravity added back)" << endl;
 }
 
 /**
@@ -146,9 +179,9 @@ void writeContactData(const DataStruct& data, const string& output_path) {
                      << 0 << ","  // foot_index: 0 for left foot
                      << "left_foot" << ","
                      << (lfoot_new_contact ? 1 : 0) << ","
-                     << data.lfoot_pos_x[i] << ","
-                     << data.lfoot_pos_y[i] << ","
-                     << data.lfoot_pos_z[i] << endl;
+                     << data.fk_left_foot_pos_x[i] << ","
+                     << data.fk_left_foot_pos_y[i] << ","
+                     << data.fk_left_foot_pos_z[i] << endl;
             }
             
             // Write right foot contact if active
@@ -158,9 +191,9 @@ void writeContactData(const DataStruct& data, const string& output_path) {
                      << 1 << ","  // foot_index: 1 for right foot
                      << "right_foot" << ","
                      << (rfoot_new_contact ? 1 : 0) << ","
-                     << data.rfoot_pos_x[i] << ","
-                     << data.rfoot_pos_y[i] << ","
-                     << data.rfoot_pos_z[i] << endl;
+                     << data.fk_right_foot_pos_x[i] << ","
+                     << data.fk_right_foot_pos_y[i] << ","
+                     << data.fk_right_foot_pos_z[i] << endl;
             }
             
             event_index++;
@@ -216,7 +249,7 @@ void writeGroundTruthTrajectory(const DataStruct& data, const string& output_pat
 
 int main(int argc, char* argv[]) {
     // Default paths
-    string input_csv = "../convex/Data/G1LoggingData.csv";
+    string input_csv = "../convex/Data/robotstate_0_env2.csv";
     string output_path = "../convex/Data";
     string sequence_name = "g1_walking";
     

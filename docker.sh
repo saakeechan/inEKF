@@ -4,6 +4,8 @@
 
 IMAGE_NAME="inekf-gtsam"
 CONTAINER_NAME="inekf-gtsam-container"
+HOST_UID=$(id -u)
+HOST_GID=$(id -g)
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -18,6 +20,7 @@ function print_usage() {
     echo "  build       - Build the Docker image"
     echo "  run         - Run the container interactively"
     echo "  exec        - Execute a command in running container"
+    echo "  fix-perms   - Fix workspace file ownership to current user"
     echo "  stop        - Stop the running container"
     echo "  clean       - Remove container and image"
     echo "  rebuild     - Clean and rebuild the image"
@@ -39,6 +42,8 @@ function run_container() {
     echo -e "${BLUE}Running Docker container: ${CONTAINER_NAME}${NC}"
     docker run -it --rm \
         --name ${CONTAINER_NAME} \
+    --user ${HOST_UID}:${HOST_GID} \
+    -e HOME=/tmp \
         -v $(pwd):/workspace \
         ${IMAGE_NAME} \
         /bin/bash
@@ -46,9 +51,23 @@ function run_container() {
 
 function exec_container() {
     if [ -z "$2" ]; then
-        docker exec -it ${CONTAINER_NAME} /bin/bash
+        docker exec -it --user ${HOST_UID}:${HOST_GID} ${CONTAINER_NAME} /bin/bash
     else
-        docker exec -it ${CONTAINER_NAME} "${@:2}"
+        docker exec -it --user ${HOST_UID}:${HOST_GID} ${CONTAINER_NAME} "${@:2}"
+    fi
+}
+
+function fix_permissions() {
+    echo -e "${BLUE}Fixing workspace ownership to UID:GID ${HOST_UID}:${HOST_GID}${NC}"
+    docker run --rm \
+        -v $(pwd):/workspace \
+        ${IMAGE_NAME} \
+        chown -R ${HOST_UID}:${HOST_GID} /workspace
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Workspace ownership fixed${NC}"
+    else
+        echo -e "${RED}✗ Failed to fix ownership${NC}"
+        exit 1
     fi
 }
 
@@ -79,6 +98,9 @@ case "$1" in
         ;;
     exec)
         exec_container "$@"
+        ;;
+    fix-perms)
+        fix_permissions
         ;;
     stop)
         stop_container

@@ -81,6 +81,18 @@
 //   bias_gyro: [0.0, 0.0, 0.0] → estimated from data
 //   bias_acc: [0.0, 0.0, 0.0] → estimated from data
 // ------------------------------------------------------------
+//
+// FOOT VELOCITY TRACKING SYSTEM:
+// This implementation tracks THREE types of foot velocities for comparison:
+//   1. Ground Truth Velocities: Finite differencing of GT foot positions from CSV
+//      - Uses lfoot_pos_x/y/z and rfoot_pos_x/y/z from G1LoggingData.csv
+//   2. Estimated Velocities: Finite differencing of factor graph foothold estimates
+//      - Computes velocity from estimated foothold positions in world frame
+//   3. Forward Kinematics Velocities: Direct FK velocities from CSV
+//      - Uses fk_left_foot_vel_x/y/z and fk_right_foot_vel_x/y/z from CSV
+// All velocities are kept separate for left and right legs
+// Output CSV format: timestamp, gt_vx/vy/vz, est_vx/vy/vz, fk_vx/vy/vz, contact_state
+// ------------------------------------------------------------
 
 
 
@@ -100,20 +112,20 @@ struct ReplayConfig : public LeggedEstimatorParams {
       (Vector(9) << 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10)
           .finished();
   // Gyro noise: sqrt(10^-5) ≈ 3.162e-3
-  double sigmaGyro = std::sqrt(1e-5);
-  double sigmaIntegration = 1e-5;
+  double sigmaGyro = std::sqrt(1e-3);
+  double sigmaIntegration = 1e-3;
   // Accelerometer noise: sqrt(10^-1) ≈ 3.162e-1
-  double sigmaAcc = std::sqrt(1e-2);
+  double sigmaAcc = std::sqrt(1e-1);
   // Bias random walk sigmas: sqrt(10^-10) = 1e-5
-  double biasAccRandomWalkSigma = 1e-5;  // bias_acc: -10
-  double biasOmegaRandomWalkSigma = 1e-5;  // bias_gyro: -10
+  double biasAccRandomWalkSigma = std::sqrt(1e-10);  // bias_acc: -10
+  double biasOmegaRandomWalkSigma = std::sqrt(1e-10);  // bias_gyro: -10
   double lagSeconds = 10;
-  double maxDeadReckoningSeconds = 0.04;
+  double maxDeadReckoningSeconds = 0.01;
   
   // Constructor to initialize contact covariance (contact: -5 → variance = 10^-5)
   ReplayConfig() {
-    const double contactVariance = 1e-5;  // 10^-5 from config
-    contactCovariance = Vector3(contactVariance, contactVariance, contactVariance).asDiagonal();
+    const double contactVariance = std::sqrt(1e-6);  // 10^-5 from config
+    contactCovariance = Vector3(contactVariance, contactVariance, contactVariance * 1e-3).asDiagonal();
   }
 };
 
@@ -131,13 +143,13 @@ struct GroundTruthInitialState {
 
 // Load ground truth initial state from CSV file
 GroundTruthInitialState loadGroundTruthInitialState(const fs::path& datasetDir) {
-  GroundTruthInitialState gtState;
+  GroundTruthInitialState gtInitialState;
   
   fs::path gtPath = datasetDir / "groundtruth.csv";
   if (!fs::exists(gtPath)) {
     std::cout << "Warning: Ground truth file not found at " << gtPath.string() 
               << ", using default initial state\n";
-    return gtState;
+    return gtInitialState;
   }
   
   // Parse the ground truth CSV
@@ -145,28 +157,28 @@ GroundTruthInitialState loadGroundTruthInitialState(const fs::path& datasetDir) 
   
   if (gtData.num_rows == 0) {
     std::cout << "Warning: Ground truth CSV is empty, using default initial state\n";
-    return gtState;
+    return gtInitialState;
   }
   
   // Extract first timestep data (index 0)
-  gtState.position = Point3(gtData.pos_x[0], gtData.pos_y[0], gtData.pos_z[0]);
-  gtState.velocity = Vector3(gtData.vel_x[0], gtData.vel_y[0], gtData.vel_z[0]);
+  gtInitialState.position = Point3(gtData.pos_x[0], gtData.pos_y[0], gtData.pos_z[0]);
+  gtInitialState.velocity = Vector3(gtData.vel_x[0], gtData.vel_y[0], gtData.vel_z[0]);
   
   // Convert quaternion to Rot3
   // DataStruct has: quat_w, quat_i, quat_j, quat_k
   Eigen::Quaterniond quat(gtData.quat_w[0], gtData.quat_i[0], 
                           gtData.quat_j[0], gtData.quat_k[0]);
-  gtState.orientation = Rot3(quat);
+  gtInitialState.orientation = Rot3(quat);
   
   std::cout << "Loaded ground truth initial state from " << gtPath.string() << ":\n";
-  std::cout << "  Position: [" << gtState.position.x() << ", " 
-            << gtState.position.y() << ", " << gtState.position.z() << "]\n";
-  std::cout << "  Velocity: [" << gtState.velocity(0) << ", " 
-            << gtState.velocity(1) << ", " << gtState.velocity(2) << "]\n";
+  std::cout << "  Position: [" << gtInitialState.position.x() << ", " 
+            << gtInitialState.position.y() << ", " << gtInitialState.position.z() << "]\n";
+  std::cout << "  Velocity: [" << gtInitialState.velocity(0) << ", " 
+            << gtInitialState.velocity(1) << ", " << gtInitialState.velocity(2) << "]\n";
   std::cout << "  Roll: " << gtData.roll[0] << " rad, Pitch: " 
             << gtData.pitch[0] << " rad, Yaw: " << gtData.yaw[0] << " rad\n";
   
-  return gtState;
+  return gtInitialState;
 }
 
 // 
@@ -203,6 +215,8 @@ struct InitialBiasEstimate {
   std::string source;
   size_t sampleCount = 0;
 };
+
+// -----------------------Initialization Helpers-----------------------
 
 
 // Convert contact meaurements from body frame to IMU frame and compute an initial attitude from the contact plane normal.
@@ -375,7 +389,8 @@ InitialBiasEstimate estimateInitialImuBias(const Dataset& dataset) {
 }
 
 // Look at these intialization methods later because we might just have 
-// the option to initialize with known values
+// the option to initialize with known values 
+// -------------------------------Initialization Helpers-----------------------
 
 
 LeggedEstimatorParams makeParams(const ReplayConfig& replayConfig,
@@ -399,11 +414,11 @@ LeggedEstimatorParams makeParams(const ReplayConfig& replayConfig,
 }
 
 NavState makeInitialState(const ReplayConfig& replayConfig, 
-                          const GroundTruthInitialState& gtState) {
+                          const GroundTruthInitialState& gtInitialState) {
   // Use ground truth if available, otherwise use default from config
-  const Point3& position = gtState.position.norm() > 0 ? gtState.position : replayConfig.initialPosition;
-  const Vector3& velocity = gtState.velocity.norm() > 0 ? gtState.velocity : replayConfig.initialVelocity;
-  const Rot3& orientation = gtState.orientation;
+  const Point3& position = gtInitialState.position.norm() > 0 ? gtInitialState.position : replayConfig.initialPosition;
+  const Vector3& velocity = gtInitialState.velocity.norm() > 0 ? gtInitialState.velocity : replayConfig.initialVelocity;
+  const Rot3& orientation = gtInitialState.orientation;
   
   return NavState(orientation, position, velocity);
 }
@@ -552,11 +567,13 @@ ReplayOutputs replayFilter(const std::string& filterName,
                            const ContactReplayPlan& contactReplayPlan,
                            const ReplayConfig& replayConfig,
                            std::ofstream& trajectoryOutput,
+                           std::ofstream& footVelocityOutput,
                            const double maxDurationSeconds,
                            const bool disableFullContactInitialization,
                            const imuBias::ConstantBias& imuBiasEstimate,
-                           const GroundTruthInitialState& gtState) {
-  const NavState initialState = makeInitialState(replayConfig, gtState);
+                           const GroundTruthInitialState& gtInitialState,
+                           const fs::path& datasetDir) {
+  const NavState initialState = makeInitialState(replayConfig, gtInitialState);
   const Matrix footholds =
       makeInitialFootholds(dataset.metadata.footNames.size());
   const Matrix covariance =
@@ -573,6 +590,139 @@ ReplayOutputs replayFilter(const std::string& filterName,
   const double startTimestamp = dataset.imuSamples.front().timestampS;
   NavState previousLoggedState = navStateFromEstimate(estimator->estimate());
   bool havePreviousLoggedState = false;
+
+  // ========================================================================
+  // LOAD GROUND TRUTH CSV DATA FOR FOOT VELOCITY CALCULATION
+  // ========================================================================
+  DataStruct gtFootData;
+  bool haveGroundTruthFootData = false;
+  fs::path gtCsvPath = datasetDir / "G1LoggingData.csv";
+  
+  if (fs::exists(gtCsvPath)) {
+    try {
+      gtFootData = ParseCSV(gtCsvPath.string());
+      haveGroundTruthFootData = (gtFootData.num_rows > 0);
+      std::cout << "Loaded ground truth foot data: " << gtFootData.num_rows << " rows\n";
+    } catch (const std::exception& e) {
+      std::cout << "Warning: Failed to load GT foot data: " << e.what() << "\n";
+    }
+  } else {
+    std::cout << "Warning: Ground truth foot CSV not found at " << gtCsvPath.string() << "\n";
+  }
+
+  // ========================================================================
+  // FOOT VELOCITY TRACKING STRUCTURES
+  // ========================================================================
+  const size_t numFeet = dataset.metadata.footNames.size();
+  
+  // Estimated foothold tracking (from factor graph)
+  Matrix previousEstimatedFootholds = Matrix::Zero(3, static_cast<Eigen::Index>(numFeet));
+  double previousEstimatedFootholdTime = 0.0;
+  bool havePreviousEstimatedFootholds = false;
+
+  // Ground truth foot position tracking (from CSV)
+  std::vector<Vector3> previousGTFootPositions(numFeet, Vector3::Zero());
+  double previousGTFootTime = 0.0;
+  bool havePreviousGTFootPositions = false;
+  
+  // Helper lambda to extract GT foot positions from CSV at given time index
+  auto getGTFootPositions = [&](size_t timeIndex) -> std::vector<Vector3> {
+    std::vector<Vector3> positions(numFeet);
+    if (haveGroundTruthFootData && timeIndex < gtFootData.num_rows) {
+      // Assuming 2 feet: left=0, right=1
+      if (numFeet >= 2) {
+        positions[0] = Vector3(gtFootData.lfoot_pos_x[timeIndex], 
+                               gtFootData.lfoot_pos_y[timeIndex], 
+                               gtFootData.lfoot_pos_z[timeIndex]);
+        positions[1] = Vector3(gtFootData.rfoot_pos_x[timeIndex], 
+                               gtFootData.rfoot_pos_y[timeIndex], 
+                               gtFootData.rfoot_pos_z[timeIndex]);
+      }
+    }
+    return positions;
+  };
+  
+  // Helper lambda to extract FK foot velocities from CSV at given time index
+  // FK FORMULA: v_foot_world = v_body + R * v_foot_body + R * [omega - bias_gyro]× * p_foot_body
+  // Where:
+  //   v_body = body velocity in world frame (from ESTIMATED STATE)
+  //   R = rotation matrix from body to world frame (from ESTIMATED STATE)
+  //   v_foot_body = foot velocity in body frame from FK joints (from CSV: fk_*_foot_vel_*)
+  //   omega = angular velocity (from CSV: gyro_body_x/y/z or omega_x/y/z)
+  //   bias_gyro = gyroscope bias (from ESTIMATED STATE)
+  //   p_foot_body = foot position in body frame (from CSV: fk_*_foot_pos_*)
+  //   [.]× = skew-symmetric matrix (cross product operator)
+  auto getFKFootVelocities = [&](size_t timeIndex, const Vector3& v_body_est, 
+                                  const Matrix3& R_est, const Vector3& bias_gyro_est) -> std::vector<Vector3> {
+    std::vector<Vector3> velocities(numFeet, Vector3::Zero());
+    if (haveGroundTruthFootData && timeIndex < gtFootData.num_rows) {
+      // Use ESTIMATED body velocity (world frame) from state
+      const Vector3& v_body = v_body_est;
+      
+      // Use ESTIMATED rotation matrix from state
+      const Matrix3& R = R_est;
+      
+      // Extract angular velocity (body frame) from CSV
+      Vector3 omega(gtFootData.gyro_body_x[timeIndex], 
+                    gtFootData.gyro_body_y[timeIndex], 
+                    gtFootData.gyro_body_z[timeIndex]);
+      
+      // Use ESTIMATED gyroscope bias from state
+      Vector3 omega_unbiased = omega - bias_gyro_est;
+      
+      // Assuming 2 feet: left=0, right=1
+      if (numFeet >= 2) {
+        // LEFT FOOT FK velocity calculation
+        Vector3 v_left_body(gtFootData.fk_left_foot_vel_x[timeIndex], 
+                            gtFootData.fk_left_foot_vel_y[timeIndex], 
+                            gtFootData.fk_left_foot_vel_z[timeIndex]);
+        Vector3 p_left_body(gtFootData.fk_left_foot_pos_x[timeIndex], 
+                            gtFootData.fk_left_foot_pos_y[timeIndex], 
+                            gtFootData.fk_left_foot_pos_z[timeIndex]);
+        // v_foot_world = v_body + R * (v_foot_body + omega × p_foot_body)
+        velocities[0] = v_body + R * v_left_body + R * omega_unbiased.cross(p_left_body);
+        
+        // RIGHT FOOT FK velocity calculation
+        Vector3 v_right_body(gtFootData.fk_right_foot_vel_x[timeIndex], 
+                             gtFootData.fk_right_foot_vel_y[timeIndex], 
+                             gtFootData.fk_right_foot_vel_z[timeIndex]);
+        Vector3 p_right_body(gtFootData.fk_right_foot_pos_x[timeIndex], 
+                             gtFootData.fk_right_foot_pos_y[timeIndex], 
+                             gtFootData.fk_right_foot_pos_z[timeIndex]);
+        velocities[1] = v_body + R * v_right_body + R * omega_unbiased.cross(p_right_body);
+      }
+    }
+    return velocities;
+  };
+  
+  // Helper lambda to get contact states from CSV
+  auto getContactStates = [&](size_t timeIndex) -> std::vector<bool> {
+    std::vector<bool> contacts(numFeet, false);
+    if (haveGroundTruthFootData && timeIndex < gtFootData.num_rows) {
+      if (numFeet >= 2) {
+        contacts[0] = (gtFootData.lfoot_contact[timeIndex] > 0.5);
+        contacts[1] = (gtFootData.rfoot_contact[timeIndex] > 0.5);
+      }
+    }
+    return contacts;
+  };
+  
+  // Helper lambda to find closest CSV time index for a given timestamp
+  auto findClosestTimeIndex = [&](double timestampS) -> size_t {
+    if (!haveGroundTruthFootData || gtFootData.num_rows == 0) return 0;
+    
+    size_t closestIdx = 0;
+    double minDiff = std::abs(gtFootData.timestamp[0] - timestampS);
+    
+    for (size_t i = 1; i < gtFootData.num_rows; ++i) {
+      double diff = std::abs(gtFootData.timestamp[i] - timestampS);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestIdx = i;
+      }
+    }
+    return closestIdx;
+  };
 
   auto logState = [&](const std::string& kind, double timestampS) {
     const ExtendedPose3d estimate = estimator->estimate();
@@ -643,6 +793,79 @@ ReplayOutputs replayFilter(const std::string& filterName,
       estimator->processContacts(update.activeContacts);
       const ExtendedPose3d estimate = estimator->estimate();
       const Matrix footholds = footholdsFromEstimate(estimate);
+      
+      // Extract current estimated state for FK velocity calculation
+      const NavState currentNavState = navStateFromEstimate(estimate);
+      const Vector3 estimatedBodyVelocity = currentNavState.velocity();
+      const Rot3 estimatedRotation = currentNavState.attitude();
+      const Matrix3 R_estimated = estimatedRotation.matrix();
+      
+      // Extract estimated bias (if available, otherwise use initial estimate)
+      // Note: GTSAM LeggedEstimator may not expose bias directly, using initial estimate
+      const Vector3 estimatedGyroBias = imuBiasEstimate.gyroscope();
+      
+      // ===================================================================
+      // COMPUTE ALL THREE TYPES OF FOOT VELOCITIES
+      // ===================================================================
+      size_t csvTimeIndex = findClosestTimeIndex(currentTime);
+      
+      // 1. ESTIMATED FOOT VELOCITIES (from factor graph foothold finite differencing)
+      std::vector<Vector3> estimatedFootVelocities(numFeet, Vector3::Zero());
+      if (havePreviousEstimatedFootholds) {
+        const double dt = currentTime - previousEstimatedFootholdTime;
+        if (dt > 1e-12) {
+          for (size_t foot = 0; foot < numFeet; ++foot) {
+            const Vector3 currentFoothold = footholds.col(static_cast<Eigen::Index>(foot));
+            const Vector3 prevFoothold = previousEstimatedFootholds.col(static_cast<Eigen::Index>(foot));
+            estimatedFootVelocities[foot] = (currentFoothold - prevFoothold) / dt;
+          }
+        }
+      }
+      
+      // 2. GROUND TRUTH FOOT VELOCITIES (from CSV foot position finite differencing)
+      std::vector<Vector3> gtFootVelocities(numFeet, Vector3::Zero());
+      if (havePreviousGTFootPositions && haveGroundTruthFootData) {
+        const double dt = currentTime - previousGTFootTime;
+        if (dt > 1e-12) {
+          std::vector<Vector3> currentGTPositions = getGTFootPositions(csvTimeIndex);
+          for (size_t foot = 0; foot < numFeet; ++foot) {
+            gtFootVelocities[foot] = (currentGTPositions[foot] - previousGTFootPositions[foot]) / dt;
+          }
+        }
+      }
+      
+      // 3. FORWARD KINEMATICS FOOT VELOCITIES (using estimated state)
+      std::vector<Vector3> fkFootVelocities = getFKFootVelocities(csvTimeIndex, 
+                                                                    estimatedBodyVelocity, 
+                                                                    R_estimated, 
+                                                                    estimatedGyroBias);
+      
+      // 4. CONTACT STATES (from CSV)
+      std::vector<bool> contactStates = getContactStates(csvTimeIndex);
+      
+      // Write enhanced foot velocity data to CSV
+      if (havePreviousEstimatedFootholds || havePreviousGTFootPositions) {
+        FootVelocityData velocityData;
+        velocityData.timestampS = currentTime;
+        velocityData.groundTruthVelocities = gtFootVelocities;
+        velocityData.estimatedVelocities = estimatedFootVelocities;
+        velocityData.fkVelocities = fkFootVelocities;
+        velocityData.contactStates = contactStates;
+        writeFootVelocityRow(footVelocityOutput, velocityData);
+      }
+      
+      // Update tracking variables for next iteration
+      previousEstimatedFootholds = footholds;
+      previousEstimatedFootholdTime = currentTime;
+      havePreviousEstimatedFootholds = true;
+      
+      if (haveGroundTruthFootData) {
+        previousGTFootPositions = getGTFootPositions(csvTimeIndex);
+        previousGTFootTime = currentTime;
+        havePreviousGTFootPositions = true;
+      }
+      // ===================================================================
+      
       for (const ContactMeasurement& contact : update.activeContacts) {
         const double residual =
             contactResidualNorm(estimate, bodyPImu, contact);
@@ -912,10 +1135,18 @@ int main(int argc, char* argv[]) {
     }
     writeMetricsHeader(metricsOutput);
 
+    std::ofstream footVelocityOutput(args.outputDir / 
+                                     (filterName + "_foot_velocities.csv"));
+    if (!footVelocityOutput) {
+      throw std::runtime_error("Unable to open foot velocity output for writing.");
+    }
+    writeFootVelocityHeader(footVelocityOutput, dataset.metadata.footNames);
+
     const ReplayOutputs outputs = replayFilter(
         filterName, dataset, contactReplayPlan, replayConfig, trajectoryOutput,
-        args.maxDurationSeconds, args.disableFullContactInitialization,
-        imuBiasEstimate.bias, gtInitialState);
+        footVelocityOutput, args.maxDurationSeconds, 
+        args.disableFullContactInitialization,
+        imuBiasEstimate.bias, gtInitialState, args.datasetDir);
     writeMetricsRow(metricsOutput, outputs);
     std::cout << filterName
               << ": wall_time_ms=" << toString(outputs.metrics.wallTimeMs, 3)
@@ -929,6 +1160,9 @@ int main(int argc, char* argv[]) {
               << '\n';
     std::cout << "  saved "
               << (args.outputDir / (filterName + "_metrics.csv")).string()
+              << '\n';
+    std::cout << "  saved "
+              << (args.outputDir / (filterName + "_foot_velocities.csv")).string()
               << '\n';
   }
   return 0;

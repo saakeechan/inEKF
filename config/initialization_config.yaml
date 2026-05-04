@@ -9,8 +9,8 @@ dt: 0.02
 # TextFile data file configuration
 textfile:
   enabled: true # Set to true to use TextFile data, false to use sensor data
-  file_name: "../Data/G1LoggingData.csv"
-  time_length: 990 # Total number of data points to process from the TextFile
+  file_name: "../Data/robotstate_0_env2.csv"
+  time_length: 200 # Total number of data points to process from the TextFile
   starting_point: 0 # Number of initial data points to skip in TextFile
 
 saved_results_folder: "../results"  # Name of the folder to save estimation results
@@ -26,7 +26,7 @@ variable_contact_covariance:
   amplifier: 1.0  # Multiplied to contact covariance when VCC is enabled
 
 Contact_estimation_NN:
-  enabled: true  # Enable contact estimation using the neural network model
+  enabled: false  # Enable contact estimation using the neural network model
   file_path: "../src/contactDetection/bipedal_contact_best_val_leg_acc.onnx"  # Path to the ONNX contact estimation model
 
 
