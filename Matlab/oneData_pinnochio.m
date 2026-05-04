@@ -2,7 +2,7 @@
 
 clear; close all; clc;
 
-filePath = "/home/saakee/Research/Saaketh_INEKF/results/2026-05-02_06-25-48.csv"
+filePath = "/home/saakee/Research/Saaketh_INEKF/results/2026-05-04_19-51-14.csv"
 
 % --- Read the file ---
 if isfile(filePath)
@@ -17,7 +17,7 @@ end
 [finish, ~] = size(result1);
 
 dt = 0.02;
-finish = (19.5 / dt);
+finish = (result1.time(end) / dt);
 start = (0 / dt) + 1;
 t = start:1:finish - 1;
 t = t .* dt;

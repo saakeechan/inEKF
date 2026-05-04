@@ -306,7 +306,7 @@ inline void writeContactPacketUsage(const fs::path& path,
 struct FootVelocityData {
   double timestampS = 0.0;
   std::vector<Vector3> groundTruthVelocities;    // From finite diff of GT foot positions
-  std::vector<Vector3> estimatedVelocities;      // From finite diff of estimated footholds
+  std::vector<Vector3> estimatedVelocities;      // From finite diff of FK foot positions in world frame
   std::vector<Vector3> fkVelocities;             // From FK velocities in CSV
   std::vector<bool> contactStates;               // Contact state for each foot
 };
@@ -323,7 +323,7 @@ inline void writeFootVelocityHeader(std::ofstream& output,
            << ',' << footName << "_gt_vz";
   }
   
-  // Estimated velocities (from factor graph foothold finite differencing)
+  // Estimated velocities (from finite diff of FK foot positions in world frame)
   for (const std::string& footName : footNames) {
     output << ',' << footName << "_est_vx"
            << ',' << footName << "_est_vy"

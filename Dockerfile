@@ -83,8 +83,8 @@ RUN wget https://github.com/microsoft/onnxruntime/releases/download/v1.25.1/onnx
 ENV CCACHE_DIR=/ccache
 ENV PATH="/usr/lib/ccache:${PATH}"
 
-# Install GTSAM Python package
-RUN pip3 install gtsam pandas
+# Install GTSAM Python package and matplotlib for plotting
+RUN pip3 install gtsam pandas matplotlib
 
 # Set working directory
 WORKDIR /workspace
