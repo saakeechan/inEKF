@@ -63,24 +63,6 @@
 #include <utility>
 #include <vector>
 
-// Covariance values populated from config/initialization_config.yaml
-// covariance_exponents (converted to sigma = sqrt(10^exponent)):
-//   gyro: -5 → sigmaGyro = 3.162e-3
-//   acc: -1 → sigmaAcc = 3.162e-1
-//   contact: -5 → contactSigma = 3.162e-3
-//   bias_gyro: -10 → biasOmegaRandomWalkSigma = 1e-5
-//   bias_acc: -10 → biasAccRandomWalkSigma = 1e-5
-//   prior_orientation: -10 → 1e-10 (in initialBaseCovarianceDiagonal)
-//   prior_velocity: -10 → 1e-10 (in initialBaseCovarianceDiagonal)
-//   prior_position: -10 → 1e-10 (in initialBaseCovarianceDiagonal)
-//
-// Initial condition (values set in ReplayConfig):
-//   position: [0.0, 0.0, 0.0] → initialPosition
-//   orientation: [1.0, 0.0, 0.0, 0.0] → Rot3() (identity quaternion)
-//   velocity: [0.0, 0.0, 0.0] → initialVelocity
-//   bias_gyro: [0.0, 0.0, 0.0] → estimated from data
-//   bias_acc: [0.0, 0.0, 0.0] → estimated from data
-// ------------------------------------------------------------
 //
 // FOOT VELOCITY TRACKING SYSTEM:
 // This implementation tracks THREE types of foot velocities for comparison:
@@ -106,26 +88,39 @@ struct ReplayConfig : public LeggedEstimatorParams {
   Vector3 gravity = Vector3(0.0, 0.0, -9.81);
   Point3 initialPosition = Point3(0.0, 0.0, 0.0);  // [Px, Py, Pz] from config
   Vector3 initialVelocity = Vector3::Zero();  // [Vx, Vy, Vz] from config
-  // Prior covariances: [position(3), orientation(3), velocity(3)]
-  // All set to 10^-10 as per prior_position, prior_orientation, prior_velocity
   Vector initialBaseCovarianceDiagonal =
       (Vector(9) << 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10)
           .finished();
-  // Gyro noise: sqrt(10^-5) ≈ 3.162e-3
-  double sigmaGyro = std::sqrt(1e-3);
+  double sigmaGyro = std::sqrt(1e-2);
   double sigmaIntegration = 1e-3;
-  // Accelerometer noise: sqrt(10^-1) ≈ 3.162e-1
-  double sigmaAcc = std::sqrt(1e-1);
-  // Bias random walk sigmas: sqrt(10^-10) = 1e-5
-  double biasAccRandomWalkSigma = std::sqrt(1e-10);  // bias_acc: -10
-  double biasOmegaRandomWalkSigma = std::sqrt(1e-10);  // bias_gyro: -10
+  double sigmaAcc = std::sqrt(1e1);
+  double biasAccRandomWalkSigma = std::sqrt(1e-10);
+  double biasOmegaRandomWalkSigma = std::sqrt(1e-10);
   double lagSeconds = 10;
   double maxDeadReckoningSeconds = 0.01;
   
-  // Constructor to initialize contact covariance (contact: -5 → variance = 10^-5)
+  // Constructor to explicitly initialize all LeggedEstimatorParams
   ReplayConfig() {
-    const double contactVariance = std::sqrt(1e-6);  // 10^-5 from config
-    contactCovariance = Vector3(contactVariance, contactVariance, contactVariance * 1e-3).asDiagonal();
+    // Body-IMU transform: identity (no rotation, zero offset)
+    body_P_imu = Pose3(Rot3(), Point3(0.0, 0.0, 0.0));
+    
+    // Contact covariance (contact: -5 → variance = 10^-5)
+    const double contactVariance = std::sqrt(1e-6);
+    contactCovariance = Vector3(contactVariance, contactVariance, contactVariance * 1e-0).asDiagonal();
+    
+    // Foothold parameters (matching GTSAM example defaults - already correct from base class)
+    footholdInitSigma = 1e-6;       // Initial foothold uncertainty (m)
+    footholdProcessSigma = 1e-6;   // Foothold process noise (m)
+
+    // Full contact initialization (set via command line flag, but default here)
+    useFullContactInitialization = false;
+    heightPriorSigma = 0.15;       // Robot height prior uncertainty (m) // Doesnt matter cauae useFullContactInitialization=false
+    
+    // Robust noise and marginalization (IMPORTANT: these differ from GTSAM base class defaults)
+    useRobustContactNoise = false;   // Set to true to use Huber loss
+    robustContactHuberK = 2.0;       // Huber loss threshold
+    marginalizeLeavingFoot = true;   // Marginalize footholds when feet leave ground
+
   }
 };
 
@@ -141,44 +136,55 @@ struct GroundTruthInitialState {
       velocity(Vector3::Zero()) {}
 };
 
-// Load ground truth initial state from CSV file
-GroundTruthInitialState loadGroundTruthInitialState(const fs::path& datasetDir) {
-  GroundTruthInitialState gtInitialState;
+// Structure to hold both ground truth initial state and full CSV data
+struct GroundTruthData {
+  GroundTruthInitialState initialState;
+  DataStruct fullData;
+  bool dataLoaded = false;
+};
+
+// Load ground truth data from CSV file (used for both initialization and foot velocity calculations)
+GroundTruthData loadGroundTruthData(const fs::path& datasetDir) {
+  GroundTruthData gtData;
   
-  fs::path gtPath = datasetDir / "groundtruth.csv";
+  fs::path gtPath = datasetDir / "robotstate_0_env2.csv";
   if (!fs::exists(gtPath)) {
     std::cout << "Warning: Ground truth file not found at " << gtPath.string() 
               << ", using default initial state\n";
-    return gtInitialState;
+    return gtData;
   }
   
   // Parse the ground truth CSV
-  DataStruct gtData = ParseCSV(gtPath.string());
+  DataStruct csvData = ParseCSV(gtPath.string());
   
-  if (gtData.num_rows == 0) {
+  if (csvData.num_rows == 0) {
     std::cout << "Warning: Ground truth CSV is empty, using default initial state\n";
-    return gtInitialState;
+    return gtData;
   }
   
-  // Extract first timestep data (index 0)
-  gtInitialState.position = Point3(gtData.pos_x[0], gtData.pos_y[0], gtData.pos_z[0]);
-  gtInitialState.velocity = Vector3(gtData.vel_x[0], gtData.vel_y[0], gtData.vel_z[0]);
+  // Store full CSV data for foot velocity calculations
+  gtData.fullData = csvData;
+  gtData.dataLoaded = true;
+  
+  // Extract first timestep data (index 0) for initialization
+  gtData.initialState.position = Point3(csvData.pos_x[0], csvData.pos_y[0], csvData.pos_z[0]);
+  gtData.initialState.velocity = Vector3(csvData.vel_x[0], csvData.vel_y[0], csvData.vel_z[0]);
   
   // Convert quaternion to Rot3
   // DataStruct has: quat_w, quat_i, quat_j, quat_k
-  Eigen::Quaterniond quat(gtData.quat_w[0], gtData.quat_i[0], 
-                          gtData.quat_j[0], gtData.quat_k[0]);
-  gtInitialState.orientation = Rot3(quat);
+  Eigen::Quaterniond quat(csvData.quat_w[0], csvData.quat_i[0], 
+                          csvData.quat_j[0], csvData.quat_k[0]);
+  gtData.initialState.orientation = Rot3(quat);
   
-  std::cout << "Loaded ground truth initial state from " << gtPath.string() << ":\n";
-  std::cout << "  Position: [" << gtInitialState.position.x() << ", " 
-            << gtInitialState.position.y() << ", " << gtInitialState.position.z() << "]\n";
-  std::cout << "  Velocity: [" << gtInitialState.velocity(0) << ", " 
-            << gtInitialState.velocity(1) << ", " << gtInitialState.velocity(2) << "]\n";
-  std::cout << "  Roll: " << gtData.roll[0] << " rad, Pitch: " 
-            << gtData.pitch[0] << " rad, Yaw: " << gtData.yaw[0] << " rad\n";
+  std::cout << "Loaded ground truth data from " << gtPath.string() << " (" << csvData.num_rows << " rows):\n";
+  std::cout << "  Initial Position: [" << gtData.initialState.position.x() << ", " 
+            << gtData.initialState.position.y() << ", " << gtData.initialState.position.z() << "]\n";
+  std::cout << "  Initial Velocity: [" << gtData.initialState.velocity(0) << ", " 
+            << gtData.initialState.velocity(1) << ", " << gtData.initialState.velocity(2) << "]\n";
+  std::cout << "  Initial Orientation (RPY): Roll=" << csvData.roll[0] << " rad, Pitch=" 
+            << csvData.pitch[0] << " rad, Yaw=" << csvData.yaw[0] << " rad\n";
   
-  return gtInitialState;
+  return gtData;
 }
 
 // 
@@ -388,6 +394,9 @@ InitialBiasEstimate estimateInitialImuBias(const Dataset& dataset) {
       "pre-init static fallback", preInitSamples.size()};
 }
 
+
+
+
 // Look at these intialization methods later because we might just have 
 // the option to initialize with known values 
 // -------------------------------Initialization Helpers-----------------------
@@ -572,7 +581,8 @@ ReplayOutputs replayFilter(const std::string& filterName,
                            const bool disableFullContactInitialization,
                            const imuBias::ConstantBias& imuBiasEstimate,
                            const GroundTruthInitialState& gtInitialState,
-                           const fs::path& datasetDir) {
+                           const DataStruct& gtFootData,
+                           const bool haveGroundTruthData) {
   const NavState initialState = makeInitialState(replayConfig, gtInitialState);
   const Matrix footholds =
       makeInitialFootholds(dataset.metadata.footNames.size());
@@ -585,34 +595,87 @@ ReplayOutputs replayFilter(const std::string& filterName,
       filterName, dataset.metadata.footNames, initialState, footholds,
       covariance, baseCovariance, params, replayConfig.lagSeconds);
 
+  // ========================================================================
+  // PRINT ALL INITIALIZATION PARAMETERS FOR VERIFICATION
+  // ========================================================================
+  std::cout << "\n========== INITIALIZATION PARAMETERS ==========\n";
+  std::cout << "Filter Name: " << filterName << "\n\n";
+  
+  std::cout << "--- ReplayConfig ---\n";
+  std::cout << "Gravity: [" << replayConfig.gravity.transpose() << "]\n";
+  std::cout << "Initial Position: [" << replayConfig.initialPosition.transpose() << "]\n";
+  std::cout << "Initial Velocity: [" << replayConfig.initialVelocity.transpose() << "]\n";
+  std::cout << "Sigma Gyro: " << replayConfig.sigmaGyro << "\n";
+  std::cout << "Sigma Integration: " << replayConfig.sigmaIntegration << "\n";
+  std::cout << "Sigma Acc: " << replayConfig.sigmaAcc << "\n";
+  std::cout << "Bias Acc Random Walk Sigma: " << replayConfig.biasAccRandomWalkSigma << "\n";
+  std::cout << "Bias Omega Random Walk Sigma: " << replayConfig.biasOmegaRandomWalkSigma << "\n";
+  std::cout << "Lag Seconds: " << replayConfig.lagSeconds << "\n";
+  std::cout << "Max Dead Reckoning Seconds: " << replayConfig.maxDeadReckoningSeconds << "\n\n";
+  
+  std::cout << "--- Body-IMU Transform (body_P_imu) ---\n";
+  std::cout << replayConfig.body_P_imu.matrix() << "\n\n";
+  
+  std::cout << "--- Initial State (from Ground Truth) ---\n";
+  std::cout << "Position: [" << initialState.position().transpose() << "]\n";
+  std::cout << "Velocity: [" << initialState.velocity().transpose() << "]\n";
+  std::cout << "Attitude (RPY): [" << initialState.attitude().rpy().transpose() << "]\n\n";
+  
+  std::cout << "--- IMU Bias Estimate ---\n";
+  std::cout << "Accelerometer Bias: [" << imuBiasEstimate.accelerometer().transpose() << "]\n";
+  std::cout << "Gyroscope Bias: [" << imuBiasEstimate.gyroscope().transpose() << "]\n";
+  std::cout << "Bias Source: " << "initial estimate" << "\n\n";
+  
+  std::cout << "--- LeggedEstimatorParams (from params) ---\n";
+  std::cout << "Use Full Contact Initialization: " << (params.useFullContactInitialization ? "true" : "false") << "\n";
+  std::cout << "Disable Full Contact Init Flag: " << (disableFullContactInitialization ? "true" : "false") << "\n";
+  std::cout << "Foothold Init Sigma: " << params.footholdInitSigma << " m (explicitly set in ReplayConfig)\n";
+  std::cout << "Foothold Process Sigma: " << params.footholdProcessSigma << " m (explicitly set in ReplayConfig)\n";
+  std::cout << "Height Prior Sigma: " << params.heightPriorSigma << " m (explicitly set in ReplayConfig)\n";
+  std::cout << "Use Robust Contact Noise: " << (params.useRobustContactNoise ? "true" : "false") << " (explicitly set in ReplayConfig)\n";
+  std::cout << "Robust Contact Huber K: " << params.robustContactHuberK << " (explicitly set in ReplayConfig)\n";
+  std::cout << "Marginalize Leaving Foot: " << (params.marginalizeLeavingFoot ? "true" : "false") << " (explicitly set in ReplayConfig)\n";
+  std::cout << "Bias Acc Random Walk Sigma (in params): " << params.biasAccRandomWalkSigma << " (from ReplayConfig)\n";
+  std::cout << "Bias Omega Random Walk Sigma (in params): " << params.biasOmegaRandomWalkSigma << " (from ReplayConfig)\n\n";
+  
+  std::cout << "--- Contact Covariance ---\n";
+  std::cout << params.contactCovariance.diagonal().transpose() << "\n\n";
+  
+  std::cout << "--- Preintegration Params ---\n";
+  if (params.preintegrationParams) {
+    std::cout << "Gyroscope Covariance diagonal: " << params.preintegrationParams->gyroscopeCovariance.diagonal().transpose() << "\n";
+    std::cout << "Accelerometer Covariance diagonal: " << params.preintegrationParams->accelerometerCovariance.diagonal().transpose() << "\n";
+    std::cout << "Integration Covariance diagonal: " << params.preintegrationParams->integrationCovariance.diagonal().transpose() << "\n";
+  }
+  
+  std::cout << "--- Initial Base Covariance Diagonal ---\n";
+  std::cout << replayConfig.initialBaseCovarianceDiagonal.transpose() << "\n";
+  
+  std::cout << "--- Dataset Info ---\n";
+  std::cout << "Number of Feet: " << dataset.metadata.footNames.size() << "\n";
+  std::cout << "Foot Names: ";
+  for (size_t i = 0; i < dataset.metadata.footNames.size(); ++i) {
+    std::cout << dataset.metadata.footNames[i];
+    if (i < dataset.metadata.footNames.size() - 1) std::cout << ", ";
+  }
+  std::cout << "\n";
+  std::cout << "Total IMU Samples: " << dataset.imuSamples.size() << "\n";
+  std::cout << "Total Contact Events: " << dataset.contactEvents.size() << "\n";
+  std::cout << "Max Duration: " << maxDurationSeconds << " s\n";
+  std::cout << "===============================================\n\n";
+
   ReplayMetrics metrics;
   const Pose3& bodyPImu = replayConfig.body_P_imu;
+  
+  
   const double startTimestamp = dataset.imuSamples.front().timestampS;
   NavState previousLoggedState = navStateFromEstimate(estimator->estimate());
   bool havePreviousLoggedState = false;
 
   // ========================================================================
-  // LOAD GROUND TRUTH CSV DATA FOR FOOT VELOCITY CALCULATION
+  // FOOT VELOCITY TRACKING STRUCTURES (using preloaded ground truth data)
   // ========================================================================
-  DataStruct gtFootData;
-  bool haveGroundTruthFootData = false;
-  fs::path gtCsvPath = datasetDir / "G1LoggingData.csv";
-  
-  if (fs::exists(gtCsvPath)) {
-    try {
-      gtFootData = ParseCSV(gtCsvPath.string());
-      haveGroundTruthFootData = (gtFootData.num_rows > 0);
-      std::cout << "Loaded ground truth foot data: " << gtFootData.num_rows << " rows\n";
-    } catch (const std::exception& e) {
-      std::cout << "Warning: Failed to load GT foot data: " << e.what() << "\n";
-    }
-  } else {
-    std::cout << "Warning: Ground truth foot CSV not found at " << gtCsvPath.string() << "\n";
-  }
-
-  // ========================================================================
-  // FOOT VELOCITY TRACKING STRUCTURES
-  // ========================================================================
+  const bool haveGroundTruthFootData = haveGroundTruthData;
   const size_t numFeet = dataset.metadata.footNames.size();
   
   // Estimated foothold tracking (from factor graph)
@@ -936,7 +999,7 @@ struct CommandLineArgs {
   std::optional<double> biasOmegaRandomWalkSigma;
   std::optional<double> contactSigmaXY;
   std::optional<double> contactSigmaZ;
-  bool useRobustContactNoise = true;
+  bool useRobustContactNoise = false;
   std::optional<double> robustContactHuberK;
   bool marginalizeLeavingFoot = false;
   std::vector<std::string> filterNames;
@@ -1078,8 +1141,8 @@ int main(int argc, char* argv[]) {
   const ReplayConfig replayConfig = makeReplayConfig(args);
   const Dataset dataset = loadDataset(args.datasetDir);
   
-  // Load ground truth initial state from CSV
-  const GroundTruthInitialState gtInitialState = loadGroundTruthInitialState(args.datasetDir);
+  // Load ground truth data from CSV (used for both initialization and foot velocity calculations)
+  const GroundTruthData gtData = loadGroundTruthData(args.datasetDir);
   
   // const InitialBiasEstimate imuBiasEstimate = estimateInitialImuBias(dataset);
   const InitialBiasEstimate imuBiasEstimate = {imuBias::ConstantBias(), "zero initialization", 0};
@@ -1146,7 +1209,7 @@ int main(int argc, char* argv[]) {
         filterName, dataset, contactReplayPlan, replayConfig, trajectoryOutput,
         footVelocityOutput, args.maxDurationSeconds, 
         args.disableFullContactInitialization,
-        imuBiasEstimate.bias, gtInitialState, args.datasetDir);
+        imuBiasEstimate.bias, gtData.initialState, gtData.fullData, gtData.dataLoaded);
     writeMetricsRow(metricsOutput, outputs);
     std::cout << filterName
               << ": wall_time_ms=" << toString(outputs.metrics.wallTimeMs, 3)

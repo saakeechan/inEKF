@@ -40,10 +40,14 @@ function build_image() {
 
 function run_container() {
     echo -e "${BLUE}Running Docker container: ${CONTAINER_NAME}${NC}"
+    mkdir -p .ccache
     docker run -it --rm \
         --name ${CONTAINER_NAME} \
-    --user ${HOST_UID}:${HOST_GID} \
-    -e HOME=/tmp \
+        --user ${HOST_UID}:${HOST_GID} \
+        -e HOME=/tmp \
+        -e CCACHE_DIR=/workspace/.ccache \
+        -v /etc/passwd:/etc/passwd:ro \
+        -v /etc/group:/etc/group:ro \
         -v $(pwd):/workspace \
         ${IMAGE_NAME} \
         /bin/bash
