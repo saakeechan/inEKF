@@ -1,6 +1,7 @@
 /* ----------------------------------------------------------------------------
  * Contact Neural Network Estimator
- * Handles all neural network-based contact detection functionality
+ * Handles neural network-based contact detection functionality
+ * Note: NN outputs contact predictions only; foot velocities are computed via kinematics
  * -------------------------------------------------------------------------- */
 
 #ifndef CONTACT_NN_HPP
@@ -49,10 +50,10 @@ public:
     // // Normalize input: (data - mean) / std per feature across time dimension
     // void normalize_nn_input(std::vector<float>& input_features);
     
-    // Run contact prediction inference (returns contacts and foot velocities)
+    // Run contact prediction inference (returns contacts; velocity output is not used)
     std::pair<Eigen::VectorXd, Eigen::VectorXd> predict_contact(const std::vector<float>& input_features);
     
-    // Convenience method: create tensor, normalize, and predict (returns contacts and foot velocities)
+    // Convenience method: create tensor, normalize, and predict (returns contacts; velocity output is not used)
     std::pair<Eigen::VectorXd, Eigen::VectorXd> nn_predict_contact();
     
     // Check if model is loaded and enabled

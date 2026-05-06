@@ -86,6 +86,19 @@ ENV PATH="/usr/lib/ccache:${PATH}"
 # Install GTSAM Python package and matplotlib for plotting
 RUN pip3 install gtsam pandas matplotlib
 
+# Install cvxpy with solvers for convex optimization
+RUN pip3 install cvxpy ecos scs osqp clarabel
+
+# Install LaTeX packages for document generation
+RUN apt-get update && apt-get install -y \
+    texlive-latex-base \
+    texlive-latex-extra \
+    texlive-fonts-recommended \
+    texlive-fonts-extra \
+    texlive-publishers \
+    texlive-science \
+    && rm -rf /var/lib/apt/lists/*
+
 # Set working directory
 WORKDIR /workspace
 

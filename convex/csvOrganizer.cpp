@@ -249,7 +249,7 @@ void writeGroundTruthTrajectory(const DataStruct& data, const string& output_pat
 
 int main(int argc, char* argv[]) {
     // Default paths
-    string input_csv = "../convex/Data/robotstate_0_env2.csv";
+    string input_csv = "../convex/Data/robotstate_0_800.csv";
     string output_path = "../convex/Data";
     string sequence_name = "g1_walking";
     

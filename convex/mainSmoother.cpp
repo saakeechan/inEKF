@@ -49,6 +49,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -147,7 +148,7 @@ struct GroundTruthData {
 GroundTruthData loadGroundTruthData(const fs::path& datasetDir) {
   GroundTruthData gtData;
   
-  fs::path gtPath = datasetDir / "robotstate_0_env2.csv";
+  fs::path gtPath = datasetDir / "robotstate_0_800.csv";
   if (!fs::exists(gtPath)) {
     std::cout << "Warning: Ground truth file not found at " << gtPath.string() 
               << ", using default initial state\n";
@@ -965,16 +966,14 @@ ReplayOutputs replayFilter(const std::string& filterName,
     // 4. CONTACT STATES (from CSV)
     std::vector<bool> contactStates = getContactStates(csvTimeIndex);
     
-    // Only write a row when at least one velocity channel was actually computed.
-    if (validEstimatedFootVelocity || validGTFootVelocity) {
-      FootVelocityData velocityData;
-      velocityData.timestampS = currentTime;
-      velocityData.groundTruthVelocities = gtFootVelocities;
-      velocityData.estimatedVelocities = estimatedFootVelocities;
-      velocityData.fkVelocities = fkFootVelocities;
-      velocityData.contactStates = contactStates;
-      writeFootVelocityRow(footVelocityOutput, velocityData);
-    }
+    // Write foot velocity row for every timestep (from the beginning)
+    FootVelocityData velocityData;
+    velocityData.timestampS = currentTime;
+    velocityData.groundTruthVelocities = gtFootVelocities;
+    velocityData.estimatedVelocities = estimatedFootVelocities;
+    velocityData.fkVelocities = fkFootVelocities;
+    velocityData.contactStates = contactStates;
+    writeFootVelocityRow(footVelocityOutput, velocityData);
     
     // Update tracking variables for next timestep
     previousFKFootPositionsWorld = fkFootPositionsWorld;
@@ -1046,6 +1045,7 @@ struct CommandLineArgs {
   bool marginalizeLeavingFoot = false;
   std::vector<std::string> filterNames;
   bool disableFullContactInitialization = true;
+  bool skipPlots = false;
 };
 
 std::vector<std::string> splitCommaSeparated(const std::string& value) {
@@ -1099,6 +1099,8 @@ CommandLineArgs parseCommandLine(int argc, char* argv[]) {
     } else if (flag == "--no-marginalize-leaving-foot" ||
                flag == "--disable-marginalize-leaving-foot") {
       args.marginalizeLeavingFoot = false;
+    } else if (flag == "--skip-plots") {
+      args.skipPlots = true;
     } else if (flag == "--variants" && index + 1 < argc) {
       args.filterNames = splitCommaSeparated(argv[++index]);
     } else if (flag == "--disable-full-contact-initialization") {
@@ -1270,5 +1272,25 @@ int main(int argc, char* argv[]) {
               << (args.outputDir / (filterName + "_foot_velocities.csv")).string()
               << '\n';
   }
+  
+  // Automatically generate foot velocity plots after processing all filters (unless disabled)
+  if (!args.skipPlots) {
+    std::cout << "\n=== Generating foot velocity plots ===\n";
+    for (const std::string& filterName : args.filterNames) {
+      std::string csvPath = (args.outputDir / (filterName + "_foot_velocities.csv")).string();
+      // Get the directory containing this source file for the Python script location
+      std::string scriptDir = fs::path(__FILE__).parent_path().string();
+      std::string plotCommand = "cd \"" + scriptDir + "\" && python3 plotFootVelocities.py \"" + csvPath + "\"";
+      std::cout << "Running: " << plotCommand << std::endl;
+      int plotResult = std::system(plotCommand.c_str());
+      if (plotResult != 0) {
+        std::cerr << "Warning: Plot generation failed for " << filterName << " (exit code: " << plotResult << ")\n";
+      }
+    }
+    std::cout << "=== Plot generation complete ===\n";
+  } else {
+    std::cout << "\n(Skipping plot generation - use without --skip-plots to enable)\n";
+  }
+  
   return 0;
 }

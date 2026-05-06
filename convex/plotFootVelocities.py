@@ -70,18 +70,17 @@ def plot_leg_data(data, leg, output_dir):
                   data['timestamp_s'].iloc[end_idx], 
                   alpha=0.2, color='red', label='Contact' if start_idx == contact_starts[0] else '')
     
-    # Plot velocity norms for contact regions only
-    if not contact_data.empty:
-        ax.scatter(contact_data['timestamp_s'], contact_gt_norm, 
-                  s=20, color='green', marker='o', label='Ground Truth', zorder=5, alpha=0.7)
-        ax.scatter(contact_data['timestamp_s'], contact_est_norm, 
-                  s=20, color='blue', marker='s', label='Estimator', zorder=5, alpha=0.7)
-        ax.scatter(contact_data['timestamp_s'], contact_fk_norm, 
-                  s=20, color='orange', marker='^', label='FK', zorder=5, alpha=0.7)
+    # Plot velocity norms for all timesteps
+    ax.plot(data['timestamp_s'], gt_v_norm, 
+            color='green', linewidth=1.5, label='Ground Truth', zorder=5, alpha=0.8)
+    ax.plot(data['timestamp_s'], est_v_norm, 
+            color='blue', linewidth=1.5, label='Estimator', zorder=5, alpha=0.8)
+    ax.plot(data['timestamp_s'], fk_v_norm, 
+            color='orange', linewidth=1.5, label='FK', zorder=5, alpha=0.8)
     
     ax.set_xlabel('Time (s)', fontsize=12)
     ax.set_ylabel('Velocity Norm (m/s)', fontsize=12)
-    ax.set_title(f'{leg_name} Leg - Velocity Norm (Contact Regions)', fontsize=14)
+    ax.set_title(f'{leg_name} Leg - Velocity Norm (Contact Regions Highlighted)', fontsize=14)
     ax.set_xlim(data['timestamp_s'].min(), data['timestamp_s'].max())
     ax.grid(True, alpha=0.3)
     
