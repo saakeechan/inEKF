@@ -16,7 +16,7 @@ from pathlib import Path
 import time
 
 # Configuration
-MAX_ITERATIONS         = 8
+MAX_ITERATIONS         = 14
 CONVERGENCE_THRESHOLD  = 1.0    # Stop if <1% change from previous iteration (for convex method)
 VARIANT                = "fixed_lag_single_bias"
 
@@ -24,15 +24,13 @@ VARIANT                = "fixed_lag_single_bias"
 METHOD = "convex"  # Options: "convex" or "threshold"
 
 # Convex smoother weights (used when METHOD="convex")
-EPS_XY     = 3.0    # XY velocity threshold (m/s)
-EPS_Z      = 0.3    # Z  velocity threshold (m/s)
-BETA       = 3.0    # Weight for prior (deviation from original contacts)
-RHO_XY     = 1.0    # Weight for XY velocity slack
-RHO_Z      = 1.0    # Weight for Z  velocity slack
-LAMBDA_TV  = 3.0    # Weight for TV epigraph (smoothness)
+BETA       = 2.0    # Weight for prior (deviation from original contacts)
+LAMBDA_TV  = 1.0    # Weight for TV epigraph (smoothness)
+LAMBDA_V   = 2.0    # Weight for velocity-based contact term
+R0         = 0.3    # Velocity threshold (m/s) - contact encouraged below, discouraged above
 
 # Threshold smoother parameters (used when METHOD="threshold")
-VEL_THRESHOLD = 0.3  # Velocity threshold (m/s) - remove contacts above this
+VEL_THRESHOLD = 0.4  # Velocity threshold (m/s) - remove contacts above this
 
 DATA_DIR      = Path("Data")
 RESULTS_DIR   = Path("results")
@@ -116,13 +114,11 @@ def run_contact_smoother(iteration, velocities_csv, history_lfoot=None, history_
         history_lfoot=history_lfoot,
         history_rfoot=history_rfoot,
         convergence_threshold=CONVERGENCE_THRESHOLD,
-        eps_xy=EPS_XY,
-        eps_z=EPS_Z,
         vel_threshold=VEL_THRESHOLD,
         beta=BETA,
-        rho_xy=RHO_XY,
-        rho_z=RHO_Z,
         lambda_tv=LAMBDA_TV,
+        lambda_v=LAMBDA_V,
+        r0=R0,
     )
 
     # Read updated contacts to count left/right foot contacts
@@ -169,7 +165,7 @@ def main():
     print(f"Convergence threshold:  {CONVERGENCE_THRESHOLD:.1f}%")
     print(f"Smoother method:        {METHOD}")
     if METHOD == "convex":
-        print(f"  eps_xy={EPS_XY}, eps_z={EPS_Z}, beta={BETA}, rho_xy={RHO_XY}, rho_z={RHO_Z}, lambda_tv={LAMBDA_TV}")
+        print(f"  beta={BETA}, lambda_tv={LAMBDA_TV}, lambda_v={LAMBDA_V}, r0={R0}")
     elif METHOD == "threshold":
         print(f"  vel_threshold={VEL_THRESHOLD} m/s")
     print("="*60)

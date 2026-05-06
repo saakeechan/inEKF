@@ -93,7 +93,7 @@ struct ReplayConfig : public LeggedEstimatorParams {
       (Vector(9) << 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10)
           .finished();
   double sigmaGyro = std::sqrt(1e-2);
-  double sigmaIntegration = 1e-3;
+  double sigmaIntegration = std::sqrt(1e-6);
   double sigmaAcc = std::sqrt(1e1);
   double biasAccRandomWalkSigma = std::sqrt(1e-10);
   double biasOmegaRandomWalkSigma = std::sqrt(1e-10);
@@ -691,6 +691,10 @@ ReplayOutputs replayFilter(const std::string& filterName,
   size_t previousCsvTimeIndex = 0;
   bool havePreviousCsvTimeIndex = false;
   
+  // Track which feet are currently in contact according to the estimator
+  // (Updated when contacts are processed from contacts.csv)
+  std::vector<bool> currentEstimatorContactStates(numFeet, false);
+  
   // Helper lambda to extract GT foot positions from CSV at given time index
   auto getGTFootPositions = [&](size_t timeIndex) -> std::vector<Vector3> {
     std::vector<Vector3> positions(numFeet);
@@ -781,16 +785,10 @@ ReplayOutputs replayFilter(const std::string& filterName,
     return positions;
   };
 
-  // Helper lambda to get contact states from CSV
+  // Helper lambda to get contact states from estimator (processed from contacts.csv)
+  // NOT from ground truth CSV - this reflects what the estimator actually uses
   auto getContactStates = [&](size_t timeIndex) -> std::vector<bool> {
-    std::vector<bool> contacts(numFeet, false);
-    if (haveGroundTruthFootData && timeIndex < gtFootData.num_rows) {
-      if (numFeet >= 2) {
-        contacts[0] = (gtFootData.lfoot_contact[timeIndex] > 0.5);
-        contacts[1] = (gtFootData.rfoot_contact[timeIndex] > 0.5);
-      }
-    }
-    return contacts;
+    return currentEstimatorContactStates;
   };
   
   // Helper lambda to find closest CSV time index for a given timestamp.
@@ -865,6 +863,10 @@ ReplayOutputs replayFilter(const std::string& filterName,
       logState("imu", currentTime);
     }
 
+    // Reset all contacts to zero at every timestep - no carry-forward behavior.
+    // Only mark feet as in contact if there's an event at this specific timestep.
+    std::fill(currentEstimatorContactStates.begin(), currentEstimatorContactStates.end(), false);
+
     while (
         updateIndex < contactReplayPlan.scheduledPacketIndices.size() &&
         std::abs(contactReplayPlan
@@ -875,6 +877,14 @@ ReplayOutputs replayFilter(const std::string& filterName,
       const ContactPacketDecision& update =
           contactReplayPlan.packetDecisions
               [contactReplayPlan.scheduledPacketIndices[updateIndex]];
+      
+      // Populate contact states only for feet listed in this event
+      for (const ContactMeasurement& contact : update.activeContacts) {
+        if (contact.foot < numFeet) {
+          currentEstimatorContactStates[contact.foot] = true;
+        }
+      }
+      
       estimator->processContacts(update.activeContacts);
       const ExtendedPose3d estimate = estimator->estimate();
       const Matrix footholds = footholdsFromEstimate(estimate);
