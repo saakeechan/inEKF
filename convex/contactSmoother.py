@@ -51,7 +51,7 @@ def load_velocities(velocities_path: Path) -> pd.DataFrame:
 
     Expected columns (output of mainSmoother):
         timestamp_s,
-        left_foot_fk_vx/vy/vz,  right_foot_fk_vx/vy/vz,
+        left_foot_est_vx/vy/vz,  right_foot_est_vx/vy/vz,
         left_foot_contact,       right_foot_contact
 
     Returns DataFrame with added columns: left_est_vnorm, right_est_vnorm.
@@ -59,14 +59,14 @@ def load_velocities(velocities_path: Path) -> pd.DataFrame:
     df = pd.read_csv(velocities_path)
 
     df['left_est_vnorm'] = np.sqrt(
-        df['left_foot_fk_vx'] ** 2 +
-        df['left_foot_fk_vy'] ** 2 +
-        df['left_foot_fk_vz'] ** 2
+        df['left_foot_est_vx'] ** 2 +
+        df['left_foot_est_vy'] ** 2 +
+        df['left_foot_est_vz'] ** 2
     )
     df['right_est_vnorm'] = np.sqrt(
-        df['right_foot_fk_vx'] ** 2 +
-        df['right_foot_fk_vy'] ** 2 +
-        df['right_foot_fk_vz'] ** 2
+        df['right_foot_est_vx'] ** 2 +
+        df['right_foot_est_vy'] ** 2 +
+        df['right_foot_est_vz'] ** 2
     )
     return df
 
@@ -100,6 +100,25 @@ def processContactSequence(
     assert len(lfoot_contact_seq) == len(vel_df), "lfoot sequence length mismatch"
     assert len(rfoot_contact_seq) == len(vel_df), "rfoot sequence length mismatch"
     
+    # Merge vel_df with fk_df on timestamp to ensure proper alignment
+    # This handles any index mismatches between the two CSVs
+    merged_df = pd.merge(
+        vel_df[['timestamp_s']],
+        fk_df,
+        on='timestamp_s',
+        how='left'
+    )
+    
+    # Verify merge succeeded
+    if len(merged_df) != len(vel_df):
+        raise ValueError(f"FK merge failed: expected {len(vel_df)} rows, got {len(merged_df)}")
+    if merged_df[['left_foot_fk_x', 'right_foot_fk_x']].isna().any().any():
+        missing_count = merged_df['left_foot_fk_x'].isna().sum()
+        raise ValueError(
+            f"FK data missing for {missing_count} timestamps. "
+            f"Ensure FK CSV and velocities CSV have matching timestamps."
+        )
+    
     # Build contact sequence from smoothed arrays
     # Follows csvOrganizer.cpp logic: write event for EVERY timestep where any foot is in contact
     new_rows = []
@@ -116,8 +135,8 @@ def processContactSequence(
         write_event = lfoot_contact or rfoot_contact
         
         if write_event:
-            # Get FK values for this timestep
-            fk_row = fk_df.iloc[i]
+            # Get FK values for this timestep (now from merged DataFrame)
+            fk_row = merged_df.iloc[i]
             
             # Detect new contacts
             lfoot_new_contact = lfoot_contact and not prev_lfoot
@@ -345,16 +364,28 @@ def convexSmoother(
     prior_lfoot = history_lfoot[0]
     prior_rfoot = history_rfoot[0]
     
+    # Check if history length matches current data length - reset if not
+    # (This can happen when contact changes alter the number of timesteps)
+    if len(prior_lfoot) != len(lfoot_seq) or len(prior_rfoot) != len(rfoot_seq):
+        print(f"    Warning: History length mismatch detected")
+        print(f"      Left foot: history={len(prior_lfoot)}, current={len(lfoot_seq)}")
+        print(f"      Right foot: history={len(prior_rfoot)}, current={len(rfoot_seq)}")
+        print(f"    Resetting history to start fresh with current data")
+        history_lfoot = [lfoot_seq.copy()]
+        history_rfoot = [rfoot_seq.copy()]
+        prior_lfoot = history_lfoot[0]
+        prior_rfoot = history_rfoot[0]
+    
     # Use LATEST sequence for convergence check
     latest_lfoot = history_lfoot[-1]
     latest_rfoot = history_rfoot[-1]
     
 
     # Extract separate XY and Z velocity components for each foot
-    vel_left_xy  = velocities_df[['left_foot_fk_vx',  'left_foot_fk_vy']].values   # (n, 2)
-    vel_left_z   = velocities_df['left_foot_fk_vz'].values                            # (n,)
-    vel_right_xy = velocities_df[['right_foot_fk_vx', 'right_foot_fk_vy']].values   # (n, 2)
-    vel_right_z  = velocities_df['right_foot_fk_vz'].values                           # (n,)
+    vel_left_xy  = velocities_df[['left_foot_est_vx',  'left_foot_est_vy']].values   # (n, 2)
+    vel_left_z   = velocities_df['left_foot_est_vz'].values                            # (n,)
+    vel_right_xy = velocities_df[['right_foot_est_vx', 'right_foot_est_vy']].values   # (n, 2)
+    vel_right_z  = velocities_df['right_foot_est_vz'].values                           # (n,)
 
     def solve_contact_cvx(
         vel_xy: np.ndarray,
@@ -381,7 +412,7 @@ def convexSmoother(
         c0 = prior_contacts.astype(float)  # Always use first sequence as prior
         
         # Compute weighted velocity norm: ||v||_t = sqrt(vx^2 + vy^2 + beta_z*vz^2)
-        # where beta_z = 1 (penalize vertical velocity moderately)
+        # where beta_z = 2 (penalize vertical velocity moderately)
         beta_z = 1.0
         vnorm = np.sqrt(
             vel_xy[:, 0]**2 + vel_xy[:, 1]**2 + beta_z * vel_z**2
@@ -425,9 +456,28 @@ def convexSmoother(
         print(f"      prior={beta * float(cp.sum(r).value):.4f}  "
               f"TV={lambda_tv * float(cp.sum(d).value):.4f}  "
               f"vel_enc={vel_cost:.4f}")
-        print(f"      contacts: {c0.sum():.0f}/{n} → {(c.value >= 0.5).sum()}/{n}")
+        
+        # Apply hysteresis thresholding with 0.6/0.4 thresholds
+        # If c >= 0.6: contact ON
+        # If c <= 0.4: contact OFF
+        # If 0.4 < c < 0.6: keep previous timestep's state
+        result = np.zeros(n, dtype=bool)
+        for i in range(n):
+            if c.value[i] >= 0.6:
+                result[i] = True
+            elif c.value[i] <= 0.4:
+                result[i] = False
+            else:
+                # In the middle: keep previous timestep's state
+                if i == 0:
+                    # For first timestep, use prior contact state
+                    result[i] = c0[i] >= 0.5
+                else:
+                    result[i] = result[i-1]
+        
+        print(f"      contacts: {c0.sum():.0f}/{n} → {result.sum()}/{n}")
 
-        return c.value >= 0.5
+        return result
 
     # Solve per foot (using prior from history[0])
     print("    Solving convex optimization for left foot...")
@@ -449,32 +499,6 @@ def convexSmoother(
     if not converged:
         history_lfoot.append(lfoot_smooth.copy())
         history_rfoot.append(rfoot_smooth.copy())
-    
-    # print(f"  Convergence check:")
-    # print(f"    Changes from history[-1]: {total_changes}/{total_timesteps} = {change_pct:.2f}%")
-    # print(f"    Converged: {converged}")
-    
-    # # Log changes from PRIOR (for debugging)
-    # vel_left_norm  = np.linalg.norm(vel_left_xy,  axis=1)
-    # vel_right_norm = np.linalg.norm(vel_right_xy, axis=1)
-    # changes_from_prior = []
-    # for i in range(len(timestamps)):
-    #     if prior_lfoot[i] != lfoot_smooth[i]:
-    #         action = "added" if lfoot_smooth[i] else "removed"
-    #         changes_from_prior.append((timestamps[i], "left",  action, vel_left_norm[i]))
-    #     if prior_rfoot[i] != rfoot_smooth[i]:
-    #         action = "added" if rfoot_smooth[i] else "removed"
-    #         changes_from_prior.append((timestamps[i], "right", action, vel_right_norm[i]))
-
-    # if changes_from_prior:
-    #     print(f"  Contact adjustments from prior: {len(changes_from_prior)}")
-    #     # Only print first few to avoid clutter
-    #     for t, foot, action, v in changes_from_prior[:5]:
-    #         print(f"    t={t:.3f}s {foot} {action} (v_xy_norm={v:.4f} m/s)")
-    #     if len(changes_from_prior) > 5:
-    #         print(f"    ... and {len(changes_from_prior) - 5} more")
-    # else:
-    #     print("  No contact adjustments from prior")
 
     return lfoot_smooth, rfoot_smooth, converged, change_pct, history_lfoot, history_rfoot
 

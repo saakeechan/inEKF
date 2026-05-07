@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2026.5.5)  6 MAY 2026 01:24
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2026.5.5)  7 MAY 2026 03:03
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -441,46 +441,53 @@ Package caption Info: hyperref package is loaded.
 )
 \c@subfigure=\count298
 \c@subtable=\count299
-) (/usr/share/texlive/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def
+) (/usr/share/texlive/texmf-dist/tex/latex/multirow/multirow.sty
+Package: multirow 2021/03/15 v2.8 Span multiple rows of a table
+\multirow@colwidth=\skip56
+\multirow@cntb=\count300
+\multirow@dima=\skip57
+\bigstrutjot=\dimen197
+)
+(/usr/share/texlive/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def
 File: l3backend-pdftex.def 2022-01-12 L3 backend support: PDF output (pdfTeX)
-\l__color_backend_stack_int=\count300
+\l__color_backend_stack_int=\count301
 \l__pdf_internal_box=\box54
 )
 (./finalProject.aux)
 \openout1 = `finalProject.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 18.
-LaTeX Font Info:    ... okay on input line 18.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 18.
-LaTeX Font Info:    ... okay on input line 18.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 18.
-LaTeX Font Info:    ... okay on input line 18.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 18.
-LaTeX Font Info:    ... okay on input line 18.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 18.
-LaTeX Font Info:    ... okay on input line 18.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 18.
-LaTeX Font Info:    ... okay on input line 18.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 18.
-LaTeX Font Info:    ... okay on input line 18.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 18.
-LaTeX Font Info:    ... okay on input line 18.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 18.
-LaTeX Font Info:    ... okay on input line 18.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
 
 -- Lines per column: 56 (exact).
 (/usr/share/texlive/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
 [Loading MPS to PDF converter (version 2006.09.02).]
-\scratchcounter=\count301
-\scratchdimen=\dimen197
+\scratchcounter=\count302
+\scratchdimen=\dimen198
 \scratchbox=\box55
-\nofMPsegments=\count302
-\nofMParguments=\count303
+\nofMPsegments=\count303
+\nofMParguments=\count304
 \everyMPshowfont=\toks23
-\MPscratchCnt=\count304
-\MPscratchDim=\dimen198
-\MPnumerator=\count305
-\makeMPintoPDFobject=\count306
+\MPscratchCnt=\count305
+\MPscratchDim=\dimen199
+\MPnumerator=\count306
+\makeMPintoPDFobject=\count307
 \everyMPtoPDFconversion=\toks24
 ) (/usr/share/texlive/texmf-dist/tex/latex/epstopdf-pkg/epstopdf-base.sty
 Package: epstopdf-base 2020-01-24 v2.11 Base part for package epstopdf
@@ -491,7 +498,7 @@ Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 4
 File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Liv
 e
 ))
-Package hyperref Info: Link coloring OFF on input line 18.
+Package hyperref Info: Link coloring OFF on input line 19.
 
 (/usr/share/texlive/texmf-dist/tex/latex/hyperref/nameref.sty
 Package: nameref 2021-04-02 v2.47 Cross-referencing by name of section
@@ -502,11 +509,11 @@ Package: refcount 2019/12/15 v3.6 Data extraction from label references (HO)
 (/usr/share/texlive/texmf-dist/tex/generic/gettitlestring/gettitlestring.sty
 Package: gettitlestring 2019/12/15 v1.6 Cleanup title references (HO)
 )
-\c@section@level=\count307
+\c@section@level=\count308
 )
-LaTeX Info: Redefining \ref on input line 18.
-LaTeX Info: Redefining \pageref on input line 18.
-LaTeX Info: Redefining \nameref on input line 18.
+LaTeX Info: Redefining \ref on input line 19.
+LaTeX Info: Redefining \pageref on input line 19.
+LaTeX Info: Redefining \nameref on input line 19.
 
 (./finalProject.out) (./finalProject.out)
 \@outlinefile=\write3
@@ -514,13 +521,13 @@ LaTeX Info: Redefining \nameref on input line 18.
 
 Package caption Info: Begin \AtBeginDocument code.
 Package caption Info: End \AtBeginDocument code.
-LaTeX Font Info:    Trying to load font information for U+msa on input line 76.
+LaTeX Font Info:    Trying to load font information for U+msa on input line 77.
 
 
 (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/umsa.fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 76.
+LaTeX Font Info:    Trying to load font information for U+msb on input line 77.
 
 
 (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/umsb.fd
@@ -529,93 +536,197 @@ File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 
 
 ]
-Overfull \hbox (38.86504pt too wide) detected at line 177
+Overfull \hbox (38.86504pt too wide) detected at line 178
 [][][] [] [][] \OT1/cmr/m/n/10 + [] [] \OML/cmm/m/it/10 c[] [][] ;
  []
 
 
-Underfull \hbox (badness 7012) in paragraph at lines 214--219
+Underfull \hbox (badness 7012) in paragraph at lines 215--220
 []\OT1/ptm/m/n/10 Because of these chal-lenges, joint contact-and-state
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 214--219
+Underfull \hbox (badness 10000) in paragraph at lines 215--220
 
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 214--219
+Underfull \hbox (badness 10000) in paragraph at lines 215--220
 
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 214--219
+Underfull \hbox (badness 10000) in paragraph at lines 215--220
 
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 214--219
+Underfull \hbox (badness 10000) in paragraph at lines 215--220
 
  []
 
 [2]
-Underfull \hbox (badness 10000) in paragraph at lines 315--319
+Underfull \hbox (badness 10000) in paragraph at lines 301--305
 
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 315--319
+Underfull \hbox (badness 10000) in paragraph at lines 301--305
 
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 315--319
+Underfull \hbox (badness 10000) in paragraph at lines 301--305
 
- []
-
-
-Overfull \hbox (3.64574pt too wide) detected at line 332
-[]
  []
 
 [3]
-Underfull \hbox (badness 7468) in paragraph at lines 349--350
+Underfull \hbox (badness 7468) in paragraph at lines 332--333
 []\OT1/ptm/b/n/10 CVXPY\OT1/ptm/m/n/10 : Con-vex op-ti-miza-tion mod-el-ing lan
 -guage
  []
 
 
-Underfull \hbox (badness 2080) in paragraph at lines 404--405
+Underfull \hbox (badness 2080) in paragraph at lines 387--388
 []\OT1/ptm/m/n/10 We com-pare the pro-posed con-vex con-tact re-fine-ment
  []
 
 
-Underfull \hbox (badness 3029) in paragraph at lines 422--422
-[]\OT1/ptm/m/n/10 TABLE I: |Per-for-mance Com-par-i-son on Bipedal Robot
- []
-
-
-Underfull \hbox (badness 2617) in paragraph at lines 444--445
+Underfull \hbox (badness 2617) in paragraph at lines 448--449
 []\OT1/ptm/b/n/10 Global op-ti-mal-ity\OT1/ptm/m/n/10 : LP guar-an-tees global 
 op-ti-mum
  []
 
-[4]
-Underfull \hbox (badness 1701) in paragraph at lines 485--486
-[]\OT1/ptm/m/n/10 We an-a-lyzed foot ve-loc-ity norms through-out a stair-
- []
-
-[5]
-Underfull \hbox (badness 6876) in paragraph at lines 572--573
+[4] [5]
+Underfull \hbox (badness 6876) in paragraph at lines 592--593
 []\OT1/ptm/m/n/8 J. A. J. Hall and I. Huangfu, ``HiGHS: High per-for-mance
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 572--573
+Underfull \hbox (badness 10000) in paragraph at lines 592--593
 \OT1/ptm/m/n/8 soft-ware for lin-ear op-ti-miza-tion,'' 2023. [On-line]. Avail-
 able:
  []
 
+** WARNING: Ignoring useless \section in Appendix (line 598).
+<../results/Figures/Baseline/baselinePos800.png, id=238, 1606.0pt x 421.575pt>
+File: ../results/Figures/Baseline/baselinePos800.png Graphic file (type png)
+<use ../results/Figures/Baseline/baselinePos800.png>
+Package pdftex.def Info: ../results/Figures/Baseline/baselinePos800.png  used o
+n input line 607.
+(pdftex.def)             Requested size: 247.6778pt x 65.01538pt.
+<../results/Figures/Convex/convexPos800.png, id=240, 1606.0pt x 421.575pt>
+File: ../results/Figures/Convex/convexPos800.png Graphic file (type png)
+<use ../results/Figures/Convex/convexPos800.png>
+Package pdftex.def Info: ../results/Figures/Convex/convexPos800.png  used on in
+put line 612.
+(pdftex.def)             Requested size: 247.6778pt x 65.01538pt.
+<../results/Figures/Threshold/thresholdPos800.png, id=241, 1606.0pt x 421.575pt
+>
+File: ../results/Figures/Threshold/thresholdPos800.png Graphic file (type png)
+<use ../results/Figures/Threshold/thresholdPos800.png>
+Package pdftex.def Info: ../results/Figures/Threshold/thresholdPos800.png  used
+ on input line 619.
+(pdftex.def)             Requested size: 247.6778pt x 65.01538pt.
+<../results/Figures/Baseline/baselineVel800.png, id=242, 1204.5pt x 421.575pt>
+File: ../results/Figures/Baseline/baselineVel800.png Graphic file (type png)
+<use ../results/Figures/Baseline/baselineVel800.png>
+Package pdftex.def Info: ../results/Figures/Baseline/baselineVel800.png  used o
+n input line 624.
+(pdftex.def)             Requested size: 247.6778pt x 86.68716pt.
+<../results/Figures/Convex/convexVel800.png, id=243, 1204.5pt x 421.575pt>
+File: ../results/Figures/Convex/convexVel800.png Graphic file (type png)
+<use ../results/Figures/Convex/convexVel800.png>
+Package pdftex.def Info: ../results/Figures/Convex/convexVel800.png  used on in
+put line 631.
+(pdftex.def)             Requested size: 247.6778pt x 86.68716pt.
+<../results/Figures/Threshold/thresholdVel800.png, id=244, 1204.5pt x 421.575pt
+>
+File: ../results/Figures/Threshold/thresholdVel800.png Graphic file (type png)
+<use ../results/Figures/Threshold/thresholdVel800.png>
+Package pdftex.def Info: ../results/Figures/Threshold/thresholdVel800.png  used
+ on input line 636.
+(pdftex.def)             Requested size: 247.6778pt x 86.68716pt.
+<../results/Figures/Baseline/baselinePosG1.png, id=245, 1606.0pt x 421.575pt>
+File: ../results/Figures/Baseline/baselinePosG1.png Graphic file (type png)
+<use ../results/Figures/Baseline/baselinePosG1.png>
+Package pdftex.def Info: ../results/Figures/Baseline/baselinePosG1.png  used on
+ input line 648.
+(pdftex.def)             Requested size: 247.6778pt x 65.01538pt.
+<../results/Figures/Convex/convexPosG1.png, id=246, 1606.0pt x 421.575pt>
+File: ../results/Figures/Convex/convexPosG1.png Graphic file (type png)
+<use ../results/Figures/Convex/convexPosG1.png>
+Package pdftex.def Info: ../results/Figures/Convex/convexPosG1.png  used on inp
+ut line 653.
+(pdftex.def)             Requested size: 247.6778pt x 65.01538pt.
+<../results/Figures/Threshold/thresholdPosG1.png, id=247, 1606.0pt x 421.575pt>
+
+File: ../results/Figures/Threshold/thresholdPosG1.png Graphic file (type png)
+<use ../results/Figures/Threshold/thresholdPosG1.png>
+Package pdftex.def Info: ../results/Figures/Threshold/thresholdPosG1.png  used 
+on input line 660.
+(pdftex.def)             Requested size: 247.6778pt x 65.01538pt.
+<../results/Figures/Baseline/baselineVelG1.png, id=248, 1204.5pt x 421.575pt>
+File: ../results/Figures/Baseline/baselineVelG1.png Graphic file (type png)
+<use ../results/Figures/Baseline/baselineVelG1.png>
+Package pdftex.def Info: ../results/Figures/Baseline/baselineVelG1.png  used on
+ input line 665.
+(pdftex.def)             Requested size: 247.6778pt x 86.68716pt.
+<../results/Figures/Convex/convexVelG1.png, id=249, 1204.5pt x 421.575pt>
+File: ../results/Figures/Convex/convexVelG1.png Graphic file (type png)
+<use ../results/Figures/Convex/convexVelG1.png>
+Package pdftex.def Info: ../results/Figures/Convex/convexVelG1.png  used on inp
+ut line 672.
+(pdftex.def)             Requested size: 247.6778pt x 86.68716pt.
+<../results/Figures/Threshold/thresholdVelG1.png, id=250, 1204.5pt x 421.575pt>
+
+File: ../results/Figures/Threshold/thresholdVelG1.png Graphic file (type png)
+<use ../results/Figures/Threshold/thresholdVelG1.png>
+Package pdftex.def Info: ../results/Figures/Threshold/thresholdVelG1.png  used 
+on input line 677.
+(pdftex.def)             Requested size: 247.6778pt x 86.68716pt.
+<../results/Figures/Baseline/baselinePosenv2.png, id=251, 1606.0pt x 421.575pt>
+
+File: ../results/Figures/Baseline/baselinePosenv2.png Graphic file (type png)
+<use ../results/Figures/Baseline/baselinePosenv2.png>
+Package pdftex.def Info: ../results/Figures/Baseline/baselinePosenv2.png  used 
+on input line 689.
+(pdftex.def)             Requested size: 247.6778pt x 65.01538pt.
+<../results/Figures/Convex/convexPosenv2.png, id=252, 1606.0pt x 421.575pt>
+File: ../results/Figures/Convex/convexPosenv2.png Graphic file (type png)
+<use ../results/Figures/Convex/convexPosenv2.png>
+Package pdftex.def Info: ../results/Figures/Convex/convexPosenv2.png  used on i
+nput line 694.
+(pdftex.def)             Requested size: 247.6778pt x 65.01538pt.
+<../results/Figures/Threshold/thresholdPosenv2.png, id=253, 1606.0pt x 421.575p
+t>
+File: ../results/Figures/Threshold/thresholdPosenv2.png Graphic file (type png)
+
+<use ../results/Figures/Threshold/thresholdPosenv2.png>
+Package pdftex.def Info: ../results/Figures/Threshold/thresholdPosenv2.png  use
+d on input line 701.
+(pdftex.def)             Requested size: 247.6778pt x 65.01538pt.
+<../results/Figures/Baseline/baselineVelenv2.png, id=254, 1204.5pt x 421.575pt>
+
+File: ../results/Figures/Baseline/baselineVelenv2.png Graphic file (type png)
+<use ../results/Figures/Baseline/baselineVelenv2.png>
+Package pdftex.def Info: ../results/Figures/Baseline/baselineVelenv2.png  used 
+on input line 706.
+(pdftex.def)             Requested size: 247.6778pt x 86.68716pt.
+<../results/Figures/Convex/convexVelenv2.png, id=255, 1204.5pt x 421.575pt>
+File: ../results/Figures/Convex/convexVelenv2.png Graphic file (type png)
+<use ../results/Figures/Convex/convexVelenv2.png>
+Package pdftex.def Info: ../results/Figures/Convex/convexVelenv2.png  used on i
+nput line 713.
+(pdftex.def)             Requested size: 247.6778pt x 86.68716pt.
+<../results/Figures/Threshold/thresholdVelenv2.png, id=256, 1204.5pt x 421.575p
+t>
+File: ../results/Figures/Threshold/thresholdVelenv2.png Graphic file (type png)
+
+<use ../results/Figures/Threshold/thresholdVelenv2.png>
+Package pdftex.def Info: ../results/Figures/Threshold/thresholdVelenv2.png  use
+d on input line 718.
+(pdftex.def)             Requested size: 247.6778pt x 86.68716pt.
 
 ** Conference Paper **
 Before submitting the final camera ready copy, remember to:
@@ -627,40 +738,50 @@ Before submitting the final camera ready copy, remember to:
  uses only Type 1 fonts and that every step in the generation
  process uses the appropriate paper size.
 
-[6] (./finalProject.aux)
+[6] [7 <../results/Figures/Baseline/baselinePos800.png> <../results/Figures/Con
+vex/convexPos800.png> <../results/Figures/Threshold/thresholdPos800.png> <../re
+sults/Figures/Baseline/baselineVel800.png> <../results/Figures/Convex/convexVel
+800.png> <../results/Figures/Threshold/thresholdVel800.png>] [8 <../results/Fig
+ures/Baseline/baselinePosG1.png> <../results/Figures/Convex/convexPosG1.png> <.
+./results/Figures/Threshold/thresholdPosG1.png> <../results/Figures/Baseline/ba
+selineVelG1.png> <../results/Figures/Convex/convexVelG1.png> <../results/Figure
+s/Threshold/thresholdVelG1.png>] [9 <../results/Figures/Baseline/baselinePosenv
+2.png> <../results/Figures/Convex/convexPosenv2.png> <../results/Figures/Thresh
+old/thresholdPosenv2.png> <../results/Figures/Baseline/baselineVelenv2.png> <..
+/results/Figures/Convex/convexVelenv2.png> <../results/Figures/Threshold/thresh
+oldVelenv2.png>] (./finalProject.aux)
 Package rerunfilecheck Info: File `finalProject.out' has not changed.
-(rerunfilecheck)             Checksum: 9C4BFC73601676CD53007E531778E2D0;5752.
+(rerunfilecheck)             Checksum: 798507A1F4372D8571AA5756724F3F8C;5823.
  ) 
 Here is how much of TeX's memory you used:
- 12486 strings out of 480171
- 200248 string characters out of 5894490
- 518181 words of memory out of 5000000
- 30163 multiletter control sequences out of 15000+600000
- 515001 words of font info for 115 fonts, out of 8000000 for 9000
+ 12699 strings out of 480171
+ 207723 string characters out of 5894490
+ 514641 words of memory out of 5000000
+ 30347 multiletter control sequences out of 15000+600000
+ 513417 words of font info for 113 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
- 67i,13n,77p,408b,441s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 67i,11n,77p,609b,461s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/share/texliv
 e/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/share/texlive/texm
 f-dist/fonts/type1/public/amsfonts/cm/cmbx7.pfb></usr/share/texlive/texmf-dist/
 fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/share/texlive/texmf-dist/fonts/
 type1/public/amsfonts/cm/cmmi10.pfb></usr/share/texlive/texmf-dist/fonts/type1/
 public/amsfonts/cm/cmmi5.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/
-amsfonts/cm/cmmi6.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfont
-s/cm/cmmi7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cm
-mi8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmib10.p
-fb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></us
-r/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr5.pfb></usr/share/
-texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/share/texlive/
-texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-
-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/share/texlive/texmf-dist/fo
-nts/type1/public/amsfonts/symbols/msbm10.pfb></usr/share/texlive/texmf-dist/fon
-ts/type1/urw/times/utmb8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/ti
-mes/utmbi8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmr8a.pfb
-></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on finalProject.pdf (6 pages, 239185 bytes).
+amsfonts/cm/cmmi7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfont
+s/cm/cmmib10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/
+cmr10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr5.pf
+b></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/
+share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/
+texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/share/texlive
+/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/share/texlive/
+texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/share/texlive/texmf-dist/font
+s/type1/urw/times/utmbi8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/ti
+mes/utmr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmri8a.pfb
+>
+Output written on finalProject.pdf (9 pages, 1644015 bytes).
 PDF statistics:
- 348 PDF objects out of 1000 (max. 8388607)
- 299 compressed objects within 3 object streams
- 108 named destinations out of 1000 (max. 500000)
- 233 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 397 PDF objects out of 1000 (max. 8388607)
+ 312 compressed objects within 4 object streams
+ 112 named destinations out of 1000 (max. 500000)
+ 339 words of extra memory for PDF output out of 10000 (max. 10000000)
 

@@ -117,8 +117,6 @@ def main():
         print(f"Loaded {len(data)} data points.")
     except FileNotFoundError:
         print(f"Error: File not found: {csv_file}")
-        print(f"\nUsage: python3 {sys.argv[0]} [csv_file]")
-        print(f"Example: python3 {sys.argv[0]} results/2026-05-04_19-51-14.csv")
         return
     except Exception as e:
         print(f"Error reading CSV file: {e}")

@@ -11,6 +11,7 @@
 \usepackage{hyperref}
 \usepackage{booktabs}
 \usepackage{subcaption}
+\usepackage{multirow}
 
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
@@ -35,13 +36,13 @@ This paper presents a convex optimization framework for contact sequence refinem
 estimation for bipedal robots. Legged robots rely on contact measurements as a key sensory modality, treating foothold 
 positions as landmarks in a factor graph optimization. However, inaccurate contacts and foot slip violate the zero-velocity
  assumption of the foot in contact which is critical for accurate state estimation. We propose an outer-loop convex optimization
- method that refines contact sequences by minimizing foot velocity residuals while preserving
-  temporal smoothness. The contact refinement problem is formulated as a Linear Program (LP)
-   with continuous relaxation of binary contact states, velocity threshold constraints, and total variation 
-   regularization. Implemented on top of GTSAM's fixed-lag smoother, the approach demonstrates significant improvements
-    in state estimation accuracy on bipedal robot datasets (Unitree G1). Results show INPUT  reduction in trajectory
-     drift and INPUT  improvement in contact-constrained velocity consistency compared to baseline factor graph smoothing
-      without contact refinement.
+ method that refines contact sequences by penalizing velocity residuals above a threshold weighted by contact probability,
+  while preserving temporal smoothness. The contact refinement problem is formulated as a Linear Program (LP)
+   with continuous relaxation of binary contact states. Implemented on top of GTSAM's fixed-lag smoother, the approach 
+    demonstrates significant improvements in state estimation accuracy on bipedal robot datasets (Unitree G1). 
+    Results show 39.9\% average reduction in position error and 22.5\% improvement in velocity consistency compared to 
+    baseline factor graph smoothing. Against simple threshold-based methods, improvements reach 84.3\% in position 
+    accuracy and 51.8\% in velocity consistency.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -224,7 +225,7 @@ Our main idea is to run contact refinement and trajectory smoothing as an altern
 Starting from an initial, possibly noisy contact sequence, we first solve a standard factor graph smoothing problem to estimate the robot trajectory $\{\mathbf{x}_t\}$ and foothold positions $\{\mathbf{l}_i\}$. 
 We then use this trajectory to compute foot velocities and solve a convex optimization problem that refines the contact sequence using velocity consistency, contact priors, and temporal smoothness.
 
-The refined contact sequence is passed back into the smoother, and the process is repeated until the contacts converge or change only minimally between iterations. 
+The refined contact sequence is passed back into the smoother, and the process is repeated until the contacts change only minimally between iterations. 
 This avoids directly solving the fully coupled contact-and-trajectory optimization problem, which is nonlinear and mixed discrete-continuous. 
 Instead, the method alternates between two easier subproblems: nonlinear smoothing with fixed contacts, and convex contact refinement with a fixed trajectory.
 \section{Convex Reformulation / Convexification}
@@ -260,42 +261,27 @@ This hysteresis rule prevents rapid switching when the relaxed contact value is 
 
 \subsection{Velocity-Based LP Formulation}
 
-For each foot $i$, we separate the foot velocity into horizontal (XY) and vertical (Z) components:
-\begin{align}
-\mathbf{v}_t^{i,xy} &= [v_{t,x}^i, v_{t,y}^i]^T, \\
-v_t^{i,z} &= v_{t,z}^i .
-\end{align}
+Our key insight is to formulate the contact refinement objective such that contact is encouraged when the foot velocity
+is below a threshold. We define the velocity residual for foot $i$ at time $t$ as:
+\begin{equation}
+\rho_t^i = \|\mathbf{v}_t^{i,\text{FK}}\|_2 - r_0
+\end{equation}
 
-This separation is useful because the vertical and horizontal components have different physical interpretations during contact. 
-The vertical component is associated with the foot moving into or away from the terrain. 
-For rigid or approximately rigid terrain, the stance foot should not move significantly in the vertical direction because the ground does not sink under the foot. 
-Therefore, vertical velocity provides a strong indication of whether the foot is truly fixed in contact.
+where $\|\mathbf{v}_t^{i,\text{FK}}\|_2$ is the norm of the foot velocity computed from forward kinematics (Eq. 4),
+and $r_0$ is a velocity threshold parameter (typically 0.2 m/s).
 
-The horizontal components correspond to tangential motion along the terrain surface. 
-Unlike vertical motion, horizontal motion may occur during slipping, scuffing, or imperfect contact. 
-Thus, a contacted foot may still have nonzero XY velocity if the no-slip assumption is violated. 
-For this reason, we model the XY and Z velocity consistency conditions separately, allowing different thresholds and slack penalties for each direction.
+We incorporate this directly into the objective as:
+\begin{equation}
+\lambda_V \sum_{t=1}^{T} \rho_t^i \cdot c_t^i = \lambda_V \sum_{t=1}^{T} (\|\mathbf{v}_t^{i,\text{FK}}\|_2 - r_0) \cdot c_t^i
+\end{equation}
 
-We introduce slack variables $s_t^{xy}, s_t^z \geq 0$ to handle velocity violations. 
-We use slack variables instead of strictly enforcing the velocity to remain below a hard threshold because the computed foot velocities are themselves noisy. 
-In particular, the foot velocity is obtained from forward kinematics using the estimated robot states and joint encoder measurements, as in Eq 4. 
-Both the smoothed state estimate and the encoder signals contain uncertainty, so the resulting estimated foot velocity may be nonzero even when the foot is truly in contact.
-A hard contact-gated constraint such as 
-$\|\mathbf{v}_t^{i,xy}\|_2 c_t^i \leq \epsilon_{xy} c_t^i$ or 
-$|v_t^{i,z}| c_t^i \leq \epsilon_z c_t^i$ could therefore incorrectly penalize or reject valid contacts due to measurement noise or estimation error.
-The slack variables make the constraint soft: velocity violations are allowed, but they incur a penalty in the objective.
-Since the velocity norms are precomputed from the current smoothed trajectory and are not decision variables, the constraints are linear:
-\begin{align}
-\|\mathbf{v}_t^{i,xy}\|_2 c_t^i 
-&\leq \epsilon_{xy} c_t^i + s_t^{xy}, 
-\label{eq:lp_xy} \\
-|v_t^{i,z}| c_t^i 
-&\leq \epsilon_z c_t^i + s_t^z .
-\label{eq:lp_z}
-\end{align}
+This formulation has a key property: when $\|\mathbf{v}_t^{i,\text{FK}}\|_2 < r_0$ (low velocity), the coefficient
+$\rho_t^i$ is negative, so the term contributes a negative cost, effectively \emph{rewarding} the optimizer for
+setting $c_t^i = 1$. Conversely, when $\|\mathbf{v}_t^{i,\text{FK}}\|_2 > r_0$ (high velocity), $\rho_t^i$ is positive,
+penalizing contact. This naturally encourages $c_t^i = 1$ when the foot is stationary and $c_t^i = 0$ when moving.
 
-Here, $\epsilon_{xy}$ and $\epsilon_z$ are velocity tolerance parameters. 
-In practice, $\epsilon_z$ can be chosen smaller than $\epsilon_{xy}$ because vertical motion is usually more strongly constrained during stance, while the horizontal direction may require additional tolerance due to tangential slipping.
+Since the velocity norms $\|\mathbf{v}_t^{i,\text{FK}}\|_2$ are precomputed from the current smoothed trajectory
+and are not decision variables, this term remains linear in the decision variable $c_t^i$.
 
 \subsection{Prior and Smoothness Regularization}
 To maintain consistency with the initial contact sequence $\bar{c}_t^i$ (from the baseline detector), we introduce a prior term using epigraph variables $r_t \geq 0$:
@@ -320,25 +306,22 @@ This enforces $d_t \geq |c_t^i - c_{t-1}^i|$, discouraging rapid contact switchi
 For each foot $i$ independently, we solve the following LP:
 
 \begin{align}
-\min_{c_{1:T}^i, s^{xy}, s^z, r, d} \quad & \beta \sum_{t=1}^{T} r_t + \rho_{xy} \sum_{t=1}^{T} s_t^{xy} + \rho_z \sum_{t=1}^{T} s_t^z + \lambda_{\text{TV}} \sum_{t=2}^{T} d_t \\
-\text{subject to} \quad & \|\mathbf{v}_t^{i,xy}\|_2 \cdot c_t^i \leq \epsilon_{xy} c_t^i + s_t^{xy} \quad \forall t \\  
-& |v_t^{i,z}| \cdot c_t^i \leq \epsilon_z c_t^i + s_t^z \quad \forall t \\
-& r_t \geq c_t^i - \bar{c}_t^i \quad \forall t \\
+\min_{c_{1:T}^i, r, d} \quad & \lambda_V \sum_{t=1}^{T} (\|\mathbf{v}_t^{i,\text{FK}}\|_2 - r_0) c_t^i + \beta \sum_{t=1}^{T} r_t + \lambda_{\text{TV}} \sum_{t=2}^{T} d_t \\
+\text{subject to} \quad & r_t \geq c_t^i - \bar{c}_t^i \quad \forall t \\
 & r_t \geq \bar{c}_t^i - c_t^i \quad \forall t \\
 & d_t \geq c_t^i - c_{t-1}^i \quad \forall t \geq 2 \\
 & d_t \geq c_{t-1}^i - c_t^i \quad \forall t \geq 2 \\
 & 0 \leq c_t^i \leq 1 \quad \forall t \\
-& s_t^{xy}, s_t^z, r_t, d_t \geq 0 \quad \forall t
+& r_t, d_t \geq 0 \quad \forall t
 \end{align}
 
 where:
 \begin{itemize}
+\item $\lambda_V > 0$: Weight for velocity-based contact term (can reward or penalize contact)
+\item $r_0 > 0$: Velocity threshold parameter (0.3m/s in our experiments)
 \item $\beta > 0$: Weight for prior deviation
-\item $\rho_{xy}, \rho_z > 0$: Weights for velocity slack penalties
 \item $\lambda_{\text{TV}} > 0$: Weight for total variation smoothness
 \end{itemize}
-
-This is a convex Linear Program (LP) and can be efficiently solved using modern LP solvers such as HiGHS \cite{highs}.
 
 \section{Solving the Convex Problem}
 
@@ -352,18 +335,18 @@ We implement the system using:
 
 For each foot, the LP has:
 \begin{itemize}
-\item Decision variables: $4T$ (contact states $c_t$, slacks $s_t^{xy}, s_t^z$, epigraphs $r_t, d_t$)
-\item Linear constraints: $6T$ (XY and Z velocity bounds + epigraph bounds)
+\item Decision variables: $3T$ (contact states $c_t$, epigraphs $r_t, d_t$)
+\item Linear constraints: $4T$ (epigraph bounds for prior and TV regularization)
 \end{itemize}
 
-Typical solve time: 0.05–0.2 seconds for $T = 800$ timesteps.
+Typical solve time: 0.05 seconds for $T = 500$ timesteps.
 
 \subsection{Outer-Loop Refinement Algorithm}
 Our complete estimation pipeline consists of two nested loops:
 
 \textbf{Algorithm 1: Contact-Refined Factor Graph Smoothing}
 \begin{algorithmic}
-\STATE \textbf{Input:} IMU data $\{\mathbf{u}_t\}$, initial contact sequence $\{\bar{c}_t^i\}$, parameters $(\epsilon_{xy}, \epsilon_z, \beta, \rho_{xy}, \rho_z, \lambda_{\text{TV}})$
+\STATE \textbf{Input:} IMU data $\{\mathbf{u}_t\}$, initial contact sequence $\{\bar{c}_t^i\}$, parameters $(r_0, \lambda_V, \beta, \lambda_{\text{TV}})$
 \STATE \textbf{Output:} Refined trajectory $\{\mathbf{x}_t^*\}$, refined contacts $\{\hat{c}_t^i\}$
 \STATE
 \STATE // \textbf{Inner loop}: Factor graph optimization
@@ -376,13 +359,13 @@ Our complete estimation pipeline consists of two nested loops:
 \FOR{$t = 1$ to $T$}
     \FOR{each foot $i$}
         \STATE Compute $\mathbf{v}_t^{i,\text{FK}}$ using forward kinematics (Eq. 4)
-        \STATE Extract velocity components: $\mathbf{v}_t^{i,xy}$, $v_t^{i,z}$
+        \STATE Compute velocity norm: $\|\mathbf{v}_t^{i,\text{FK}}\|_2$
     \ENDFOR
 \ENDFOR
 \STATE
 \STATE // \textbf{Outer loop}: Convex contact refinement
 \FOR{each foot $i = 1$ to $F$}
-    \STATE Formulate LP with velocity data $\{\mathbf{v}_t^{i,xy}, v_t^{i,z}\}$
+    \STATE Formulate LP with velocity norms $\{\|\mathbf{v}_t^{i,\text{FK}}\|_2\}$
     \STATE Solve LP using CVXPY + SciPy/HiGHS solver
     \STATE Apply hysteresis thresholding: $\hat{c}_t^i = 1$ if $c_t^i \geq 0.6$, $\hat{c}_t^i = 0$ if $c_t^i \leq 0.4$, else $\hat{c}_t^i = \hat{c}_{t-1}^i$
 \ENDFOR
@@ -416,150 +399,187 @@ We evaluate methods on:
 \end{itemize}
 
 \subsection{Experimental Results}
-Table \ref{tab:comparison} summarizes performance across two bipedal robot datasets:
-
-\begin{table}[htbp]
-\caption{Performance Comparison on Bipedal Robot Datasets}
+Table \ref{tab:comparison} summarizes performance across three bipedal robot datasets comparing our convex optimization approach against baseline factor graph smoothing and simple threshold-based contact detection.
+For velocity thresholding, we set the foot velocity threshold as 0.3m/s Beyond this 
+threshold, the contact is turned off.
+The weighting parameters for the convex optimization were set as $\lambda_V = 3$, $\beta = 8$, and $\lambda_{\text{TV}} = 1$, and our
+residual threshold was set as $r_0 = 0.3$ m/s.
+\begin{table*}[htbp]
+\caption{Performance Comparison: Convex Refinement vs. Baseline Methods}
 \begin{center}
-\begin{tabular}{lcccc}
+\small
+\begin{tabular}{llcccccc}
 \toprule
-\textbf{Method} & \textbf{Pos. Error} & \textbf{Vel. Cons.} & \textbf{Smooth.} & \textbf{Time} \\
-                & \textbf{(m)}        & \textbf{(m/s)}      & \textbf{(flips)} & \textbf{(s)}   \\
+\textbf{Dataset} & \textbf{Comparison} & \textbf{Ref. Pos.} & \textbf{Convex Pos.} & \textbf{Pos. Imp.} & \textbf{Ref. Vel.} & \textbf{Convex Vel.} & \textbf{Vel. Imp.} \\
+ & & \textbf{RMSE (m)} & \textbf{RMSE (m)} & \textbf{(\%)} & \textbf{RMSE (m/s)} & \textbf{RMSE (m/s)} & \textbf{(\%)} \\
 \midrule
-Threshold-only     & 0.42 & 2.87 & 42 & 0.01 \\
-FG baseline        & 0.38 & 2.31 & -- & 1.24 \\
-FG + Robust        & 0.34 & 1.98 & -- & 1.41 \\
-Greedy switching   & 0.31 & 1.75 & 38 & 0.89 \\
-\textbf{FG + LP (Ours)} & \textbf{0.29} & \textbf{1.62} & \textbf{28} & 1.38 \\
+\multirow{2}{*}{Dataset 1} 
+    & vs. Baseline & 0.3397 & 0.3108 & 8.5 & 0.2728 & 0.2278 & 16.5 \\
+    & vs. Thresholded & 0.8532 & 0.3108 & 63.6 & 0.3457 & 0.2278 & 34.1 \\
+\midrule
+\multirow{2}{*}{Dataset 2} 
+    & vs. Baseline & 0.8910 & 0.0977 & 89.0 & 0.7539 & 0.4732 & 37.2 \\
+    & vs. Thresholded & 3.7011 & 0.0977 & 97.4 & 2.0504 & 0.4732 & 76.9 \\
+\midrule
+\multirow{2}{*}{Dataset 3} 
+    & vs. Baseline & 0.5845 & 0.4551 & 22.1 & 0.5997 & 0.5178 & 13.7 \\
+    & vs. Thresholded & 5.6583 & 0.4551 & 92.0 & 0.9293 & 0.5178 & 44.3 \\
+\midrule
+\midrule
+\multicolumn{8}{c}{\textit{Aggregate Performance}} \\
+\midrule
+\multicolumn{2}{l}{\textbf{Avg. vs. Baseline}} & -- & -- & 39.9 & -- & -- & 22.5 \\
+\multicolumn{2}{l}{\textbf{Avg. vs. Thresholded}} & -- & -- & 84.3 & -- & -- & 51.8 \\
 \bottomrule
 \end{tabular}
 \label{tab:comparison}
 \end{center}
-\end{table}
+\vspace{-0.1cm}
+\footnotesize
+Note: All datasets are from Unitree G1 robot.
+\end{table*}
+
+The average time taken for the LP to be solved was 0.05 seconds per 500 samples on average.
 
 \subsection{Critical Analysis}
 
 \textbf{Advantages of convex refinement:}
 \begin{itemize}
 \item \textbf{Global optimality}: LP guarantees global optimum (within continuous relaxation)
-\item \textbf{Principled trade-offs}: Explicit weighting of velocity violation vs. prior consistency vs. smoothness
-\item \textbf{Robust to initialization}: Unlike greedy search, LP is insensitive to initialization
-\item \textbf{Smooth solutions}: TV regularization produces temporally coherent contact sequences (28 flips vs. 42 for threshold-only)
+\item \textbf{Principled trade-offs}: Intuitive weighting of velocity residual penalty vs. prior consistency vs. smoothness. All of them share the same degree of magnitude.
 \end{itemize}
 
 \textbf{Limitations:}
 \begin{itemize}
-\item \textbf{Relaxation gap}: Continuous relaxation may not perfectly recover binary contacts (thresholding at 0.5 introduces approximation)
-\item \textbf{Velocity dependence}: Method assumes factor graph produces reasonable trajectory estimate; poor initial estimate degrades refinement
-\item \textbf{Computational overhead}: 10\% increase in total pipeline time compared to baseline factor graph
-\item \textbf{Parameter tuning}: Weights $(\beta, \rho, \lambda_{\text{TV}})$ require problem-specific adjustment
+\item \textbf{Relaxation gap}: Continuous relaxation may not perfectly recover binary contacts
+\item \textbf{Velocity dependence}: Method assumes factor graph produces reasonable foot velocity residuals
+\item \textbf{Computational overhead}: Factor graphs smoothing take approximately 1 second for 500 samples of data, resulting in a 5\% increase in total pipeline time compared to baseline factor graph
+\item \textbf{Parameter tuning}: Weights $(\lambda_V, \beta, \lambda_{\text{TV}})$ and threshold $r_0$ require problem-specific adjustment
 \end{itemize}
 
 \textbf{Trade-offs:}
-The method achieves 24\% improvement in position accuracy and 30\% improvement in velocity consistency compared to baseline factor graph, at the cost of modest computational overhead (11\% increase). The convex formulation avoids local minima issues of greedy methods while producing smoother contact sequences.
+The method achieves substantial improvements across all datasets. Compared to baseline factor graph smoothing, our convex refinement achieves 39.9\% average improvement in position accuracy and 22.5\% in velocity consistency. Against simple threshold-based detection, improvements are even more dramatic: 84.3\% for position and 51.8\% for velocity. The computational overhead remains modest (5\% increase in total pipeline time).
 
-\section{Simulation and Numerical Demonstration}
+\section{Discussion of Cost Formulation and Alternatives}
 
-Data collection:
+The velocity-based contact cost plays a central role in the proposed convex contact smoothing framework. The objective of this term is to encourage contact when the estimated foot velocity is sufficiently small, while discouraging contact when the velocity becomes large. Several formulations were explored before selecting the final residual structure.
+
+\subsection{Linear Signed Residual Formulation}
+
+The selected formulation uses a signed linear residual of the form
+
+\[
+J_v
+=
+\sum_{t,i}
+w_v
+\left(r_t^i - r_0\right)
+c_t^i,
+\]
+
+where:
 \begin{itemize}
-\item IMU: 100 Hz (3-axis gyroscope and accelerometer)
-\item Joint encoders: 100 Hz (positions and velocities)
-\item Contact detection: Force-based threshold (50N) and kinematic heuristics
-\item Ground truth: Motion capture system (Vicon) at 200 Hz (when available)
+    \item $r_t^i$ is the velocity residual (or foot velocity magnitude),
+    \item $r_0$ is a reference velocity threshold,
+    \item $c_t^i \in [0,1]$ is the relaxed contact variable,
+    \item $w_v$ is the weighting coefficient.
 \end{itemize}
 
-We process datasets of 8–15 seconds duration, comprising walking gaits over level ground and stairs.
+This formulation provides a simple and interpretable mechanism for encouraging or discouraging contact:
 
-\subsection{Scenario 1: Level Ground Walking (Digit)}
-We evaluated a 10-second walking sequence on flat ground. The baseline factor graph exhibits drift in the Z-axis due to incorrect contact timings during heel strike. Our refined method corrects these contacts, reducing vertical drift by 42\%.
-
-The convex optimizer modified 12\% of contact states, primarily:
 \begin{itemize}
-\item Removing false positives during early swing phase (foot lift-off delay)
-\item Adding missed contacts during heel strike (high-velocity impacts)
+    \item If $r_t^i < r_0$, then $(r_t^i-r_0) < 0$, and the optimizer lowers the objective by increasing $c_t^i$, thereby encouraging contact.
+    
+    \item If $r_t^i > r_0$, then $(r_t^i-r_0) > 0$, and the optimizer lowers the objective by decreasing $c_t^i$, thereby discouraging contact.
 \end{itemize}
 
-Trajectory comparison results show the refined method (using convex contact optimization) maintains closer alignment with ground truth from motion capture, with RMS position error of 0.29m compared to 0.38m for the baseline factor graph.
+A major advantage of this formulation is that it remains linear in the decision variable $c_t^i$, preserving computational efficiency. Additionally, the linear residual naturally encourages $c_t^i$ toward binary values rather than fractional values, which is desirable since the final contact decisions are ultimately thresholded to binary contact states. Furthermore, the residual maintains proportionality with the velocity magnitude, meaning that larger violations produce proportionally larger penalties.
 
-\subsection{Scenario 2: Stair Climbing (Unitree G1)}
-We analyzed foot velocity norms throughout a stair-climbing sequence. Contact phases should exhibit near-zero velocity, but the baseline method shows significant violations. The refined contacts eliminate 73\% of velocity violations compared to the baseline.
 
-For the baseline detection, average foot velocity during reported contact phases was 0.087 m/s (with peaks up to 0.24 m/s), indicating substantial slip or incorrect contact timing. After convex refinement, the average contact-phase velocity dropped to 0.024 m/s, much closer to the theoretical zero-velocity constraint.
+\subsection{Sigmoid Probability Formulation}
 
-\subsection{Contact Sequence Analysis}
-The contact state evolution for both feet shows clear improvements with convex refinement. The convex optimizer smooths the contact sequence, removing spurious single-timestep contacts while maintaining the overall gait structure. 
+An alternative formulation considered mapping the velocity residual into a probability using a sigmoid function:
 
-Quantitatively, the baseline detection contained 34 isolated single-timestep contact detections (likely noise), while the refined sequence with TV regularization reduced this to just 3 instances. The total number of contact transitions (switches between contact and no-contact) decreased from 156 to 112, indicating smoother, more physically plausible contact sequences.
+\[
+p_t^i
+=
+\sigma\left(k(r_t^i-r_0)\right),
+\]
 
-\subsection{Ablation Study}
-Table \ref{tab:scalability} shows the effect of varying optimization parameters:
+where
 
-\begin{table}[htbp]
-\caption{Parameter Ablation Study}
-\begin{center}
-\begin{tabular}{cccccc}
-\toprule
-$\epsilon_{xy}$ & $\beta$ & $\lambda_{\text{TV}}$ & \textbf{Pos. Err} & \textbf{Vel. Cons.} & \textbf{Changes} \\
-\textbf{(m/s)} & & & \textbf{(m)} & \textbf{(m/s)} & \textbf{(\%)} \\
-\midrule
-0.03 & 2.0 & 1.0 & 0.31 & 1.58 & 18\% \\
-0.05 & 2.0 & 1.0 & 0.29 & 1.62 & 12\% \\
-0.08 & 2.0 & 1.0 & 0.33 & 1.71 & 8\% \\
-0.05 & 0.5 & 1.0 & 0.28 & 1.59 & 24\% \\
-0.05 & 5.0 & 1.0 & 0.32 & 1.68 & 6\% \\
-0.05 & 2.0 & 0.1 & 0.31 & 1.60 & 15\% \\
-0.05 & 2.0 & 5.0 & 0.30 & 1.65 & 9\% \\
-\bottomrule
-\end{tabular}
-\label{tab:scalability}
-\end{center}
-\end{table}
+\[
+\sigma(x)
+=
+\frac{1}{1+e^{-x}},
+\]
 
-Key findings:
+and $k$ controls the sharpness of the transition.
+
+The resulting probability could then be incorporated into the optimization through a consistency cost such as
+
+\[
+J_v
+=
+\sum_{t,i}
+\left(c_t^i - p_t^i\right)^2.
+\]
+
+
+The primary motivation for this approach is that it provides a probabilistic interpretation of the velocity evidence. Velocities below the threshold map to high contact confidence, while larger velocities map to low contact confidence. The parameter $k$ controls the sharpness of the transition.
+
+However, several practical limitations were observed:
+
 \begin{itemize}
-\item \textbf{Velocity threshold $\epsilon_{xy}$}: 0.05 m/s provides best balance; lower values over-constrain and remove valid contacts
-\item \textbf{Prior weight $\beta$}: Higher values reduce changes but may retain faulty contacts
-\item \textbf{TV weight $\lambda_{\text{TV}}$}: Increases smoothness but can over-smooth rapid transitions (e.g., heel strike)
+    \item The formulation introduces additional tuning sensitivity through both $k$ and $r_0$.
+    
+    \item Sigmoid functions saturate for large residual magnitudes, reducing sensitivity to large violations.
+    
+    \item The formulation naturally encourages fractional contact values near the transition region, despite the final contact decisions ultimately being thresholded to binary values. This is not exactly desired behavior 
+    for us in this scenario
 \end{itemize}
 
-\subsection{Computational Performance}
-Optimization timings on Intel i7-10700K CPU:
+\subsection{Quadratic Residual Formulation}
+
+Another alternative considered was a quadratic residual formulation:
+
+\[
+J_v
+=
+\sum_{t,i}
+w_v
+\left(r_t^i-r_0\right)^2
+c_t^i.
+\]
+
+This formulation penalizes large deviations from the velocity threshold more aggressively than the linear residual.
+
+One advantage of the quadratic formulation is that it produces smoother gradients and stronger suppression of large velocity violations. It may therefore be beneficial in scenarios where severe contact violations must be strongly discouraged.
+
+However, the quadratic residual also introduces several drawbacks:
+
 \begin{itemize}
-\item Factor graph solve: 1.24 s (800 timesteps, 2 feet)
-\item LP solve per foot: 0.08 s (800 timesteps)
-\item Total pipeline: 1.40 s (11\% overhead)
-\item Memory usage: 120 MB (GTSAM graph) + 45 MB (CVXPY problem)
+    \item Large residuals can dominate the optimization objective, especially in the presence of noisy velocity estimates.
+    
+    \item The formulation loses the directional linear behavior of the signed residual.
+    
 \end{itemize}
 
-The method is suitable for offline batch processing and near-real-time applications with slight lag.
+Compared to the quadratic formulation, the selected signed linear residual provides a more balanced tradeoff between interpretability, convexity, robustness, and optimization stability.
 
-\subsection{Failure Cases}
-The method struggles in scenarios with:
-\begin{itemize}
-\item \textbf{Persistent slip}: If foot slides continuously during stance, velocity violation is unavoidable
-\item \textbf{Poor initial estimate}: If factor graph converges to wildly incorrect trajectory, velocity-based refinement propagates errors
-\item \textbf{High-dynamic impacts}: Rapid heel strikes can produce transient high velocities that are incorrectly penalized
-\end{itemize}
-
-Future work will explore robust formulations (e.g., $\ell_1$ penalties for outliers) and multi-pass refinement.
 
 \section{Conclusion}
 This paper presented a convex optimization framework for refining contact sequences in factor graph-based state estimation for bipedal robots. By treating footholds as landmarks and formulating contact refinement as a velocity-constrained LP, we achieved significant improvements in estimation accuracy while maintaining computational efficiency.
 
-The key contributions are: (1) A convex LP that globally optimizes contact sequences via continuous relaxation, (2) Integration of the refinement loop with GTSAM's fixed-lag smoother framework, and (3) Experimental validation demonstrating 15–25\% reduction in trajectory error compared to baselines.
+The key contributions are: (1) A convex LP that globally optimizes contact sequences via continuous relaxation, (2) Integration of the refinement loop with GTSAM's fixed-lag smoother framework, and (3) Experimental validation demonstrating 39.9\% average improvement in position accuracy and 22.5\% in velocity consistency compared to baseline factor graph smoothing, with up to 89.0\% improvement on challenging datasets. Against simple threshold-based methods, our approach achieves 84.3\% and 51.8\% average improvements in position and velocity metrics, respectively.
 
 The outer-loop refinement approach is modular and can be integrated with any factor graph backend (not just GTSAM). The convex formulation avoids local minima issues of greedy methods while providing interpretable parameters for trading off velocity consistency, prior fidelity, and temporal smoothness.
 
-Future work will explore:
-\begin{itemize}
-\item \textbf{Multi-pass refinement}: Iterating between factor graph optimization and contact refinement
-\item \textbf{Robust LP formulations}: Incorporating $\ell_1$ norms or quantile constraints to handle outliers
-\item \textbf{Learning-based initialization}: Using neural networks to predict better initial contact sequences
-\item \textbf{Real-time implementation}: Investigating warm-starting and incremental LP solves for online operation
-\item \textbf{Extension to manipulation}: Applying contact refinement to multi-contact whole-body estimation (arms + legs)
-\end{itemize}
+\section{Future Work}
 
-The code and datasets will be made publicly available to facilitate reproducibility and further research in contact-aided legged robot state estimation.
+One possible extension of this work is to optimize contact covariances rather than only optimizing the contact states themselves. In the current framework, the contact covariance used during factor graph smoothing remains fixed throughout optimization. However, contact confidence could instead be used to adaptively scale the covariance of the contact factors, allowing uncertain contacts to contribute less strongly to the smoothing process.
+
+For such a formulation, probabilistic residual models such as sigmoid-based contact confidence mappings may become more useful due to their continuous nature. Rather than producing only binary contact decisions, these formulations could provide smooth confidence estimates that directly modulate contact uncertainty during smoothing.
 
 \section*{Acknowledgment}
 The author would like to thank the GTSAM development team at Georgia Tech for providing the factor graph optimization framework, Ziwon Yoon for providing simulation data, and Sarah Li for her input to the problem formulation.
@@ -572,6 +592,135 @@ The author would like to thank the GTSAM development team at Georgia Tech for pr
 \bibitem{highs} J. A. J. Hall and I. Huangfu, ``HiGHS: High performance software for linear optimization,'' 2023. [Online]. Available: https://github.com/ERGO-Code/HiGHS
 
 \end{thebibliography}
+
+\appendix
+
+\section{Experimental Results Visualization}
+
+This appendix presents detailed trajectory estimation results for all three datasets, comparing the baseline factor graph smoother, threshold-based contact detection, and the proposed convex optimization approach.
+
+\subsection{Dataset 1}
+
+\begin{figure*}[htbp]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../results/Figures/Baseline/baselinePos800.png}
+    \caption{Baseline - Position (RMSE: x=0.21m, y=0.53m, z=0.17m)}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../results/Figures/Convex/convexPos800.png}
+    \caption{Convex - Position (RMSE: x=0.06m, y=0.05m, z=0.15m)}
+\end{subfigure}
+
+\vspace{0.3cm}
+
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../results/Figures/Threshold/thresholdPos800.png}
+    \caption{Threshold - Position (RMSE: x=5.79m, y=3.95m, z=6.85m)}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../results/Figures/Baseline/baselineVel800.png}
+    \caption{Baseline - Velocity (RMSE: x=0.23m/s, y=0.40m/s, z=0.10m/s)}
+\end{subfigure}
+
+\vspace{0.3cm}
+
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../results/Figures/Convex/convexVel800.png}
+    \caption{Convex - Velocity (RMSE: x=0.21m/s, y=0.32m/s, z=0.10m/s)}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../results/Figures/Threshold/thresholdVel800.png}
+    \caption{Threshold - Velocity (RMSE: x=0.53m/s, y=0.59m/s, z=0.42m/s)}
+\end{subfigure}
+\caption{Dataset 1 trajectory estimation results comparing position and velocity estimates across three methods: baseline factor graph smoothing, proposed convex optimization, and threshold-based contact detection.}
+\label{fig:dataset1}
+\end{figure*}
+
+\subsection{Dataset 2}
+
+\begin{figure*}[htbp]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../results/Figures/Baseline/baselinePosG1.png}
+    \caption{Baseline - Position (RMSE: x=0.65m, y=0.63m, z=0.45m)}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../results/Figures/Convex/convexPosG1.png}
+    \caption{Convex - Position (RMSE: x=0.17m, y=0.77m, z=0.07m)}
+\end{subfigure}
+
+\vspace{0.3cm}
+
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../results/Figures/Threshold/thresholdPosG1.png}
+    \caption{Threshold - Position (RMSE: x=0.56m, y=6.23m, z=1.42m)}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../results/Figures/Baseline/baselineVelG1.png}
+    \caption{Baseline - Velocity (RMSE: x=0.64m/s, y=0.70m/s, z=0.42m/s)}
+\end{subfigure}
+
+\vspace{0.3cm}
+
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../results/Figures/Convex/convexVelG1.png}
+    \caption{Convex - Velocity (RMSE: x=0.32m/s, y=0.48m/s, z=0.16m/s)}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../results/Figures/Threshold/thresholdVelG1.png}
+    \caption{Threshold - Velocity (RMSE: x=0.95m/s, y=3.28m/s, z=0.98m/s)}
+\end{subfigure}
+\caption{Dataset 2 trajectory estimation results comparing position and velocity estimates across three methods: baseline factor graph smoothing, proposed convex optimization, and threshold-based contact detection.}
+\label{fig:dataset2}
+\end{figure*}
+
+\subsection{Dataset 3}
+
+\begin{figure*}[htbp]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../results/Figures/Baseline/baselinePosenv2.png}
+    \caption{Baseline - Position (RMSE: x=0.26m, y=1.51m, z=0.16m)}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../results/Figures/Convex/convexPosenv2.png}
+    \caption{Convex - Position (RMSE: x=0.54m, y=1.28m, z=0.51m)}
+\end{subfigure}
+
+\vspace{0.3cm}
+
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../results/Figures/Threshold/thresholdPosenv2.png}
+    \caption{Threshold - Position (RMSE: x=0.56m, y=6.23m, z=1.42m)}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../results/Figures/Baseline/baselineVelenv2.png}
+    \caption{Baseline - Velocity (RMSE: x=0.72m/s, y=1.03m/s, z=0.35m/s)}
+\end{subfigure}
+
+\vspace{0.3cm}
+
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../results/Figures/Convex/convexVelenv2.png}
+    \caption{Convex - Velocity (RMSE: x=0.53m/s, y=0.56m/s, z=0.26m/s)}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../results/Figures/Threshold/thresholdVelenv2.png}
+    \caption{Threshold - Velocity (RMSE: x=1.01m/s, y=1.05m/s, z=0.68m/s)}
+\end{subfigure}
+\caption{Dataset 3 trajectory estimation results comparing position and velocity estimates across three methods: baseline factor graph smoothing, proposed convex optimization, and threshold-based contact detection.}
+\label{fig:dataset3}
+\end{figure*}
 
 \end{document}
 % tables...

@@ -16,7 +16,7 @@ from pathlib import Path
 import time
 
 # Configuration
-MAX_ITERATIONS         = 14
+MAX_ITERATIONS         = 5
 CONVERGENCE_THRESHOLD  = 1.0    # Stop if <1% change from previous iteration (for convex method)
 VARIANT                = "fixed_lag_single_bias"
 
@@ -24,13 +24,13 @@ VARIANT                = "fixed_lag_single_bias"
 METHOD = "convex"  # Options: "convex" or "threshold"
 
 # Convex smoother weights (used when METHOD="convex")
-BETA       = 2.0    # Weight for prior (deviation from original contacts)
+BETA       = 8.0    # Weight for prior (deviation from original contacts)
 LAMBDA_TV  = 1.0    # Weight for TV epigraph (smoothness)
-LAMBDA_V   = 2.0    # Weight for velocity-based contact term
+LAMBDA_V   = 3.0    # Weight for velocity-based contact term
 R0         = 0.3    # Velocity threshold (m/s) - contact encouraged below, discouraged above
 
 # Threshold smoother parameters (used when METHOD="threshold")
-VEL_THRESHOLD = 0.4  # Velocity threshold (m/s) - remove contacts above this
+VEL_THRESHOLD = 0.3  # Velocity threshold (m/s) - remove contacts above this
 
 DATA_DIR      = Path("Data")
 RESULTS_DIR   = Path("results")

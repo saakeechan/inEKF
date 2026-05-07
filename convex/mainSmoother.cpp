@@ -92,9 +92,9 @@ struct ReplayConfig : public LeggedEstimatorParams {
   Vector initialBaseCovarianceDiagonal =
       (Vector(9) << 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10)
           .finished();
-  double sigmaGyro = std::sqrt(1e-2);
+  double sigmaGyro = std::sqrt(1e-5);
   double sigmaIntegration = std::sqrt(1e-6);
-  double sigmaAcc = std::sqrt(1e1);
+  double sigmaAcc = std::sqrt(1e-1);
   double biasAccRandomWalkSigma = std::sqrt(1e-10);
   double biasOmegaRandomWalkSigma = std::sqrt(1e-10);
   double lagSeconds = 10;
@@ -106,8 +106,8 @@ struct ReplayConfig : public LeggedEstimatorParams {
     body_P_imu = Pose3(Rot3(), Point3(0.0, 0.0, 0.0));
     
     // Contact covariance (contact: -5 → variance = 10^-5)
-    const double contactVariance = std::sqrt(1e-6);
-    contactCovariance = Vector3(contactVariance, contactVariance, contactVariance * 1e-0).asDiagonal();
+    const double contactVariance = std::sqrt(1e-5);
+    contactCovariance = Vector3(contactVariance, contactVariance, contactVariance).asDiagonal();
     
     // Foothold parameters (matching GTSAM example defaults - already correct from base class)
     footholdInitSigma = 1e-6;       // Initial foothold uncertainty (m)
