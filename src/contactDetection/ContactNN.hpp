@@ -19,7 +19,7 @@ class ContactNN {
 public:
     // Constants for NN input shape
     static constexpr int NN_WINDOW_SIZE = 10;  // Number of timesteps
-    static constexpr int NN_FEATURE_SIZE = 32;  // Number of features per timestep (q, qd, acc, omega, p, v, tau)
+    static constexpr int NN_FEATURE_SIZE = 57;  // Number of features per timestep (acc, omega, q, qd, p, v, tau, tau_sq_sum, v_cmd) for both legs
     
     // Constructor
     ContactNN(RobotModel& robot_ref);
@@ -30,7 +30,7 @@ public:
     // Load ONNX contact estimation model
     void load_contact_model(const std::string& model_path);
     
-    // Extract 30-element feature vector from current robot state
+    // Extract 57-element feature vector from current robot state
     Eigen::VectorXd extract_nn_features(
         const Eigen::VectorXd& encoder,
         const Eigen::VectorXd& encoderdot,

@@ -643,154 +643,8 @@ void InEKFilter::Propagate_and_Correct()
     robot_state.Hard_Contact = HARD_CONTACT_t[frame_count];
     robot_state.Slip = SLIP_t[frame_count];
     robot_state.d_v = d_v[frame_count];
-    robot_state.dv_norm = dv_norm[frame_count];
 
 
-}
-
-// void InEKFilter::send_states(ROBOT_STATES &state_){ 
-
-//     //Sending Estimated States----------------------------------------------------------------------------
-
-//     Eigen::Vector3d w_IMU_world = filter.getState().getRotation() * (IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias()); // assuming bias is in body frame.
-//     robot.transform_state_to_base(
-//         filter.getState().getRotation(),
-//         filter.getState().getPosition(),
-//         filter.getState().getVelocity(),
-//         w_IMU_world,
-//         robot_state.Rotation,
-//         robot_state.Position,
-//         robot_state.Velocity,
-//         robot_state.Angular_Velocity
-//     );
-
-//     // state_.Position = filter.getState().getPosition();
-
-//     // state_.Velocity = filter.getState().getVelocity();
-//     // state_.Bias_Gyro = filter.getState().getGyroscopeBias();
-//     // state_.Bias_Acc = filter.getState().getAccelerometerBias();
-//     // state_.Rotation= filter.getState().getRotation();
-
-//     // state_.Contact = CONTACT_t[frame_count];
-//     // state_.Hard_Contact = HARD_CONTACT_t[frame_count];
-//     // state_.Slip = SLIP_t[frame_count];
-//     // state_.d_v = d_v[frame_count];
-
-// }
-
-void InEKFilter::SAVE_onestep(int save_index){
-
-    if(save_index<SAVEMAXCNT)
-    {
-        if(textfile_flag){
-            //Sending True States----------------------------------------------------------------------------
-            int j = time_count + TextFile_Skip_Data;
-
-            // Build rotation matrix from TextFile quaternion data
-            Eigen::Vector4d quat_true;
-            quat_true << TextFileData.quat_w[j], TextFileData.quat_i[j], TextFileData.quat_j[j], TextFileData.quat_k[j];
-            Eigen::Matrix3d temp_R = BasicFunctions_Estimator::Quaternion_to_Rotation_Matrix(quat_true);
-
-            Eigen::Vector3d temp_eul = BasicFunctions_Estimator::Rotation_to_EulerZYX(temp_R);
-
-            for(int i=0;i<3;i++)
-            {
-                for(int k=0;k<3;k++)
-                {
-                    SAVE_MATRIX[idx_TRUE_Rotation+i*3+k][save_index] = temp_R(i,k);
-                }
-            }
-
-
-            Eigen::Vector3d v_true;
-            Eigen::Vector<double,3> dv_true;
-            Eigen::Matrix3d R_true;
-
-            for(int i=0;i<robot.num_legs;i++){
-
-                v_true << TextFileData.vel_x[j], TextFileData.vel_y[j], TextFileData.vel_z[j];
-                
-                // Build R_true from TextFile quaternion data (same as temp_R)
-                Eigen::Vector4d quat_true_loop;
-                quat_true_loop << TextFileData.quat_w[j], TextFileData.quat_i[j], TextFileData.quat_j[j], TextFileData.quat_k[j];
-                R_true = BasicFunctions_Estimator::Quaternion_to_Rotation_Matrix(quat_true_loop);
-                
-                dv_true = v_true
-                          + R_true * robot.get_foot_velocity(i+1)
-                          + R_true * BasicFunctions_Estimator::Hat_so3(IMU_Gyro[frame_count])*robot.get_foot_position(i+1);
-
-
-                for(int k=0; k<3; k++){
-
-                    SAVE_MATRIX[idx_ESTIMATED_dv + 3 * i + k][save_index] = d_v[frame_count](3*i + k);
-                    SAVE_MATRIX[idx_TRUE_dv + 3 * i + k][save_index] = dv_true(k);
-                }
-            }
-
-
-
-            // Save position, velocity, biases, and RPY
-            for(int i=0;i<3;i++)
-            {
-                SAVE_MATRIX[idx_TRUE_Position+i][save_index] = TextFileData.pos_x[j] * (i == 0) + TextFileData.pos_y[j] * (i == 1) + TextFileData.pos_z[j] * (i == 2);
-                SAVE_MATRIX[idx_TRUE_Velocity+i][save_index] = TextFileData.vel_x[j] * (i == 0) + TextFileData.vel_y[j] * (i == 1) + TextFileData.vel_z[j] * (i == 2);
-                SAVE_MATRIX[idx_TRUE_Bias_Gyro+i][save_index] = 0;
-                SAVE_MATRIX[idx_TRUE_Bias_Acc+i][save_index] = 0;
-                SAVE_MATRIX[idx_TRUE_rpy+i][save_index] = temp_eul(i);
-            }
-
-
-            // Save contact states
-            std::vector<bool> temp_contact = TextFileData.contact_state[j];
-            
-            for(int i=0;i<robot.num_legs;i++)
-            {
-                SAVE_MATRIX[idx_TRUE_Contact+i][save_index] = temp_contact[i];
-                SAVE_MATRIX[idx_TRUE_Slip+i][save_index] = SLIP_t[frame_count][i];
-                SAVE_MATRIX[idx_TRUE_Hard_Contact+i][save_index] = HARD_CONTACT_t[frame_count][i];
-            }
-
-        }else{
-
-            // I dont know nwhat to do for sensor derived state estimation
-        }
-
-
-
-        for(int i=0;i<robot.num_legs;i++)
-        {
-            SAVE_MATRIX[idx_ESTIMATED_Contact+i][save_index] = CONTACT_t[frame_count][i];
-            SAVE_MATRIX[idx_ESTIMATED_Slip+i][save_index] = SLIP_t[frame_count][i];
-            SAVE_MATRIX[idx_ESTIMATED_Hard_Contact+i][save_index] = HARD_CONTACT_t[frame_count][i];
-
-        }
-
-
-
-        Eigen::Vector3d temp_eul = BasicFunctions_Estimator::Rotation_to_EulerZYX(filter.getState().getRotation());
-        for(int i=0;i<3;i++)
-        {
-            SAVE_MATRIX[idx_ESTIMATED_Position+i][save_index] = filter.getState().getPosition()(i);
-            SAVE_MATRIX[idx_ESTIMATED_Velocity+i][save_index] = filter.getState().getVelocity()(i);
-            SAVE_MATRIX[idx_ESTIMATED_Bias_Gyro+i][save_index] = filter.getState().getGyroscopeBias()(i);
-            SAVE_MATRIX[idx_ESTIMATED_Bias_Acc+i][save_index] = filter.getState().getAccelerometerBias()(i);
-            SAVE_MATRIX[idx_ESTIMATED_rpy+i][save_index] = temp_eul(i);
-        }
-
-        for(int i=0;i<3;i++)
-        {
-            for(int j=0;j<3;j++)
-            {
-                SAVE_MATRIX[idx_ESTIMATED_Rotation+i*3+j][save_index] = filter.getState().getRotation()(i,j);
-            }
-        }
-
-    }
-    else
-    {
-        save_index = SAVEMAXCNT-1;
-        cout<<"over Max_SAVE_cnt!!"<<endl;
-    }
 }
 
 // where previous data is moved to index 0 and new data is moved to index 1
@@ -808,49 +662,6 @@ void InEKFilter::sliding_window(){
         std::swap(d_v[0], d_v[1]);
         std::swap(dv_norm[0], dv_norm[1]);
     }
-}
-
-void InEKFilter::writeSavedData(){
-
-    // Build filename efficiently
-    std::string filename = "../result/pinnochio_inekf/" + estimator_info + "_" + cov_info + "_" + 
-                          initial_info + "_" + file_info + "x" + std::to_string(time_count) + "_1.txt";
-
-    // Use C++ file stream with RAII and error checking
-    std::ofstream outfile(filename);
-    if (!outfile.is_open()) {
-        std::cerr << "Error: Failed to open file: " << filename << std::endl;
-        return;
-    }
-
-    // Write data with proper formatting
-    for(int i = 0; i < time_count; i++) {
-        for(int j = 0; j < SAVEMAXDATA; j++) {
-            outfile << SAVE_MATRIX[j][i] << "\t";
-        }
-        outfile << "\n";
-    }
-
-    // File automatically closed by destructor
-    cout << filename << endl;
-    cout << "Saving to a file done" << endl;
-    
-    // Print contact detection accuracy statistics
-    if (total_comparisons > 0) {
-        cout << "\n=== Contact Detection Accuracy ==="<< endl;
-        cout << "Total comparisons: " << total_comparisons << endl;
-        for (int k = 0; k < robot.num_legs; k++) {
-            int total_leg = contact_match_count[k] + contact_mismatch_count[k];
-            double accuracy = (total_leg > 0) ? (100.0 * contact_match_count[k] / total_leg) : 0.0;
-            cout << "Leg " << (k+1) << ": Matches=" << contact_match_count[k] 
-                 << ", Mismatches=" << contact_mismatch_count[k]
-                 << ", Accuracy=" << std::fixed << std::setprecision(2) << accuracy << "%" << endl;
-        }
-    }
-    
-    // Write dv history to CSV
-    // writeDvHistory();
-
 }
 
 void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const std::vector<bool> &Contact_i){
@@ -877,7 +688,7 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
 
 }
 void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i,
-     const Eigen::VectorXd &motor_torques_i, const Eigen::VectorXd &motor_torques_cmd_i, const Eigen::VectorXd &Cmd_Velocity_i){
+     const Eigen::VectorXd &motor_torques_i, const Eigen ::VectorXd &motor_torques_cmd_i, const Eigen::VectorXd &Cmd_Velocity_i){
 
     new_measurement(imu_i, motor_data_i); // read motor and IMU data first
 
@@ -885,96 +696,72 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
         // Run NN detection at 0.02s intervals or on first frame
         if (time_count % static_cast<int>(0.02 / dt) == 0 || frame_count == 0) {
 
-            // Store raw motor torques for NN feature extraction
-            MOTOR_TORQUES[frame_count] = motor_torques_i;
-            MOTOR_TORQUES_CMD[frame_count] = motor_torques_cmd_i; // Store commanded torques for potential future use/analysis
-            CMD_V[frame_count] = Cmd_Velocity_i; // Store commanded velocities for potential future use/analysis
+        // Store raw motor torques for NN feature extraction
+        MOTOR_TORQUES[frame_count] = motor_torques_i;
+        MOTOR_TORQUES_CMD[frame_count] = motor_torques_cmd_i; // Store commanded torques for potential future use/analysis
+        CMD_V[frame_count] = Cmd_Velocity_i; // Store commanded velocities for potential future use/analysis
 
-            // Compute sum of squared torques for each leg
-            for (int leg = 0; leg < robot.num_legs; ++leg) {
-                double sum_sq = 0.0;
-                for (int joint_idx : robot.Leg_indices_map[leg]) {
-                    sum_sq += motor_torques_i(joint_idx) * motor_torques_i(joint_idx);
-                }
-                torqueSumSquared[frame_count](leg) = sum_sq;
+        // Compute sum of squared torques for each leg
+        for (int leg = 0; leg < robot.num_legs; ++leg) {
+            double sum_sq = 0.0;
+            for (int joint_idx : robot.Leg_indices_map[leg]) {
+                sum_sq += motor_torques_i(joint_idx) * motor_torques_i(joint_idx);
             }
+            torqueSumSquared[frame_count](leg) = sum_sq;
+        }
 
-            // Calculate leg speeds by summing absolute encoder velocities for each leg
-            Eigen::VectorXd leg_speeds(robot.num_legs);
-            for (int i = 0; i < robot.num_legs; i++) {
-                double leg_speed_sum = 0.0;
-                for (int idx : robot.Leg_indices_map[i]) {
-                    leg_speed_sum += std::abs(ENCODERDOT[frame_count](idx));
-                }
-                leg_speeds(i) = leg_speed_sum;
+        // Calculate leg speeds by summing absolute encoder velocities for each leg
+        Eigen::VectorXd leg_speeds(robot.num_legs);
+        for (int i = 0; i < robot.num_legs; i++) {
+            double leg_speed_sum = 0.0;
+            for (int idx : robot.Leg_indices_map[i]) {
+                leg_speed_sum += std::abs(ENCODERDOT[frame_count](idx));
             }
+            leg_speeds(i) = leg_speed_sum;
+        }
 
-            // Extract NN features from current state (includes q, qd, acc, omega, p, v, tau)
-            Eigen::VectorXd features = contact_nn->extract_nn_features(
-                ENCODER[frame_count],
-                ENCODERDOT[frame_count],
-                IMU_Acc[frame_count],
-                IMU_Gyro[frame_count],
-                MOTOR_TORQUES[frame_count],
-                MOTOR_TORQUES_CMD[frame_count],
-                CMD_V[frame_count]
-            );
-            
-            // Update sliding window buffer with new features
-            contact_nn->update_nn_feature_buffer(features);
-            
-            // Predict contacts and foot velocities using ONNX Runtime model
-            auto [predicted_contacts, predicted_foot_velocities] = contact_nn->nn_predict_contact();
-            // Implement hysteresis with probability thresholds (after sigmoid)
-            // If probability is above 0.7 then contact is true, if probability is below 0.3 then contact is false, if in between then keep previous state
-            for (int leg = 0; leg < robot.num_legs; ++leg) {
-                double prob = predicted_contacts[leg]; // Extract probability value for this leg (post-sigmoid)
-                if (prob > 0.8) {
-                    CONTACT_t[frame_count][leg] = true;
-                } else if (prob < 0.2) {
-                    CONTACT_t[frame_count][leg] = false;
-                } else {
-                    // Keep previous state (hysteresis zone)
-                    CONTACT_t[frame_count][leg] = CONTACT_t[frame_count - 1][leg];
-                }
-            }
-            // Store predicted velocity norm in dv_norm
-            // dv_norm[frame_count](0) = predicted_foot_velocities(0);  // Left leg dv_norm from NN
-
-            for (int k=0; k<robot.num_legs; k++){
-            
-            d_v[frame_count].block(3*k,0,3,1) = filter.getState().getVelocity()
-                    + filter.getState().getRotation()*robot.get_foot_velocity(k+1)
-                    + filter.getState().getRotation()*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias())*robot.get_foot_position(k+1);
-
-            dv_norm[frame_count](k) = d_v[frame_count].block(3*k,0,3,1).norm();
-            }
-
-            // If torque sum squared exceeds threshold for any leg, set contact to true for that leg
-            for (int leg = 0; leg < robot.num_legs; ++leg) {
-                if (torqueSumSquared[frame_count](leg) >= 1500) {
-                    CONTACT_t[frame_count][leg] = true;
-                }
-            }
-
-            // If all leg speeds are low (< 1.0), assume standing (all legs in contact)
-            bool all_legs_slow = true;
-            for (int i = 0; i < robot.num_legs; i++) {
-                if (leg_speeds(i) >= 1.0) {
-                    all_legs_slow = false;
-                    break;
-                }
-            }
-            if (all_legs_slow) {
-                for (int i = 0; i < robot.num_legs; i++) {
-                    CONTACT_t[frame_count][i] = true;
-                }
+        // Extract NN features from current state (includes q, qd, acc, omega, p, v, tau)
+        Eigen::VectorXd features = contact_nn->extract_nn_features(
+            ENCODER[frame_count],
+            ENCODERDOT[frame_count],
+            IMU_Acc[frame_count],
+            IMU_Gyro[frame_count],
+            MOTOR_TORQUES[frame_count],
+            MOTOR_TORQUES_CMD[frame_count],
+            CMD_V[frame_count]
+        );
+        
+        // Update sliding window buffer with new features
+        contact_nn->update_nn_feature_buffer(features);
+        
+        // Predict contacts using neural network (returns contacts and foot velocities)
+        auto [predicted_contacts, predicted_foot_velocities] = contact_nn->nn_predict_contact();
+        
+        // Implement hysteresis with probability thresholds (after sigmoid)
+        for (int leg = 0; leg < robot.num_legs; ++leg) {
+            double prob = predicted_contacts[leg]; // Extract probability value for this leg (post-sigmoid)
+            if (prob > 0.6) {
+                CONTACT_t[frame_count][leg] = true;
+            } else if (prob < 0.4) {
+                CONTACT_t[frame_count][leg] = false;
+            } else if (frame_count > 0) {
+                // Keep previous state (hysteresis zone)
+                CONTACT_t[frame_count][leg] = CONTACT_t[frame_count - 1][leg];
             }
         }
-        else {
-            // Use previous frame's contact detection result
-            CONTACT_t[frame_count] = CONTACT_t[frame_count - 1];
-        }
+        
+        // Note: predicted_foot_velocities contains NN-predicted dv_norms for both legs
+        // - predicted_foot_velocities(0) = left leg dv_norm
+        // - predicted_foot_velocities(1) = right leg dv_norm
+        // Currently not used; dv is computed kinematically in Propagate_and_Correct()
+
+        dv_norm[frame_count] = predicted_foot_velocities; // Store NN-predicted foot velocities for potential future use/analysis
+    }
+    else {
+
+        // Use previous frame's contact detection result
+        CONTACT_t[frame_count] = CONTACT_t[frame_count - 1];
+    }
     }
     else
     {
@@ -1025,13 +812,12 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
         frame_count = 1;
     }
 
-    time_count++;
-    
     // Frame 1 information is now moved to frame 0
     sliding_window();
 
 
 }
+
 void InEKFilter::Onestep(){    
     // No-argument version: uses CSV data directly (requires csv_mode == true)
 
@@ -1103,38 +889,43 @@ void InEKFilter::Onestep(){
             // If probability is above 0.5 then contact is true, otherwise false
             for (int leg = 0; leg < robot.num_legs; ++leg) {
                 double prob = predicted_contacts[leg]; // Extract probability value for this leg (post-sigmoid)
-                if (prob > 0.5) {
+                if (prob > 0.6) {
                     CONTACT_t[frame_count][leg] = true;
-                } else if (prob < 0.5) {
+                } else if (prob < 0.4) {
                     CONTACT_t[frame_count][leg] = false;
-                } else {
+                } else if (frame_count > 0) {
                     // Keep previous state (hysteresis zone)
                     CONTACT_t[frame_count][leg] = CONTACT_t[frame_count - 1][leg];
+                } else {
+                    // For the first frame, if we're in the hysteresis zone, default to contact = true (conservative assumption)
+                    CONTACT_t[frame_count][leg] = true;
                 }
             }
+
+            dv_norm[frame_count] = predicted_foot_velocities; // Store NN-predicted foot velocities for potential future use/analysis
 
             // Note: dv and dv_norm are computed in Propagate_and_Correct() using kinematics
 
-            // If torque sum squared exceeds threshold for any leg, set contact to true for that leg
-            for (int leg = 0; leg < robot.num_legs; ++leg) {
-                if (torqueSumSquared[frame_count](leg) >= 2000) {
-                    CONTACT_t[frame_count][leg] = true;
-                }
-            }
+            // // If torque sum squared exceeds threshold for any leg, set contact to true for that leg
+            // for (int leg = 0; leg < robot.num_legs; ++leg) {
+            //     if (torqueSumSquared[frame_count](leg) >= 2000) {
+            //         CONTACT_t[frame_count][leg] = true;
+            //     }
+            // }
 
-            // If all leg speeds are low (< 1.0), assume standing (all legs in contact)
-            bool all_legs_slow = true;
-            for (int i = 0; i < robot.num_legs; i++) {
-                if (leg_speeds(i) >= 1.0) {
-                    all_legs_slow = false;
-                    break;
-                }
-            }
-            if (all_legs_slow) {
-                for (int i = 0; i < robot.num_legs; i++) {
-                    CONTACT_t[frame_count][i] = true;
-                }
-            }
+            // // If all leg speeds are low (< 1.0), assume standing (all legs in contact)
+            // bool all_legs_slow = true;
+            // for (int i = 0; i < robot.num_legs; i++) {
+            //     if (leg_speeds(i) >= 1.0) {
+            //         all_legs_slow = false;
+            //         break;
+            //     }
+            // }
+            // if (all_legs_slow) {
+            //     for (int i = 0; i < robot.num_legs; i++) {
+            //         CONTACT_t[frame_count][i] = true;
+            //     }
+            // }
         } else {
             // Use previous frame's contact detection result
             CONTACT_t[frame_count] = CONTACT_t[frame_count - 1];

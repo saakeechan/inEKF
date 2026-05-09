@@ -160,6 +160,24 @@ add_executable(csvOrganizer
     src/utility/csvParser.cpp
 )
 
+# writeFKFootPosVel executable: Compute FK foot positions/velocities and append to CSV
+add_executable(writeFKFootPosVel 
+    src/utility/writeFKFootPosVel.cpp
+    src/utility/csvParser.cpp
+)
+
+set_target_properties(writeFKFootPosVel PROPERTIES
+    BUILD_RPATH "${PINOCCHIO_LIBRARY_DIRS}"
+    INSTALL_RPATH "${PINOCCHIO_LIBRARY_DIRS}"
+)
+
+target_link_libraries(writeFKFootPosVel
+    INEKF_Estimator
+    pinocchio_default
+    pinocchio_parsers
+    yaml-cpp
+)
+
 
 # ============================================================
 # Installation rules
