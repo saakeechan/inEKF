@@ -2,73 +2,67 @@
 
 clear; close all; clc;
 
-% --- Go to result folder ---
-cd /home/saakee/Research/Saaketh_INEKF/result/pinnochio_inekf
-
-% --- File information ---
-slip = 5;
-SRmode = sprintf('(SR%.0f)', slip);
-cov = '-5-1-1-4-8 -10 -10-10';
-% cov = '-2-1-3-6-12 -3 -10-10';
-% cov = '-1-1-1-5-10 -10 -2-2';
-% cov = '-5-4-1-2-4 -10 -10-10';
-initial = '0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00_0.00';
-data = 'x990_';
-index = 1;
-
-% --- Construct filename and full path ---
-fileName = [SRmode 'H(adj)_(' cov ')_(' initial ')_' data num2str(index) '.txt'];
-filePath = fileName;
+filePath = "/home/saakee/Research/Saaketh_INEKF/results/2026-05-05_19-07-40.csv"
 
 % --- Read the file ---
 if isfile(filePath)
-    result1 = readtable(filePath);
+    result1 = readtable(filePath, 'VariableNamingRule', 'preserve');
     disp('File loaded successfully!');
 else
     error('File not found:\n%s', filePath);
 end
-
-% --- Label for plotting or legend use ---
-name1 = 'H SR (Your File)';
-
 
 
 % Basic
 [finish, ~] = size(result1);
 
 dt = 0.02;
-finish = (19.5 / dt);
+finish = (result1.time(end) / dt);
 start = (0 / dt) + 1;
 t = start:1:finish - 1;
 t = t .* dt;
 
+slip = 0.3;
+
 % --- Relative velocities and rotation errors ---
-for k = start:1:finish - 1
-    % Relative true and estimated velocities
-    R_true = [result1.Var1(k), result1.Var2(k), result1.Var3(k);
-              result1.Var4(k), result1.Var5(k), result1.Var6(k);
-              result1.Var7(k), result1.Var8(k), result1.Var9(k)];
-    R_est =  [result1.Var37(k), result1.Var38(k), result1.Var39(k);
-              result1.Var40(k), result1.Var41(k), result1.Var42(k);
-              result1.Var43(k), result1.Var44(k), result1.Var45(k)];
+v_rel_true = zeros(finish-1, 3);
+v_rel_est  = zeros(finish-1, 3);
+rot_error  = zeros(finish-1, 3);
+phi_error  = zeros(finish-1, 3);
+Hrpy_error = zeros(finish-1, 3);
 
-    v_true = [result1.Var10(k); result1.Var11(k); result1.Var12(k)];
-    v_est  = [result1.Var46(k); result1.Var47(k); result1.Var48(k)];
+for k = start:finish-1
 
+    % --- Ground-truth rotation from quaternion ---
+    q_true = [result1.GT_Qw(k), result1.GT_Qx(k), result1.GT_Qy(k), result1.GT_Qz(k)];
+    R_true = quat2rotm(q_true);
+
+    % --- Estimated rotation from quaternion ---
+    q_est = [result1.EST_Qw(k), result1.EST_Qx(k), result1.EST_Qy(k), result1.EST_Qz(k)];
+    R_est = quat2rotm(q_est);
+
+    % --- Ground-truth and estimated world-frame velocities ---
+    v_true = [result1.GT_Vx(k);  result1.GT_Vy(k);  result1.GT_Vz(k)];
+    v_est  = [result1.EST_Vx(k); result1.EST_Vy(k); result1.EST_Vz(k)];
+
+    % --- Convert world-frame velocity into body/local frame ---
     v_rel_true(k, 1:3) = (R_true' * v_true)';
-    v_rel_est(k, 1:3)  = (R_est' * v_est)';
+    v_rel_est(k, 1:3)  = (R_est'  * v_est)';
 
-    % Rotation error metrics
+    % --- Rotation error metrics ---
     rot_error(k, 1:3)  = rotm2eul(R_true' * R_est);
-    phi_error(k, 1:3)  = logm_vec(R_est) - logm_vec(R_true);
-    Hrpy_error(k, 1:3) = Rotation_to_Euler(R_est) - Rotation_to_Euler(R_true);
+    phi_error(k, 1:3)  = logm_vec(R_true' * R_est)';
+    Hrpy_error(k, 1:3) = [ ...
+        result1.EST_roll(k)  - result1.GT_roll(k), ...
+        result1.EST_pitch(k) - result1.GT_pitch(k), ...
+        result1.EST_yaw(k)   - result1.GT_yaw(k)];
 end
 
 
 
-% --- Contact point velocities (foot 1–4) ---
-d1_v = sqrt(result1.Var52(1:finish - 1).^2 + result1.Var53(1:finish - 1).^2 + result1.Var54(1:finish - 1).^2);
-d2_v = sqrt(result1.Var55(1:finish - 1).^2 + result1.Var56(1:finish - 1).^2 + result1.Var57(1:finish - 1).^2);
+% --- Contact point velocity magnitudes ---
+d1_v = result1.GT_dv_norm_leg1(1:finish-1);
+d2_v = result1.GT_dv_norm_leg2(1:finish-1);
 
 
 % --- Slip detection for single dataset ---
@@ -77,35 +71,22 @@ slip_pt = [];
 bar_height_plus = [];
 bar_height_minus = [];
 
-for i = start:1:finish - 1
-    if (d1_v(i) > slip && result1.Var32(i)) || ...
-       (d2_v(i) > slip && result1.Var33(i))
+for i = start:finish-1
+    if (d1_v(i) > slip && result1.GT_Contact_leg1(i)) || ...
+       (d2_v(i) > slip && result1.GT_Contact_leg2(i))
 
         idx = idx + 1;
-        slip_pt(1, idx) = i * dt;
+        slip_pt(1, idx) = result1.time(i);
         bar_height_plus(1, idx) = 1;
         bar_height_minus(1, idx) = -1;
     end
 end
 
 
+% --- Use CSV time column ---
+t_plot = result1.time(start:finish-1);
 
-
-% Correlation
-% figure(30);
-% hold on;
-% 
-% [c,lags]=xcorr(result1.Var94(start:1:a-1), result2.Var94(start:1:a-1), 'Normalized');
-% stem(lags,c);
-% 
-% [c2,lags2]=xcorr(result1.Var94(start:1:a-1), result4.Var94(start:1:a-1), 'Normalized');
-% stem(lags2,c2);
-% 
-% [c3,lags3]=xcorr(result2.Var94(start:1:a-1), result4.Var94(start:1:a-1), 'Normalized');
-% stem(lags3,c3);
-% legend('IS-PIS', 'IS-NIS', 'PIS-NIS')
-% grid minor;
-% dv (Single File Plot)
+%% Contact point velocity plot
 
 figure(12);
 clf;
@@ -114,8 +95,8 @@ hold on;
 grid minor;
 
 % --- Plot contact point velocities ---
-plot(t(1:length(d1_v)), d1_v, 'r');
-plot(t(1:length(d2_v)), d2_v, 'g');
+plot(t_plot, d1_v(start:finish-1), 'r');
+plot(t_plot, d2_v(start:finish-1), 'g');
 
 xlabel('Time [s]');
 ylabel('Velocity magnitude [m/s]');
@@ -124,43 +105,43 @@ legend('Foot 1', 'Foot 2');
 ylim auto;
 
 % --- Overlay slip markers as shaded bands ---
-yl = ylim;  % get y-axis limits once
+yl = ylim;
+
 if ~isempty(slip_pt)
-    % Turn off automatic legend updates temporarily
     ax = gca;
     ax.Legend.AutoUpdate = 'off';
 
     for i = 1:length(slip_pt)
         t_start = slip_pt(i) - 0.01;
         t_end   = slip_pt(i) + 0.01;
-        fill([t_start t_end t_end t_start], [yl(1) yl(1) yl(2) yl(2)], ...
+
+        fill([t_start t_end t_end t_start], ...
+             [yl(1) yl(1) yl(2) yl(2)], ...
              'r', 'FaceAlpha', 0.15, 'EdgeColor', 'none');
     end
 
-    % Add a single patch object for legend representation
     hSlip = fill([0 0 0 0], [0 0 0 0], 'r', ...
-                 'FaceAlpha', 0.15, 'EdgeColor', 'none', 'DisplayName', 'Slip Event');
-    uistack(hSlip, 'bottom'); % push behind curves for visibility
+                 'FaceAlpha', 0.15, ...
+                 'EdgeColor', 'none', ...
+                 'DisplayName', 'Slip Event');
 
-    % Turn legend auto-update back on
+    uistack(hSlip, 'bottom');
     ax.Legend.AutoUpdate = 'on';
 end
 
 grid on;
 hold off;
 
-% Relative Velocity Plot (Single File Only)
+
+%% Relative Velocity Plot
 
 figure(2);
 clf;
 set(gcf, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
 
-% define time window
-a = finish;  % equivalent to your old end index
-
 subplot(3,1,1);
-plot(t, v_rel_true(start:a-1,1), '-k', ...
-     t, v_rel_est(start:a-1,1), '-r','LineWidth', 0.2);
+plot(t_plot, v_rel_true(start:finish-1,1), '-k', ...
+     t_plot, v_rel_est(start:finish-1,1), '-r', 'LineWidth', 0.2);
 title('V_x^{rel}');
 xlabel('Time [s]');
 ylabel('Velocity [m/s]');
@@ -168,8 +149,8 @@ legend('V_x true', 'V_x estimated');
 grid minor;
 
 subplot(3,1,2);
-plot(t, v_rel_true(start:a-1,2), '-k', ...
-     t, v_rel_est(start:a-1,2), '-r','LineWidth', 0.2);
+plot(t_plot, v_rel_true(start:finish-1,2), '-k', ...
+     t_plot, v_rel_est(start:finish-1,2), '-r', 'LineWidth', 0.2);
 title('V_y^{rel}');
 xlabel('Time [s]');
 ylabel('Velocity [m/s]');
@@ -177,18 +158,17 @@ legend('V_y true', 'V_y estimated');
 grid minor;
 
 subplot(3,1,3);
-plot(t, v_rel_true(start:a-1,3), '-k', ...
-     t, v_rel_est(start:a-1,3), '-r','LineWidth', 0.2);
+plot(t_plot, v_rel_true(start:finish-1,3), '-k', ...
+     t_plot, v_rel_est(start:finish-1,3), '-r', 'LineWidth', 0.2);
 title('V_z^{rel}');
 xlabel('Time [s]');
 ylabel('Velocity [m/s]');
 legend('V_z true', 'V_z estimated');
 grid minor;
 
-sgtitle('Relative Velocity Comparison (True vs Estimated)');
+sgtitle('Relative Velocity Comparison: True vs Estimated');
 
-
-% Bias (Single File Only)
+%% Bias Estimates
 
 figure(1);
 clf;
@@ -196,8 +176,8 @@ set(gcf, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
 
 % --- Bias X ---
 subplot(3,1,1);
-plot(t, result1.Var58(start:finish-1), 'r', ...
-     t, result1.Var61(start:finish-1), '-.b','LineWidth', 0.2);
+plot(t_plot, result1.EST_Bg_x(start:finish-1), 'r', ...
+     t_plot, result1.EST_Ba_x(start:finish-1), '-.b', 'LineWidth', 0.2);
 title('b_x');
 xlabel('Time [s]');
 ylabel('Bias');
@@ -206,8 +186,8 @@ grid minor;
 
 % --- Bias Y ---
 subplot(3,1,2);
-plot(t, result1.Var59(start:finish-1), 'r', ...
-     t, result1.Var62(start:finish-1), '-.b','LineWidth', 0.2);
+plot(t_plot, result1.EST_Bg_y(start:finish-1), 'r', ...
+     t_plot, result1.EST_Ba_y(start:finish-1), '-.b', 'LineWidth', 0.2);
 title('b_y');
 xlabel('Time [s]');
 ylabel('Bias');
@@ -216,8 +196,8 @@ grid minor;
 
 % --- Bias Z ---
 subplot(3,1,3);
-plot(t, result1.Var60(start:finish-1), 'r', ...
-     t, result1.Var63(start:finish-1), '-.b','LineWidth', 0.2);
+plot(t_plot, result1.EST_Bg_z(start:finish-1), 'r', ...
+     t_plot, result1.EST_Ba_z(start:finish-1), '-.b', 'LineWidth', 0.2);
 title('b_z');
 xlabel('Time [s]');
 ylabel('Bias');
@@ -226,9 +206,8 @@ grid minor;
 
 sgtitle('Gyroscope and Accelerometer Bias Estimates');
 
-a = finish - start + 1; % Adjusted definition to represent number of samples
 
-% Velocity (Single File Only)
+%% Velocity
 
 figure(20);
 clf;
@@ -236,8 +215,8 @@ set(gcf, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
 
 % --- Vx ---
 subplot(3,1,1);
-plot(t, result1.Var10(start:finish-1), 'k', ...
-     t, result1.Var46(start:finish-1), '-.b','LineWidth', 0.2);
+plot(t_plot, result1.GT_Vx(start:finish-1), 'k', ...
+     t_plot, result1.EST_Vx(start:finish-1), '-.b', 'LineWidth', 0.2);
 title('V_x');
 xlabel('Time [s]');
 ylabel('Velocity [m/s]');
@@ -246,8 +225,8 @@ grid minor;
 
 % --- Vy ---
 subplot(3,1,2);
-plot(t, result1.Var11(start:finish-1), 'k', ...
-     t, result1.Var47(start:finish-1), '-.b','LineWidth', 0.2);
+plot(t_plot, result1.GT_Vy(start:finish-1), 'k', ...
+     t_plot, result1.EST_Vy(start:finish-1), '-.b', 'LineWidth', 0.2);
 title('V_y');
 xlabel('Time [s]');
 ylabel('Velocity [m/s]');
@@ -256,8 +235,8 @@ grid minor;
 
 % --- Vz ---
 subplot(3,1,3);
-plot(t, result1.Var12(start:finish-1), 'k', ...
-     t, result1.Var48(start:finish-1), '-.b','LineWidth', 0.2);
+plot(t_plot, result1.GT_Vz(start:finish-1), 'k', ...
+     t_plot, result1.EST_Vz(start:finish-1), '-.b', 'LineWidth', 0.2);
 title('V_z');
 xlabel('Time [s]');
 ylabel('Velocity [m/s]');
@@ -266,9 +245,8 @@ grid minor;
 
 sgtitle('True vs Estimated Velocities');
 
-%%
 
-% RPY (Single File Only)
+%% RPY
 
 figure(121);
 clf;
@@ -276,8 +254,8 @@ set(gcf, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
 
 % --- Roll ---
 subplot(3,1,1);
-plot(t, result1.Var34(start:finish-1), 'k', ...
-     t, result1.Var70(start:finish-1), '-.b','LineWidth', 0.2);
+plot(t_plot, result1.GT_roll(start:finish-1), 'k', ...
+     t_plot, result1.EST_roll(start:finish-1), '-.b', 'LineWidth', 0.2);
 title('Roll');
 xlabel('Time [s]');
 ylabel('Angle [rad]');
@@ -286,8 +264,8 @@ grid minor;
 
 % --- Pitch ---
 subplot(3,1,2);
-plot(t, result1.Var35(start:finish-1), 'k', ...
-     t, result1.Var71(start:finish-1), '-.b','LineWidth', 0.2);
+plot(t_plot, result1.GT_pitch(start:finish-1), 'k', ...
+     t_plot, result1.EST_pitch(start:finish-1), '-.b', 'LineWidth', 0.2);
 title('Pitch');
 xlabel('Time [s]');
 ylabel('Angle [rad]');
@@ -296,60 +274,18 @@ grid minor;
 
 % --- Yaw ---
 subplot(3,1,3);
-plot(t, result1.Var36(start:finish-1), 'k', ...
-     t, result1.Var72(start:finish-1), '-.b','LineWidth', 0.2);
+plot(t_plot, result1.GT_yaw(start:finish-1), 'k', ...
+     t_plot, result1.EST_yaw(start:finish-1), '-.b', 'LineWidth', 0.2);
 title('Yaw');
 xlabel('Time [s]');
 ylabel('Angle [rad]');
 legend('Yaw true', 'Yaw estimated');
 grid minor;
 
-sgtitle('True vs Estimated Roll–Pitch–Yaw');
+sgtitle('True vs Estimated Roll-Pitch-Yaw');
 
 
-
-
-
-% %% logm (Single File Only) I dont know what this vs above code is!!
-% 
-% figure(123);
-% clf;
-% set(gcf, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
-% 
-% % --- Roll ---
-% subplot(3,1,1);
-% plot(t, result1.Var46(start:finish-1), 'k', ...
-%      t, result1.Var94(start:finish-1), '-.b');
-% title('Roll');
-% xlabel('Time [s]');
-% ylabel('Angle [rad]');
-% legend('Roll true', 'Roll estimated');
-% grid minor;
-% 
-% % --- Pitch ---
-% subplot(3,1,2);
-% plot(t, result1.Var47(start:finish-1), 'k', ...
-%      t, result1.Var95(start:finish-1), '-.b');
-% title('Pitch');
-% xlabel('Time [s]');
-% ylabel('Angle [rad]');
-% legend('Pitch true', 'Pitch estimated');
-% grid minor;
-% 
-% % --- Yaw ---
-% subplot(3,1,3);
-% plot(t, result1.Var48(start:finish-1), 'k', ...
-%      t, result1.Var96(start:finish-1), '-.b');
-% title('Yaw');
-% xlabel('Time [s]');
-% ylabel('Angle [rad]');
-% legend('Yaw true', 'Yaw estimated');
-% grid minor;
-% 
-% sgtitle('True vs Estimated Log-Map Orientation (Roll–Pitch–Yaw)');
-
-
-% Velocity Error (Single File Only)
+%% Velocity Error
 
 figure(4);
 clf;
@@ -357,8 +293,8 @@ set(gcf, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
 
 % --- Vx Error ---
 subplot(3,1,1);
-vx_error = result1.Var46(start:finish-1) - result1.Var10(start:finish-1);
-plot(t, vx_error, 'b','LineWidth', 0.2);
+vx_error = result1.EST_Vx(start:finish-1) - result1.GT_Vx(start:finish-1);
+plot(t_plot, vx_error, 'b','LineWidth', 0.2);
 yline(0, '--k');
 grid minor;
 title('V_x Error');
@@ -369,8 +305,8 @@ legend(['RMSE: ' num2str(rmse_vx, '%.4f')]);
 
 % --- Vy Error ---
 subplot(3,1,2);
-vy_error = result1.Var47(start:finish-1) - result1.Var11(start:finish-1);
-plot(t, vy_error, 'b','LineWidth', 0.2);
+vy_error = result1.EST_Vy(start:finish-1) - result1.GT_Vy(start:finish-1);
+plot(t_plot, vy_error, 'b','LineWidth', 0.2);
 yline(0, '--k');
 grid minor;
 title('V_y Error');
@@ -381,8 +317,8 @@ legend(['RMSE: ' num2str(rmse_vy, '%.4f')]);
 
 % --- Vz Error ---
 subplot(3,1,3);
-vz_error = result1.Var48(start:finish-1) - result1.Var12(start:finish-1);
-plot(t, vz_error, 'b','LineWidth', 0.2);
+vz_error = result1.EST_Vz(start:finish-1) - result1.GT_Vz(start:finish-1);
+plot(t_plot, vz_error, 'b','LineWidth', 0.2);
 yline(0, '--k');
 grid minor;
 title('V_z Error');
@@ -391,10 +327,10 @@ ylabel('Velocity [m/s]');
 rmse_vz = rms(vz_error);
 legend(['RMSE: ' num2str(rmse_vz, '%.4f')]);
 
-sgtitle('Velocity Estimation Error (True vs Estimated)');
+sgtitle('Velocity Estimation Error');
 
 
-% Position Error (Single File Only)
+%% Position Error
 
 figure(5);
 clf;
@@ -402,8 +338,8 @@ set(gcf, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
 
 % --- Px Error ---
 subplot(3,1,1);
-px_error = result1.Var49(start:finish-1) - result1.Var13(start:finish-1);
-plot(t, px_error, 'b','LineWidth', 0.2);
+px_error = result1.EST_Px(start:finish-1) - result1.GT_Px(start:finish-1);
+plot(t_plot, px_error, 'b','LineWidth', 0.2);
 yline(0, '--k');
 grid minor;
 title('P_x Error');
@@ -414,8 +350,8 @@ legend(['RMSE: ' num2str(rmse_px, '%.4f')]);
 
 % --- Py Error ---
 subplot(3,1,2);
-py_error = result1.Var50(start:finish-1) - result1.Var14(start:finish-1);
-plot(t, py_error, 'b','LineWidth', 0.2);
+py_error = result1.EST_Py(start:finish-1) - result1.GT_Py(start:finish-1);
+plot(t_plot, py_error, 'b','LineWidth', 0.2);
 yline(0, '--k');
 grid minor;
 title('P_y Error');
@@ -426,8 +362,8 @@ legend(['RMSE: ' num2str(rmse_py, '%.4f')]);
 
 % --- Pz Error ---
 subplot(3,1,3);
-pz_error = result1.Var51(start:finish-1) - result1.Var15(start:finish-1);
-plot(t, pz_error, 'b','LineWidth', 0.2);
+pz_error = result1.EST_Pz(start:finish-1) - result1.GT_Pz(start:finish-1);
+plot(t_plot, pz_error, 'b','LineWidth', 0.2);
 yline(0, '--k');
 grid minor;
 title('P_z Error');
@@ -436,463 +372,152 @@ ylabel('Position [m]');
 rmse_pz = rms(pz_error);
 legend(['RMSE: ' num2str(rmse_pz, '%.4f')]);
 
-sgtitle('Position Estimation Error (True vs Estimated)');
+sgtitle('Position Estimation Error');
 
-%% Rel Velocity Error (Single File Only)
+%% Relative Velocity Error
+
 figure(6);
 clf;
 set(gcf, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
 
-% --- Relative Vx Error ---
-subplot(3,1,1);
-v_rel_error_x = v_rel_est(start:finish-1,1) - v_rel_true(start:finish-1,1);
-plot(t, v_rel_error_x, 'b','LineWidth', 0.2);
-yline(0, '--k');
-grid minor;
-title('Relative V_x Error');
-xlabel('Time [s]');
-ylabel('Velocity [m/s]');
-rmse_vx_rel = rms(v_rel_error_x);
-legend(['RMSE: ' num2str(rmse_vx_rel, '%.4f')]);
+rel_labels = {'V_x^{rel}', 'V_y^{rel}', 'V_z^{rel}'};
 
-% % --- Optional (Commented) Slip-Only RMSE Calculation ---
-% % slip_indices = int64(slip_pt ./ dt);
-% % rmse_vx_slip = rms(v_rel_est(slip_indices,1) - v_rel_true(slip_indices,1));
-% % legend(['Slip RMSE: ' num2str(rmse_vx_slip, '%.4f')]);
+for j = 1:3
+    subplot(3,1,j);
 
-% --- Add slip bars ---
-hold on;
-if exist('slip_pt', 'var') && ~isempty(slip_pt)
-    b1 = bar(slip_pt, bar_height_plus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-    b1 = bar(slip_pt, bar_height_minus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
+    v_rel_error = v_rel_est(start:finish-1,j) - v_rel_true(start:finish-1,j);
+
+    plot(t_plot, v_rel_error, 'b', 'LineWidth', 0.2);
+    yline(0, '--k');
+    grid minor;
+
+    title(['Relative ' rel_labels{j} ' Error']);
+    xlabel('Time [s]');
+    ylabel('Velocity [m/s]');
+
+    rmse_rel = rms(v_rel_error);
+    legend(['RMSE: ' num2str(rmse_rel, '%.4f')]);
+
+    hold on;
+    if exist('slip_pt', 'var') && ~isempty(slip_pt)
+        bar(slip_pt, bar_height_plus, 1, ...
+            'FaceAlpha', 0.2, ...
+            'FaceColor', [1 0 0], ...
+            'LineStyle', 'none');
+
+        bar(slip_pt, bar_height_minus, 1, ...
+            'FaceAlpha', 0.2, ...
+            'FaceColor', [1 0 0], ...
+            'LineStyle', 'none');
+    end
 end
 
+sgtitle('Relative Velocity Error');
 
-% --- Relative Vy Error ---
-subplot(3,1,2);
-v_rel_error_y = v_rel_est(start:finish-1,2) - v_rel_true(start:finish-1,2);
-plot(t, v_rel_error_y, 'b','LineWidth', 0.2);
-yline(0, '--k');
-grid minor;
-title('Relative V_y Error');
-xlabel('Time [s]');
-ylabel('Velocity [m/s]');
-rmse_vy_rel = rms(v_rel_error_y);
-legend(['RMSE: ' num2str(rmse_vy_rel, '%.4f')]);
+%% RPY Error
 
-% % --- Optional (Commented) Slip-Only RMSE Calculation ---
-% % slip_indices = int64(slip_pt ./ dt);
-% % rmse_vy_slip = rms(v_rel_est(slip_indices,2) - v_rel_true(slip_indices,2));
-% % legend(['Slip RMSE: ' num2str(rmse_vy_slip, '%.4f')]);
-
-hold on;
-if exist('slip_pt', 'var') && ~isempty(slip_pt)
-    b1 = bar(slip_pt, bar_height_plus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-    b1 = bar(slip_pt, bar_height_minus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-end
-
-
-% --- Relative Vz Error ---
-subplot(3,1,3);
-v_rel_error_z = v_rel_est(start:finish-1,3) - v_rel_true(start:finish-1,3);
-plot(t, v_rel_error_z, 'b','LineWidth', 0.2);
-yline(0, '--k');
-grid minor;
-title('Relative V_z Error');
-xlabel('Time [s]');
-ylabel('Velocity [m/s]');
-rmse_vz_rel = rms(v_rel_error_z);
-legend(['RMSE: ' num2str(rmse_vz_rel, '%.4f')]);
-
-% % --- Optional (Commented) Slip-Only RMSE Calculation ---
-% % slip_indices = int64(slip_pt ./ dt);
-% % rmse_vz_slip = rms(v_rel_est(slip_indices,3) - v_rel_true(slip_indices,3));
-% % legend(['Slip RMSE: ' num2str(rmse_vz_slip, '%.4f')]);
-
-hold on;
-if exist('slip_pt', 'var') && ~isempty(slip_pt)
-    b1 = bar(slip_pt, bar_height_plus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-    b1 = bar(slip_pt, bar_height_minus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-end
-
-sgtitle('Relative Velocity Error (True vs Estimated)');
-
-% RPY Error (Single File Only)
 figure(31);
 clf;
 set(gcf, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
 sgtitle('RPY Estimation Error');
 
-% --- Roll Error ---
-subplot(3,1,1);
-roll_error = result1.Var70(start:finish-1) - result1.Var34(start:finish-1);
-plot(t, roll_error, 'b','LineWidth', 0.2);
-yline(0, '--k');
-grid minor;
-title('Roll Error');
-xlabel('Time [s]');
-ylabel('Angle [rad]');
-rmse_roll = rms(roll_error);
-legend(['RMSE: ' num2str(rmse_roll, '%.4f')]);
+labels = {'Roll', 'Pitch', 'Yaw'};
 
-% % --- Optional (Commented) Slip-Only RMSE Example ---
-% % slip_indices = int64(slip_pt ./ dt);
-% % rmse_roll_slip = rms(result1.Var94(slip_indices) - result1.Var46(slip_indices));
-% % legend(['Slip RMSE: ' num2str(rmse_roll_slip, '%.4f')]);
+for j = 1:3
+    subplot(3,1,j);
 
-hold on;
-if exist('slip_pt', 'var') && ~isempty(slip_pt)
-    b1 = bar(slip_pt, bar_height_plus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-    b1 = bar(slip_pt, bar_height_minus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
+    if j == 1
+        err = result1.EST_roll(start:finish-1) - result1.GT_roll(start:finish-1);
+    elseif j == 2
+        err = result1.EST_pitch(start:finish-1) - result1.GT_pitch(start:finish-1);
+    else
+        err = result1.EST_yaw(start:finish-1) - result1.GT_yaw(start:finish-1);
+    end
+
+    plot(t_plot, err, 'b','LineWidth', 0.2);
+    yline(0, '--k');
+    grid minor;
+
+    title([labels{j} ' Error']);
+    xlabel('Time [s]');
+    ylabel('Angle [rad]');
+
+    rmse_val = rms(err);
+    legend(['RMSE: ' num2str(rmse_val, '%.4f')]);
+
+    hold on;
+    if ~isempty(slip_pt)
+        bar(slip_pt, bar_height_plus, 1, 'FaceAlpha',0.2,'FaceColor',[1 0 0],'LineStyle','none');
+        bar(slip_pt, bar_height_minus,1,'FaceAlpha',0.2,'FaceColor',[1 0 0],'LineStyle','none');
+    end
 end
 
 
-% --- Pitch Error ---
-subplot(3,1,2);
-pitch_error = result1.Var71(start:finish-1) - result1.Var35(start:finish-1);
-plot(t, pitch_error, 'b','LineWidth', 0.2);
-yline(0, '--k');
-grid minor;
-title('Pitch Error');
-xlabel('Time [s]');
-ylabel('Angle [rad]');
-rmse_pitch = rms(pitch_error);
-legend(['RMSE: ' num2str(rmse_pitch, '%.4f')]);
+%% Log-map Error
 
-% % --- Optional (Commented) Slip-Only RMSE Example ---
-% % slip_indices = int64(slip_pt ./ dt);
-% % rmse_pitch_slip = rms(result1.Var95(slip_indices) - result1.Var47(slip_indices));
-% % legend(['Slip RMSE: ' num2str(rmse_pitch_slip, '%.4f')]);
-
-hold on;
-if exist('slip_pt', 'var') && ~isempty(slip_pt)
-    b1 = bar(slip_pt, bar_height_plus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-    b1 = bar(slip_pt, bar_height_minus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-end
-
-
-% --- Yaw Error ---
-subplot(3,1,3);
-yaw_error = result1.Var72(start:finish-1) - result1.Var36(start:finish-1);
-plot(t, yaw_error, 'b','LineWidth', 0.2);
-yline(0, '--k');
-grid minor;
-title('Yaw Error');
-xlabel('Time [s]');
-ylabel('Angle [rad]');
-rmse_yaw = rms(yaw_error);
-legend(['RMSE: ' num2str(rmse_yaw, '%.4f')]);
-
-% % --- Optional (Commented) Slip-Only RMSE Example ---
-% % slip_indices = int64(slip_pt ./ dt);
-% % rmse_yaw_slip = rms(result1.Var96(slip_indices) - result1.Var48(slip_indices));
-% % legend(['Slip RMSE: ' num2str(rmse_yaw_slip, '%.4f')]);
-
-hold on;
-if exist('slip_pt', 'var') && ~isempty(slip_pt)
-    b1 = bar(slip_pt, bar_height_plus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-    b1 = bar(slip_pt, bar_height_minus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-end
-
-
-% Logm Error (Single File Only)
 figure(33);
 clf;
 set(gcf, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
 sgtitle('Log-Map Orientation Error');
 
-% --- Roll (φ_x) Error ---
-subplot(3,1,1);
-phi_error_roll = phi_error(start:finish-1,1);
-plot(t, phi_error_roll, 'b','LineWidth', 0.2);
-yline(0, '--k');
-grid minor;
-title('logm Error Roll');
-xlabel('Time [s]');
-ylabel('Angle [rad]');
-rmse_phi_roll = rms(phi_error_roll);
-legend(['RMSE: ' num2str(rmse_phi_roll, '%.4f')]);
+labels = {'Roll', 'Pitch', 'Yaw'};
 
-% % --- Optional (Commented) Slip-Only RMSE Example ---
-% % slip_indices = int64(slip_pt ./ dt);
-% % rmse_phi_roll_slip = rms(phi_error(slip_indices,1));
-% % legend(['Slip RMSE: ' num2str(rmse_phi_roll_slip, '%.4f')]);
+for j = 1:3
+    subplot(3,1,j);
 
-hold on;
-if exist('slip_pt', 'var') && ~isempty(slip_pt)
-    b1 = bar(slip_pt, bar_height_plus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-    b1 = bar(slip_pt, bar_height_minus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
+    err = phi_error(start:finish-1,j);
+
+    plot(t_plot, err, 'b','LineWidth', 0.2);
+    yline(0, '--k');
+    grid minor;
+
+    title(['logm Error ' labels{j}]);
+    xlabel('Time [s]');
+    ylabel('Angle [rad]');
+
+    rmse_val = rms(err);
+    legend(['RMSE: ' num2str(rmse_val, '%.4f')]);
+
+    hold on;
+    if ~isempty(slip_pt)
+        bar(slip_pt, bar_height_plus, 1, 'FaceAlpha',0.2,'FaceColor',[1 0 0],'LineStyle','none');
+        bar(slip_pt, bar_height_minus,1,'FaceAlpha',0.2,'FaceColor',[1 0 0],'LineStyle','none');
+    end
 end
 
 
-% --- Pitch (φ_y) Error ---
-subplot(3,1,2);
-phi_error_pitch = phi_error(start:finish-1,2);
-plot(t, phi_error_pitch, 'b','LineWidth', 0.2);
-yline(0, '--k');
-grid minor;
-title('logm Error Pitch');
-xlabel('Time [s]');
-ylabel('Angle [rad]');
-rmse_phi_pitch = rms(phi_error_pitch);
-legend(['RMSE: ' num2str(rmse_phi_pitch, '%.4f')]);
+%% H-RPY Error
 
-% % --- Optional (Commented) Slip-Only RMSE Example ---
-% % slip_indices = int64(slip_pt ./ dt);
-% % rmse_phi_pitch_slip = rms(phi_error(slip_indices,2));
-% % legend(['Slip RMSE: ' num2str(rmse_phi_pitch_slip, '%.4f')]);
-
-hold on;
-if exist('slip_pt', 'var') && ~isempty(slip_pt)
-    b1 = bar(slip_pt, bar_height_plus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-    b1 = bar(slip_pt, bar_height_minus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-end
-
-
-% --- Yaw (φ_z) Error ---
-subplot(3,1,3);
-phi_error_yaw = phi_error(start:finish-1,3);
-plot(t, phi_error_yaw, 'b','LineWidth', 0.2);
-yline(0, '--k');
-grid minor;
-title('logm Error Yaw');
-xlabel('Time [s]');
-ylabel('Angle [rad]');
-rmse_phi_yaw = rms(phi_error_yaw);
-legend(['RMSE: ' num2str(rmse_phi_yaw, '%.4f')]);
-
-% % --- Optional (Commented) Slip-Only RMSE Example ---
-% % slip_indices = int64(slip_pt ./ dt);
-% % rmse_phi_yaw_slip = rms(phi_error(slip_indices,3));
-% % legend(['Slip RMSE: ' num2str(rmse_phi_yaw_slip, '%.4f')]);
-
-hold on;
-if exist('slip_pt', 'var') && ~isempty(slip_pt)
-    b1 = bar(slip_pt, bar_height_plus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-    b1 = bar(slip_pt, bar_height_minus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-end
-
-
-% H RPY Error (Single File Only)
 figure(34);
 clf;
 set(gcf, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
 sgtitle('H RPY Orientation Error');
 
-% --- Roll Error ---
-subplot(3,1,1);
-Hrpy_roll = Hrpy_error(start:finish-1,1);
-plot(t, Hrpy_roll, 'b','LineWidth', 0.2);
-yline(0, '--k');
-grid minor;
-title('H RPY Error Roll');
-xlabel('Time [s]');
-ylabel('Angle [rad]');
-rmse_Hrpy_roll = rms(Hrpy_roll);
-legend(['RMSE: ' num2str(rmse_Hrpy_roll, '%.4f')]);
+labels = {'Roll', 'Pitch', 'Yaw'};
 
-% % --- Optional (Commented) Slip-Only RMSE Example ---
-% % slip_indices = int64(slip_pt ./ dt);
-% % rmse_Hrpy_roll_slip = rms(Hrpy_error(slip_indices,1));
-% % legend(['Slip RMSE: ' num2str(rmse_Hrpy_roll_slip, '%.4f')]);
+for j = 1:3
+    subplot(3,1,j);
 
-hold on;
-if exist('slip_pt', 'var') && ~isempty(slip_pt)
-    b1 = bar(slip_pt, bar_height_plus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-    b1 = bar(slip_pt, bar_height_minus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
+    err = Hrpy_error(start:finish-1,j);
+
+    plot(t_plot, err, 'b','LineWidth', 0.2);
+    yline(0, '--k');
+    grid minor;
+
+    title(['H RPY Error ' labels{j}]);
+    xlabel('Time [s]');
+    ylabel('Angle [rad]');
+
+    rmse_val = rms(err);
+    legend(['RMSE: ' num2str(rmse_val, '%.4f')]);
+
+    hold on;
+    if ~isempty(slip_pt)
+        bar(slip_pt, bar_height_plus, 1, 'FaceAlpha',0.2,'FaceColor',[1 0 0],'LineStyle','none');
+        bar(slip_pt, bar_height_minus,1,'FaceAlpha',0.2,'FaceColor',[1 0 0],'LineStyle','none');
+    end
 end
 
-
-% --- Pitch Error ---
-subplot(3,1,2);
-Hrpy_pitch = Hrpy_error(start:finish-1,2);
-plot(t, Hrpy_pitch, 'b','LineWidth', 0.2);
-yline(0, '--k');
-grid minor;
-title('H RPY Error Pitch');
-xlabel('Time [s]');
-ylabel('Angle [rad]');
-rmse_Hrpy_pitch = rms(Hrpy_pitch);
-legend(['RMSE: ' num2str(rmse_Hrpy_pitch, '%.4f')]);
-
-% % --- Optional (Commented) Slip-Only RMSE Example ---
-% % slip_indices = int64(slip_pt ./ dt);
-% % rmse_Hrpy_pitch_slip = rms(Hrpy_error(slip_indices,2));
-% % legend(['Slip RMSE: ' num2str(rmse_Hrpy_pitch_slip, '%.4f')]);
-
-hold on;
-if exist('slip_pt', 'var') && ~isempty(slip_pt)
-    b1 = bar(slip_pt, bar_height_plus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-    b1 = bar(slip_pt, bar_height_minus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-end
-
-
-% --- Yaw Error ---
-subplot(3,1,3);
-Hrpy_yaw = Hrpy_error(start:finish-1,3);
-plot(t, Hrpy_yaw, 'b','LineWidth', 0.2);
-yline(0, '--k');
-grid minor;
-title('H RPY Error Yaw');
-xlabel('Time [s]');
-ylabel('Angle [rad]');
-rmse_Hrpy_yaw = rms(Hrpy_yaw);
-legend(['RMSE: ' num2str(rmse_Hrpy_yaw, '%.4f')]);
-
-% % --- Optional (Commented) Slip-Only RMSE Example ---
-% % slip_indices = int64(slip_pt ./ dt);
-% % rmse_Hrpy_yaw_slip = rms(Hrpy_error(slip_indices,3));
-% % legend(['Slip RMSE: ' num2str(rmse_Hrpy_yaw_slip, '%.4f')]);
-
-hold on;
-if exist('slip_pt', 'var') && ~isempty(slip_pt)
-    b1 = bar(slip_pt, bar_height_plus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-    b1 = bar(slip_pt, bar_height_minus, 1);
-    set(b1, 'FaceAlpha', 0.2, 'FaceColor', [1 0 0], 'Linestyle', 'none');
-end
-
-
-
-%% %% Iterations (Single File Only)
-% figure(8);
-% clf;
-% set(gcf, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
-% 
-% % --- Original multi-file version (commented) ---
-% % Y = [result1.Var97(start:finish-1), result2.Var97(start:finish-1)];
-% % stem(t, Y);
-%
-% % --- Single-file version ---
-% p = plot(t, result1.Var97(start:finish-1), 'b');
-% grid minor;
-% set(gca, 'FontSize', 12);
-% title('Iterations', 'FontSize', 15);
-% xlabel('Time (s)', 'FontSize', 12);
-% ylabel('Iteration Number', 'FontSize', 12);
-% 
-% mean_iter = mean(result1.Var97(start:finish-1));
-% legend(['Mean Iteration No. = ' num2str(mean_iter, '%.2f')], 'FontSize', 12);
-
-%% %% Back-propagation Steps (Single File Only)
-% figure(9);
-% clf;
-% set(gcf, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
-%
-% % --- Original multi-file version (commented) ---
-% % Y = [result1.Var98(start:finish-1), result2.Var98(start:finish-1)];
-% % stem(t, Y);
-%
-% % --- Single-file version ---
-% p = plot(t, result1.Var98(start:finish-1), 'b');
-% grid minor;
-% set(gca, 'FontSize', 12);
-% title('Back-Propagation Steps', 'FontSize', 15);
-% xlabel('Time (s)', 'FontSize', 12);
-% ylabel('Step Count', 'FontSize', 12);
-%
-% mean_backprop = mean(result1.Var98(start:finish-1));
-% legend(['Mean Steps = ' num2str(mean_backprop, '%.2f')], 'FontSize', 12);
-%
-%
-% %% Cost (Single File Only)
-% figure(10);
-% clf;
-% set(gcf, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
-%
-% % --- Original multi-file version (commented) ---
-% % Y = [result1.Var100(start:finish-1), result2.Var100(start:finish-1)];
-% % stem(t, Y);
-%
-% % --- Single-file version ---
-% p = plot(t, result1.Var100(start:finish-1), 'b');
-% grid minor;
-% set(gca, 'FontSize', 12);
-% title('Cost Function', 'FontSize', 15);
-% xlabel('Time (s)', 'FontSize', 12);
-% ylabel('Cost Value', 'FontSize', 12);
-%
-% mean_cost = mean(result1.Var100(start:finish-1));
-% legend(['Mean Cost = ' num2str(mean_cost, '%.4f')], 'FontSize', 12);
-%
-%
-% %% Operating Time (Single File Only)
-% figure(11);
-% clf;
-% set(gcf, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
-%
-% % --- Original multi-file version (commented) ---
-% % Y = [result1.Var99(start:finish-1), result2.Var99(start:finish-1)];
-% % stem(t, Y);
-%
-% % --- Single-file version ---
-% p = plot(t, result1.Var99(start:finish-1), 'b');
-% grid minor;
-% set(gca, 'FontSize', 12);
-% title('Operating Time', 'FontSize', 15);
-% xlabel('Time (s)', 'FontSize', 12);
-% ylabel('Operating Time (s)', 'FontSize', 12);
-%
-% mean_oper_time = mean(result1.Var99(start:finish-1));
-% legend(['Mean Operating Time = ' num2str(mean_oper_time, '%.4f')], 'FontSize', 12);
-
-
-
-%% dv (Single File Only)
-
-% % --- Compute contact point accelerations from velocity differences ---
-% d1_a(1) = 0; d2_a(1) = 0; d3_a(1) = 0; d4_a(1) = 0;
-% for k = 2:length(d1_v)
-%     d1_a(k) = d1_v(k) - d1_v(k-1);
-%     d2_a(k) = d2_v(k) - d2_v(k-1);
-%     d3_a(k) = d3_v(k) - d3_v(k-1);
-%     d4_a(k) = d4_v(k) - d4_v(k-1);
-% end
-%
-% % --- Plot contact point Y-direction velocities ---
-% figure(15);
-% clf;
-% subplot(2,1,1);
-% plot(t, d1_v, t, d2_v, t, d3_v, t, d4_v);
-% title('Contact Point Y Velocities');
-% xlabel('Time (s)');
-% ylabel('Velocity (m/s)');
-% legend('d1_y', 'd2_y', 'd3_y', 'd4_y');
-% grid on; grid minor;
-%
-% % --- Plot contact point Z-direction velocities ---
-% subplot(2,1,2);
-% plot(t, result1.Var66(start:finish-1), ...
-%      t, result1.Var69(start:finish-1), ...
-%      t, result1.Var72(start:finish-1), ...
-%      t, result1.Var75(start:finish-1));
-% title('Contact Point Z Velocities');
-% xlabel('Time (s)');
-% ylabel('Velocity (m/s)');
-% legend('d1_z', 'd2_z', 'd3_z', 'd4_z');
-% grid on; grid minor;
 
 %%
 

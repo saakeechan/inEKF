@@ -11,7 +11,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include "csvParserG1_FootPosVel.hpp"
+#include "csvParser.hpp"
 #include "../../src/utility/RobotModel.hpp"
 
 using std::cout;
@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
         csv_filename = argv[1];
     } else {
         // Default CSV file path
-        csv_filename = "/home/saakee/Research/deep-contact-estimator/Data/CSVFiles/robotstate_40000_env8.csv";
+        csv_filename = "/home/saakee/Research/Saaketh_INEKF/convex/Data/G1LoggingData.csv";
         cout << "No CSV file specified. Using default: " << csv_filename << endl;
     }
     
@@ -33,7 +33,7 @@ int main(int argc, char* argv[]) {
     // STEP 1: Parse G1 CSV data
     // ========================================================================
     cout << "Loading CSV data from: " << csv_filename << endl;
-    G1DataStruct g1_data = ParseG1CSV(csv_filename);
+    DataStruct g1_data = ParseCSV(csv_filename);
     
     // Verify data was loaded
     if (g1_data.timestamp.empty()) {

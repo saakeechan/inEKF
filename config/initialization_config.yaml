@@ -9,23 +9,25 @@ dt: 0.02
 # TextFile data file configuration
 textfile:
   enabled: true # Set to true to use TextFile data, false to use sensor data
-  file_name: "/home/saakee/Research/Saaketh_INEKF/Data/G1LoggingData.csv"
-  time_length: 990 # Total number of data points to process from the TextFile
+  file_name: "../Data/G1LoggingData.csv"
+  time_length: 999 # Total number of data points to process from the TextFile
   starting_point: 0 # Number of initial data points to skip in TextFile
+
+saved_results_folder: "../results"  # Name of the folder to save estimation results
 
 # Slip rejection configuration
 slip_rejection:
-  enabled: true  # Slip rejection mode
-  threshold: 5  # Slip threshold in m/s
+  enabled: false  # Slip rejection mode
+  threshold: 0.3  # Slip threshold in m/s
 
 # Variable contact covariance configuration
 variable_contact_covariance:
-  enabled: false  # Variable contact covariance mode
+  enabled: true  # Variable contact covariance mode
   amplifier: 1.0  # Multiplied to contact covariance when VCC is enabled
 
 Contact_estimation_NN:
   enabled: true  # Enable contact estimation using the neural network model
-  file_path: "/home/saakee/Research/Saaketh_INEKF/src/contactDetection/bipedal_contact_best_val_leg_acc.onnx"  # Path to the ONNX contact estimation model
+  file_path: "../src/contactDetection/bipedal_contact_best_val_leg_acc.onnx"  # Path to the ONNX contact estimation model
 
 
 

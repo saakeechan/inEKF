@@ -20,8 +20,12 @@
 #include <vector>
 #include <yaml-cpp/yaml.h>
 #include "InEKF_estimator.hpp"
-#include "../utility/TextFileDataStruct.hpp"
+#include "../utility/csvParser.hpp"
 #include "contact_detection.hpp"
+#include "../utility/inekf_save_utils.hpp"
+#include <filesystem>
+#include <chrono>
+#include <sstream>
 
 
 using std::cout;  
@@ -29,10 +33,10 @@ using std::endl;
 
 // This is just reading of the sensor data file and ground truth data file
 
-void InEKFilter::LoadTextFileData(const std::string& textfile_filename) {
-    TextFileData.loadFromParser(textfile_filename);
-    std::cout << "Loaded TextFile data with " << TextFileData.timestamp.size() << " rows." << std::endl;
-    textfile_flag = true;
+void InEKFilter::LoadCSVData(const std::string& csv_filename) {
+    CSVData = ParseCSV(csv_filename);
+    std::cout << "Loaded CSV data with " << CSVData.timestamp.size() << " rows." << std::endl;
+    csv_mode = true;
 }
 
 std::vector<double> InEKFilter::Variable_Contact_Cov(int frame_count){ // time is either 0 or 1 cause sliding window of 2 for filter; fix this for smoother later
@@ -191,37 +195,37 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
 
     inekf::RobotState initial_state(ForP);
 
-    if(textfile_flag){
+    if(csv_mode){
 
-        int idx = 0 + TextFile_Skip_Data; // To skip trash data in TextFile at the beginning
+        int idx = 0 + start_index; // Skip initial rows in CSV if needed
 
-        // initialize from TextFile data + initial condition offset because we might want to start from non-zero state as described in the TextFile file
+        // Initialize from CSV data + initial condition offset
 
-        // Position from TextFile data (pos_x, pos_y, pos_z)
-        p0 << TextFileData.pos_x[idx] + initial_condition(0),
-              TextFileData.pos_y[idx] + initial_condition(1),
-              TextFileData.pos_z[idx] + initial_condition(2);
+        // Position from CSV data (pos_x, pos_y, pos_z)
+        p0 << CSVData.pos_x[idx] + initial_condition(0),
+              CSVData.pos_y[idx] + initial_condition(1),
+              CSVData.pos_z[idx] + initial_condition(2);
         
-        // Velocity from TextFile data (vel_x, vel_y, vel_z)
-        v0 << TextFileData.vel_x[idx] + initial_condition(7),
-              TextFileData.vel_y[idx] + initial_condition(8),
-              TextFileData.vel_z[idx] + initial_condition(9);
+        // Velocity from CSV data (vel_x, vel_y, vel_z)
+        v0 << CSVData.vel_x[idx] + initial_condition(7),
+              CSVData.vel_y[idx] + initial_condition(8),
+              CSVData.vel_z[idx] + initial_condition(9);
 
         // Bias initialization
         bg0 << initial_condition(10), initial_condition(11), initial_condition(12);
         ba0 << initial_condition(13), initial_condition(14), initial_condition(15);
 
-        // Convert quaternion from TextFile to rotation matrix
-        Eigen::Vector4d quat;
-        quat << TextFileData.quat_w[idx], TextFileData.quat_i[idx], TextFileData.quat_j[idx], TextFileData.quat_k[idx];
-        R0 = BasicFunctions_Estimator::Quaternion_to_Rotation_Matrix(quat);
+        // Convert quaternion from CSV to rotation matrix
+        Eigen::Vector4d quat_csv;
+        quat_csv << CSVData.quat_w[idx], CSVData.quat_i[idx], CSVData.quat_j[idx], CSVData.quat_k[idx];
+        Eigen::Matrix3d R_csv = BasicFunctions_Estimator::Quaternion_to_Rotation_Matrix(quat_csv);
 
-        Vector3d Euler = BasicFunctions_Estimator::Rotation_to_EulerZYX(R0);
-        // add initial condition offset
-        Euler(0) = Euler(0) + initial_condition[3];
-        Euler(1) = Euler(1) + initial_condition[4];
-        Euler(2) = Euler(2) + initial_condition[5];
-        R0 = BasicFunctions_Estimator::EulerZYX_to_R_bw(Euler);
+        // Get rotation offset from initial condition (quaternion: w, x, y, z)
+        Eigen::Vector4d quat_offset = initial_condition.block(3, 0, 4, 1);
+        Eigen::Matrix3d R_offset = BasicFunctions_Estimator::Quaternion_to_Rotation_Matrix(quat_offset);
+
+        // Compose rotations: R0 = R_offset * R_csv (applies offset in body frame)
+        R0 = R_offset * R_csv;
 
     }else{ // Initialize for sensor readings
 
@@ -337,18 +341,21 @@ void InEKFilter::InitializeFromYAML(const std::string& config_path) {
     variable_contact_cov_mode = config["variable_contact_covariance"]["enabled"].as<bool>();
     cov_amplifier = config["variable_contact_covariance"]["amplifier"].as<double>();
     
-    // Load TextFile settings if present
+    // Load saved results folder path
+    saved_results_folder = config["saved_results_folder"].as<std::string>();
+    
+    // Load CSV settings if present
     if (config["textfile"]) {
-        textfile_flag = config["textfile"]["enabled"].as<bool>();
-        if (textfile_flag) {
+        csv_mode = config["textfile"]["enabled"].as<bool>();
+        if (csv_mode) {
             std::string file_name = config["textfile"]["file_name"].as<std::string>();
-            LoadTextFileData(file_name);
-            TextFile_Skip_Data = config["textfile"]["starting_point"].as<int>();
+            LoadCSVData(file_name);
+            start_index = config["textfile"]["starting_point"].as<int>();
             time_length = config["textfile"]["time_length"].as<int>();
         }
     }
     else {
-        textfile_flag = false;
+        csv_mode = false;
     }
     
     // Load contact model path
@@ -465,21 +472,24 @@ void InEKFilter::new_measurement(const Eigen::VectorXd &imu_i, const Eigen::Matr
 
 void InEKFilter::new_measurement()
 {
-    // No-argument version: only for TextFile mode
-    if(!textfile_flag) {
-        std::cerr << "Error: new_measurement() with no arguments requires textfile_flag == true" << std::endl;
+    // No-argument version: only for CSV mode
+    if(!csv_mode) {
+        std::cerr << "Error: new_measurement() with no arguments requires csv_mode == true" << std::endl;
         return;
     }
     
-    int j = time_count + TextFile_Skip_Data;
+    int j = time_count + start_index;
     
-    // IMU data from TextFile
-    IMU_Gyro[frame_count] << TextFileData.gyro_x[j], TextFileData.gyro_y[j], TextFileData.gyro_z[j];
-    IMU_Acc[frame_count] << TextFileData.acc_x[j], TextFileData.acc_y[j], TextFileData.acc_z[j];
+    // IMU data from CSV
+    IMU_Gyro[frame_count] << CSVData.gyro_body_x[j], CSVData.gyro_body_y[j], CSVData.gyro_body_z[j];
+    IMU_Acc[frame_count] << CSVData.acc_body_x[j], CSVData.acc_body_y[j], CSVData.acc_body_z[j];
 
     if (robot.robot_name == "G1") {
     // Convert gravity-compensated body IMU to world frame with gravity added back
-    IMU_Acc[frame_count] = filter.getState().getRotation() * IMU_Acc[frame_count] - gravity;
+    // Eigen::Vector4d quat_gt;
+    // quat_gt << CSVData.quat_w[j], CSVData.quat_i[j], CSVData.quat_j[j], CSVData.quat_k[j];
+    // Eigen::Matrix3d R_gt = BasicFunctions_Estimator::Quaternion_to_Rotation_Matrix(quat_gt);
+    // IMU_Acc[frame_count] = R_gt * IMU_Acc[frame_count] - gravity;
     }
     // IMU_Gyro[frame_count] = filter.getState().getRotation() * IMU_Gyro[frame_count];
 
@@ -488,21 +498,21 @@ void InEKFilter::new_measurement()
 
     // ========================================================================
     // ROBOT-SPECIFIC ENCODER ASSIGNMENT
-    // This section assigns encoder and encoder velocity data from TextFile to 
+    // This section assigns encoder and encoder velocity data from CSV to 
     // the appropriate indices for Pinocchio FK.
     // 
     // When creating a new robot model:
-    // 1. Implement assign_encoder_from_TextFile() in your Robot_Model_XXX class
-    // 2. Implement assign_encoderdot_from_TextFile() in your Robot_Model_XXX class
-    // 3. These methods should map TextFile data to correct joint indices per your URDF/MJCF
+    // 1. Map CSV joint data to the robot's joint configuration
+    // 2. Ensure joint ordering matches your URDF/MJCF model
+    // 3. Use robot.map_indices_to_encoders() for proper mapping
     // ========================================================================
     
-    // Map TextFile data to encoder vectors
-    robot.map_indices_to_encoders(TextFileData.encoders[j], ENCODER[frame_count], "encoder");
-    robot.map_indices_to_encoders(TextFileData.encoderdots[j], ENCODERDOT[frame_count], "encoderdot");
+    // Map CSV data to encoder vectors
+    robot.map_indices_to_encoders(CSVData.encoders[j], ENCODER[frame_count], "encoder");
+    robot.map_indices_to_encoders(CSVData.encoderdots[j], ENCODERDOT[frame_count], "encoderdot");
     
-    // Get contact state from TextFile
-    CONTACT_t[frame_count] = TextFileData.contact_state[j];
+    // Get contact state from CSV
+    CONTACT_t[frame_count] = CSVData.contact_state[j];
     
     // Consolidate IMU measurement
     imu_measurement << IMU_Gyro[frame_count], IMU_Acc[frame_count];
@@ -536,7 +546,6 @@ void InEKFilter::Propagate_and_Correct()
         contactConstraints.emplace_back(i, CONTACT_t[frame_count][i]);
     }
 
-    //cout<<"HC "<<HARD_CONTACT_t[frame_count]<<endl;
     filter.setContacts(contactConstraints);
 
 
@@ -555,8 +564,6 @@ void InEKFilter::Propagate_and_Correct()
         // Extract Jacobian for this leg and compute measurement covariance
         Eigen::MatrixXd FK_Jacobian_full = robot.get_foot_jacobian(k+1);
 
-        
-
         // Extract only the active encoder columns (removes base DOFs + unused joints)
         Eigen::MatrixXd FK_Jacobian = robot.extract_active_encoder_jacobian(FK_Jacobian_full);
 
@@ -574,31 +581,18 @@ void InEKFilter::Propagate_and_Correct()
         measured_kinematics.push_back(frame);
     }
 
-    // exit(0); // Exit after building kinematics for debugging - remove this in actual use
-    // Correct state using kinematic measurements
-
     filter.CorrectKinematics(measured_kinematics, true);
     
 
         // Store dv norms for this time step
         std::vector<double> dv_norms_current(robot.num_legs);
 
-        // // DEBUG: Override filter velocity and rotation with ground truth for dv computation
-        // int j_debug = time_count + TextFile_Skip_Data;
-        // Eigen::Vector3d v_gt;
-        // v_gt << TextFileData.vel_x[j_debug], TextFileData.vel_y[j_debug], TextFileData.vel_z[j_debug];
-        // Eigen::Vector4d quat_gt;
-        // quat_gt << TextFileData.quat_w[j_debug], TextFileData.quat_i[j_debug], TextFileData.quat_j[j_debug], TextFileData.quat_k[j_debug];
-        // Eigen::Matrix3d R_gt = BasicFunctions_Estimator::Quaternion_to_Rotation_Matrix(quat_gt);
-
-        // Compute d_v from kinematics if not using NN, otherwise compute dv_norm
-        if (!contact_nn_enabled || !contact_nn->is_enabled()) {
-            for (int k=0; k<robot.num_legs; k++){
-                d_v[frame_count].block(3*k,0,3,1) = filter.getState().getVelocity()
-                        + filter.getState().getRotation()*robot.get_foot_velocity(k+1)
-                        + filter.getState().getRotation()*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias())*robot.get_foot_position(k+1);
-                dv_norm[frame_count](k) = d_v[frame_count].block(3*k,0,3,1).norm();
-            }
+        // Always compute d_v and dv_norm from kinematics (not using NN for velocity prediction)
+        for (int k=0; k<robot.num_legs; k++){
+            d_v[frame_count].block(3*k,0,3,1) = filter.getState().getVelocity()
+                    + filter.getState().getRotation()*robot.get_foot_velocity(k+1)
+                    + filter.getState().getRotation()*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias())*robot.get_foot_position(k+1);
+            dv_norm[frame_count](k) = d_v[frame_count].block(3*k,0,3,1).norm();
         }
         
         for (int k=0; k<robot.num_legs; k++){
@@ -619,28 +613,27 @@ void InEKFilter::Propagate_and_Correct()
             // std::cout << "Frame Position " << k << ": " << robot.get_foot_position(k+1).transpose() << std::endl;
             // std::cout << "Frame Velocity " << k << ": " << robot.get_foot_velocity(k+1).transpose() << std::endl;
     }
-    // std::cout << "Frame Velocity " << robot.get_foot_velocity(1).transpose() << std::endl;
     
     
     // Append dv norms to history
     dv_history.push_back(dv_norms_current);
 
-    Eigen::Vector3d w_IMU_world = filter.getState().getRotation() * (IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias()); // assuming bias is in body frame.
-        robot.transform_state_to_base(
-        filter.getState().getRotation(),
-        filter.getState().getPosition(),
-        filter.getState().getVelocity(),
-        w_IMU_world,
-        robot_state.Rotation,
-        robot_state.Position,
-        robot_state.Velocity,
-        robot_state.Angular_Velocity
-    );
+    // Eigen::Vector3d w_IMU_world = filter.getState().getRotation() * (IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias()); // assuming bias is in body frame.
+    //     robot.transform_state_to_base(
+    //     filter.getState().getRotation(),
+    //     filter.getState().getPosition(),
+    //     filter.getState().getVelocity(),
+    //     w_IMU_world,
+    //     robot_state.Rotation,
+    //     robot_state.Position,
+    //     robot_state.Velocity,
+    //     robot_state.Angular_Velocity
+    // );
 
-    // robot_state.Rotation = filter.getState().getRotation();
-    // robot_state.Position = filter.getState().getPosition();
-    // robot_state.Velocity = filter.getState().getVelocity();
-    // robot_state.Angular_Velocity = IMU_Gyro[frame_count]; // assuming bias is in body frame.
+    robot_state.Rotation = filter.getState().getRotation();
+    robot_state.Position = filter.getState().getPosition();
+    robot_state.Velocity = filter.getState().getVelocity();
+    robot_state.Angular_Velocity = IMU_Gyro[frame_count]; // assuming bias is in body frame.
 
     
     // Populate remaining robot_state fields (sensor-specific and contact data)
@@ -1040,12 +1033,12 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
 
 }
 void InEKFilter::Onestep(){    
-    // No-argument version: uses TextFile data directly (requires textfile_flag == true)
+    // No-argument version: uses CSV data directly (requires csv_mode == true)
 
-    new_measurement(); // reads from TextFile when textfile_flag is true
+    new_measurement(); // reads from CSV when csv_mode is true
     
-    // Extract leg torques from TextFile data
-    int j = time_count + TextFile_Skip_Data;
+    // Extract leg torques from CSV data
+    int j = time_count + start_index;
 
     if(contact_nn_enabled) {
         
@@ -1055,7 +1048,7 @@ void InEKFilter::Onestep(){
             MOTOR_TORQUES[frame_count] = Eigen::VectorXd::Zero(robot.encoder_size);
             for (int i = 0; i < robot.num_legs; i++) {
                 for (int idx : robot.Leg_indices_map[i]) {
-                    MOTOR_TORQUES[frame_count](idx) = TextFileData.motor_torques[j][idx];
+                    MOTOR_TORQUES[frame_count](idx) = CSVData.motor_torques[j][idx];
                 }
             }
 
@@ -1063,12 +1056,12 @@ void InEKFilter::Onestep(){
             MOTOR_TORQUES_CMD[frame_count] = Eigen::VectorXd::Zero(robot.encoder_size);
             for (int i = 0; i < robot.num_legs; i++) {
                 for (int idx : robot.Leg_indices_map[i]) {
-                    MOTOR_TORQUES_CMD[frame_count](idx) = TextFileData.motor_torques_cmd[j][idx];
+                    MOTOR_TORQUES_CMD[frame_count](idx) = CSVData.motor_torques_cmd[j][idx];
                 }
             }
 
-            // Store commanded velocity from TextFile data
-            CMD_V[frame_count] = Eigen::Vector3d(TextFileData.CMD_V[j][0], TextFileData.CMD_V[j][1], TextFileData.CMD_V[j][2]);
+            // Store commanded velocity from CSV data
+            CMD_V[frame_count] = Eigen::Vector3d(CSVData.CMD_V[j][0], CSVData.CMD_V[j][1], CSVData.CMD_V[j][2]);
 
             // Compute sum of squared torques for each leg
             for (int leg = 0; leg < robot.num_legs; ++leg) {
@@ -1104,27 +1097,27 @@ void InEKFilter::Onestep(){
             // Update sliding window buffer with new features
             contact_nn->update_nn_feature_buffer(features);
             
-            // Predict contacts and foot velocities using ONNX Runtime model
+            // Predict contacts using ONNX Runtime model (velocity output is ignored)
             auto [predicted_contacts, predicted_foot_velocities] = contact_nn->nn_predict_contact();
             // Implement hysteresis with probability thresholds (after sigmoid)
-            // If probability is above 0.7 then contact is true, if probability is below 0.3 then contact is false, if in between then keep previous state
+            // If probability is above 0.5 then contact is true, otherwise false
             for (int leg = 0; leg < robot.num_legs; ++leg) {
                 double prob = predicted_contacts[leg]; // Extract probability value for this leg (post-sigmoid)
-                if (prob > 0.6) {
+                if (prob > 0.5) {
                     CONTACT_t[frame_count][leg] = true;
-                } else if (prob < 0.4) {
+                } else if (prob < 0.5) {
                     CONTACT_t[frame_count][leg] = false;
                 } else {
                     // Keep previous state (hysteresis zone)
                     CONTACT_t[frame_count][leg] = CONTACT_t[frame_count - 1][leg];
                 }
             }
-            // Store predicted velocity norm in dv_norm
-            dv_norm[frame_count](0) = predicted_foot_velocities(0);  // Left leg dv_norm from NN
+
+            // Note: dv and dv_norm are computed in Propagate_and_Correct() using kinematics
 
             // If torque sum squared exceeds threshold for any leg, set contact to true for that leg
             for (int leg = 0; leg < robot.num_legs; ++leg) {
-                if (torqueSumSquared[frame_count](leg) >= 1500) {
+                if (torqueSumSquared[frame_count](leg) >= 2000) {
                     CONTACT_t[frame_count][leg] = true;
                 }
             }
@@ -1145,39 +1138,34 @@ void InEKFilter::Onestep(){
         } else {
             // Use previous frame's contact detection result
             CONTACT_t[frame_count] = CONTACT_t[frame_count - 1];
-            dv_norm[frame_count] = dv_norm[frame_count - 1];
+            // Note: dv_norm is computed in Propagate_and_Correct() using kinematics
         }
     }
     else
     {
-        // Extract leg torques from TextFile data
-        int j = time_count + TextFile_Skip_Data;
+        // Extract leg torques from CSV data
+        int j = time_count + start_index;
         Eigen::VectorXd leg_torques(robot.num_legs);
         for (int i = 0; i < robot.num_legs; i++) {
             // Sum squared torques for all motors in this leg
             double leg_torque_sum = 0.0;
             for (int idx : robot.Leg_indices_map[i]) {
-                double torque = TextFileData.motor_torques[j][idx];
+                double torque = CSVData.motor_torques[j][idx];
                 leg_torque_sum += torque * torque;
             }
             leg_torques(i) = leg_torque_sum;
         }
 
-        Eigen::VectorXd leg_speeds = Eigen::VectorXd::Ones(robot.num_legs) * 1000; // Placeholder: set high leg speeds to avoid slip detection in TextFile mode (since we don't have real motor velocity data)
+        Eigen::VectorXd leg_speeds = Eigen::VectorXd::Ones(robot.num_legs) * 1000; // Placeholder: set high leg speeds to avoid slip detection in CSV mode (since we don't have real motor velocity data)
         torqueSumSquared[frame_count] = leg_torques;
         Eigen::VectorXd dv_for_detection = d_v[0]; // Use dv from frame 0 for detection, as it is the most recent after sliding window update
-        CONTACT_t[frame_count] = ContactDetection::detect_contact(leg_torques, dv_for_detection, leg_speeds);
+        // CONTACT_t[frame_count] = ContactDetection::detect_contact(leg_torques, dv_for_detection, leg_speeds);
     }
-    GroundTruthContact = TextFileData.contact_state[j]; // For evaluation purposes, store ground truth contact from TextFile
+    GroundTruthContact = CSVData.contact_state[j]; // For evaluation purposes, store ground truth contact from CSV
     
     // Print contact and d_v info for debugging
-    // Only output left leg (leg 0), right leg set to false (0)
-    std::cout << "Contacts: [" << CONTACT_t[frame_count][0] << ", 0]";
+    std::cout << "Contacts: [" << CONTACT_t[frame_count][0] << ", " << CONTACT_t[frame_count][1] << "]";
     std::cout << " GT: [" << GroundTruthContact[0] << ", " << GroundTruthContact[1] << "]" << std::endl;
-    
-    // // Output left leg velocity norm (CNN outputs this directly as a scalar)
-    // std::cout << "d_v from NN: Left Leg norm=" 
-    //           << dv_norm[frame_count](0) << std::endl;
 
     // Compare detected contact with ground truth and update counters
     for (int k = 0; k < robot.num_legs; k++) {
@@ -1191,10 +1179,7 @@ void InEKFilter::Onestep(){
 
     Propagate_and_Correct();
 
-    SAVE_onestep(time_count); // save estimated and true states to SAVE_MATRIX
-
-    // send_states(current_state); // update current_state with latest estimates for external use (e.g., logging, visualization)
-
+    InEKF_SaveUtils::save_onestep_impl(*this, time_count); // save estimated and true states to SAVE_MATRIX
     
     if(filter.getState().getVelocity().norm()>10 && dt!=0){
        cout<<"Diverged!! from time "<<time_count<<endl;
@@ -1211,39 +1196,6 @@ void InEKFilter::Onestep(){
     
     // Frame 1 information is now moved to frame 0
     sliding_window();
-}
-
-void InEKFilter::writeDvHistory() {
-    std::string filename = robot.robot_name + "_dv_values.csv";
-
-    std::ofstream outfile(filename);
-    
-    if (!outfile.is_open()) {
-        std::cerr << "Error: Failed to open file: " << filename << std::endl;
-        return;
-    }
-    
-    // Write header row
-    for (int k = 0; k < robot.num_legs; k++) {
-        outfile << "Leg_" << (k+1);
-        if (k < robot.num_legs - 1) {
-            outfile << ",";
-        }
-    }
-    outfile << "\n";
-    
-    // Write data rows (each time step)
-    for (size_t t = 0; t < dv_history.size(); t++) {
-        for (int k = 0; k < robot.num_legs; k++) {
-            outfile << dv_history[t][k];
-            if (k < robot.num_legs - 1) {
-                outfile << ",";
-            }
-        }
-        outfile << "\n";
-    }
-    
-    cout << "dv history saved to " << filename << " (" << dv_history.size() << " time steps, " << robot.num_legs << " legs)" << endl;
 }
 
 void InEKFilter::getParameters(const std::string& urdf_path, const std::string& robot_name) {

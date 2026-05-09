@@ -23,7 +23,7 @@ link_directories(${PINOCCHIO_LIBRARY_DIRS})
 # Create executable
 add_executable(getFootPositionVelocityFK 
     getFootPositionVelocityFK.cpp
-    ../csvParserG1_FootPosVel.cpp
+    ../csvParser.cpp
     ../../src/utility/RobotModel.cpp
 )
 

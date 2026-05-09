@@ -1,6 +1,7 @@
 /* ----------------------------------------------------------------------------
  * Contact Neural Network Estimator Implementation
- * Handles all neural network-based contact detection functionality
+ * Handles neural network-based contact detection functionality
+ * Note: NN outputs contact predictions only; foot velocities are computed via kinematics
  * -------------------------------------------------------------------------- */
 
 #include "ContactNN.hpp"
@@ -86,7 +87,7 @@ std::pair<Eigen::VectorXd, Eigen::VectorXd> ContactNN::predict_contact(const std
         // Run inference
         // Model outputs:
         // - contact_logits: [batch_size] = [1] with single logit for left leg only
-        // - foot_velocities: [batch_size] = [1] with velocity norm for left leg (currently unused)
+        // - foot_velocities: [batch_size] = [1] with velocity norm for left leg (not used - computed via kinematics instead)
         auto output_tensors = contact_model_session->Run(
             Ort::RunOptions{nullptr},
             input_names.data(),

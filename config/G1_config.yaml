@@ -12,7 +12,7 @@ robot_name: "G1"
 # ============================================================================
 model:
   # Path to robot model file
-  model_path: "/home/saakee/Research/Saaketh_INEKF/src/utility/G1/g1_29dof_rev_1_0_wFootFrames.urdf"
+  model_path: "../src/utility/G1/g1_29dof_rev_1_0_wFootFrames.urdf"
   
   # Model format: "urdf" or "mjcf"
   format: "urdf"

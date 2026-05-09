@@ -13,7 +13,7 @@
 #include "../utility/RobotModel.hpp"
 
 // Include CSV data parser
-#include "../utility/TextFileDataStruct.hpp"
+#include "../utility/csvParser.hpp"
 // ----------------------------
 
 // Include ContactNN for neural network-based contact detection
@@ -68,7 +68,7 @@ public:
     // Load ONNX contact estimation model (delegates to ContactNN)
     void load_contact_model(const std::string& model_path = "../src/estimator/bipedal_contact_best_val_leg_acc.onnx");
     
-    void LoadTextFileData(const std::string& TextFile_filename);
+    void LoadCSVData(const std::string& csv_filename);
 
     void Initialize(double _dt, Eigen::Vector<double,12> cov_val_setting, Eigen::Vector<double, 16> initial_condition, int sliding_window_size = 2); // default sliding window size = 2 (filter)
     
@@ -76,7 +76,7 @@ public:
 
     void new_measurement(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const std::vector<bool> &Contact_i);
     void new_measurement(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i);  // Contact detection from torques
-    void new_measurement();  // No-argument version for TextFile mode
+    void new_measurement();  // No-argument version for CSV mode
 
     std::vector<bool> contact_detection_logic(const std::vector<double> &motor_torques_i);  // Helper for contact detection from torques
     void Propagate_and_Correct();
@@ -85,20 +85,15 @@ public:
     // void send_states(ROBOT_STATES &state_);
     void sliding_window();
 
-    void SAVE_onestep(int save_index);
-
     void Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const std::vector<bool> &Contact_i);
     void Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const Eigen::VectorXd &motor_torques_i, const Eigen::VectorXd &motor_torques_cmd_i, const Eigen::VectorXd &Cmd_Velocity_i);  // Contact detection from torques
-    void Onestep();  // No-argument version for TextFile mode
+    void Onestep();  // No-argument version for CSV mode
     // void Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const Eigen::VectorXd &motor_torques_i);  // Contact detection from torques
-
-    void writeSavedData();
-    void writeDvHistory();  // Write dv norms to CSV file
 
     // Static utility function - can be called without creating an estimator object
     static void getParameters(const std::string& urdf_path, const std::string& robot_name);
 
-    int TextFile_Skip_Data = 0; // default (change in main.cpp if you have trash data)
+    int start_index = 0; // Starting row index in CSV data (skip initial bad data)
 
     //Necessary classes & variables
     RobotModel robot; // This is where robot model is defined
@@ -144,7 +139,7 @@ public:
     std::vector<Eigen::VectorXd>   ENCODERDOT;   // Dynamic size, set after robot config loaded
     std::vector<Eigen::VectorXd>   MOTOR_TORQUES;     // Raw motor torques for NN features
     std::vector<Eigen::VectorXd>   MOTOR_TORQUES_CMD; // Commanded motor torques for logging and potential use in contact detection
-    std::vector<Eigen::VectorXd>   CMD_V;            // Commanded velocities (if available in TextFile data)
+    std::vector<Eigen::VectorXd>   CMD_V;            // Commanded velocities (if available in CSV data)
     std::vector<Eigen::VectorXd>   torqueSumSquared;  // Sliding window buffer for torque sum squared
     //SAVE PARAMETER
     std::string estimator_info;
@@ -161,7 +156,9 @@ public:
     int idx_TRUE_Rotation;
     int idx_TRUE_Velocity;
     int idx_TRUE_Position;
+    int idx_TRUE_Omega;
     int idx_TRUE_dv;
+    int idx_TRUE_dv_norm;
     int idx_TRUE_Bias_Gyro;
     int idx_TRUE_Bias_Acc;
     int idx_TRUE_Contact;
@@ -172,7 +169,9 @@ public:
     int idx_ESTIMATED_Rotation;
     int idx_ESTIMATED_Velocity;
     int idx_ESTIMATED_Position;
+    int idx_ESTIMATED_Omega;
     int idx_ESTIMATED_dv;
+    int idx_ESTIMATED_dv_norm;
     int idx_ESTIMATED_Bias_Gyro;
     int idx_ESTIMATED_Bias_Acc;
     int idx_ESTIMATED_Contact;
@@ -182,8 +181,8 @@ public:
     int idx_end;
 
     //Parameters
-    bool textfile_flag = false;
-    TextFileDataStruct TextFileData; // Universal TextFile data type - robot agnostic
+    bool csv_mode = false;
+    DataStruct CSVData; // Robot data from CSV parser
     int time_length = 0;  // Total number of data points to process (from YAML)
 
     bool slip_rejection_mode = false;
@@ -191,6 +190,8 @@ public:
 
     bool variable_contact_cov_mode = false;
     double cov_amplifier = 2;
+
+    std::string saved_results_folder = "../results";
 
     // dv history for CSV logging: [time_step][leg] = dv_norm
     std::vector<std::vector<double>> dv_history;
@@ -207,8 +208,10 @@ private:
         idx_TRUE_Rotation = 0;
         idx_TRUE_Velocity = idx_TRUE_Rotation + 9;
         idx_TRUE_Position = idx_TRUE_Velocity + 3;
-        idx_TRUE_dv = idx_TRUE_Position + 3;
-        idx_TRUE_Bias_Gyro = idx_TRUE_dv + robot.num_legs * 3;
+        idx_TRUE_Omega = idx_TRUE_Position + 3;
+        idx_TRUE_dv = idx_TRUE_Omega + 3;
+        idx_TRUE_dv_norm = idx_TRUE_dv + robot.num_legs * 3;
+        idx_TRUE_Bias_Gyro = idx_TRUE_dv_norm + robot.num_legs;
         idx_TRUE_Bias_Acc = idx_TRUE_Bias_Gyro + 3;
         idx_TRUE_Contact = idx_TRUE_Bias_Acc + 3;
         idx_TRUE_Slip = idx_TRUE_Contact + robot.num_legs;
@@ -218,8 +221,10 @@ private:
         idx_ESTIMATED_Rotation = idx_TRUE_rpy + 3;
         idx_ESTIMATED_Velocity = idx_ESTIMATED_Rotation + 9;
         idx_ESTIMATED_Position = idx_ESTIMATED_Velocity + 3;
-        idx_ESTIMATED_dv = idx_ESTIMATED_Position + 3;
-        idx_ESTIMATED_Bias_Gyro = idx_ESTIMATED_dv + robot.num_legs * 3;
+        idx_ESTIMATED_Omega = idx_ESTIMATED_Position + 3;
+        idx_ESTIMATED_dv = idx_ESTIMATED_Omega + 3;
+        idx_ESTIMATED_dv_norm = idx_ESTIMATED_dv + robot.num_legs * 3;
+        idx_ESTIMATED_Bias_Gyro = idx_ESTIMATED_dv_norm + robot.num_legs;
         idx_ESTIMATED_Bias_Acc = idx_ESTIMATED_Bias_Gyro + 3;
         idx_ESTIMATED_Contact = idx_ESTIMATED_Bias_Acc + 3;
         idx_ESTIMATED_Slip = idx_ESTIMATED_Contact + robot.num_legs;
