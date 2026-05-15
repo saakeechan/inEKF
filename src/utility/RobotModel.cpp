@@ -343,7 +343,7 @@ Eigen::MatrixXd RobotModel::get_foot_jacobian(int i_leg) const {
         pin_model,
         const_cast<pinocchio::Data&>(pin_data),
         foot_frame_ids[i_leg - 1],
-        pinocchio::LOCAL_WORLD_ALIGNED,
+        pinocchio::WORLD,
         J_foot_full
     );
     
@@ -353,7 +353,7 @@ Eigen::MatrixXd RobotModel::get_foot_jacobian(int i_leg) const {
         pin_model,
         const_cast<pinocchio::Data&>(pin_data),
         imu_frame_id,
-        pinocchio::LOCAL_WORLD_ALIGNED,
+        pinocchio::WORLD,
         J_imu_full
     );
     
@@ -383,7 +383,7 @@ Eigen::Vector3d RobotModel::get_foot_velocity(int i_leg) const {
         pin_model,
         const_cast<pinocchio::Data&>(pin_data),
         foot_frame_ids[i_leg - 1],
-        pinocchio::LOCAL_WORLD_ALIGNED
+        pinocchio::WORLD
     );
     
     // Get IMU velocity in Base Frame
@@ -391,7 +391,7 @@ Eigen::Vector3d RobotModel::get_foot_velocity(int i_leg) const {
         pin_model,
         const_cast<pinocchio::Data&>(pin_data),
         imu_frame_id,
-        pinocchio::LOCAL_WORLD_ALIGNED
+        pinocchio::WORLD
     );
     
     // Compute relative velocity in Base Frame
@@ -522,7 +522,7 @@ void RobotModel::transform_state_to_base(
         pin_model,
         const_cast<pinocchio::Data&>(pin_data),
         imu_frame_id,
-        pinocchio::LOCAL_WORLD_ALIGNED
+        pinocchio::WORLD
     );
     
     const Eigen::Vector3d v_imu_Base = imu_velocity_world.linear();   // Joint-induced linear velocity in Base frame

@@ -24,8 +24,8 @@ int main() {
     // If this is your first time running a new robot, uncomment the line below
     //  to extract parameters and use that to fill in the yaml files
     
-    // InEKFilter::getParameters("/home/saakee/Research/Saaketh_INEKF/src/utility/G1/g1_29dof_rev_1_0_wFootFrames.urdf", "g1_wFootFrames");
-    // return 0;
+    InEKFilter::getParameters("../src/utility/G1/g1_29dof_rev_1_0_wFootFrames.urdf", "g1_wFootFrames");
+    return 0;
 
 
     // InEKFilter::getParameters("../digit_mujoco-main/src/digit_mujoco/models/flat/digit-v3-flat.xml", "Digit");

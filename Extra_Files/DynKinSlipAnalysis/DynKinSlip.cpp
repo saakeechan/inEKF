@@ -216,7 +216,7 @@ int main(int argc, char** argv) {
     std::cout << "=== Dynamic Kinematic Slip Analysis ===\n" << std::endl;
 
     // Load CSV file
-    std::string csv_path = (argc > 1) ? argv[1] : "../Data/robotstate_0_env2.csv";
+    std::string csv_path = (argc > 1) ? argv[1] : "../Data/robotstate_0_env3.csv";
     DataStruct data = ParseCSV(csv_path);
     std::cout << "Loaded " << data.num_rows << " rows from: " << csv_path << "\n" << std::endl;
 
