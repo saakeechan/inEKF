@@ -178,6 +178,24 @@ target_link_libraries(writeFKFootPosVel
     yaml-cpp
 )
 
+# DynKinSlip executable: Dynamic Kinematic Slip Analysis for left foot
+add_executable(DynKinSlip 
+    Extra_Files/DynKinSlipAnalysis/DynKinSlip.cpp
+    src/utility/csvParser.cpp
+)
+
+set_target_properties(DynKinSlip PROPERTIES
+    BUILD_RPATH "${PINOCCHIO_LIBRARY_DIRS}"
+    INSTALL_RPATH "${PINOCCHIO_LIBRARY_DIRS}"
+)
+
+target_link_libraries(DynKinSlip
+    INEKF_Estimator
+    pinocchio_default
+    pinocchio_parsers
+    yaml-cpp
+)
+
 
 # ============================================================
 # Installation rules

@@ -27,3 +27,7 @@ unitree_ros/
 results/
 
 convex/assignment
+
+# IDE and build cache
+.vscode/
+.ccache/

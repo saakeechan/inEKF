@@ -340,13 +340,13 @@ void InEKFilter::InitializeFromYAML(const std::string& config_path) {
     // Load variable contact covariance settings
     variable_contact_cov_mode = config["variable_contact_covariance"]["enabled"].as<bool>();
     cov_amplifier = config["variable_contact_covariance"]["amplifier"].as<double>();
-    
-    // Load saved results folder path
-    saved_results_folder = config["saved_results_folder"].as<std::string>();
+
     
     // Load CSV settings if present
     if (config["textfile"]) {
         csv_mode = config["textfile"]["enabled"].as<bool>();
+        // Load saved results folder path
+        saved_results_folder = config["saved_results_folder"].as<std::string>();
         if (csv_mode) {
             std::string file_name = config["textfile"]["file_name"].as<std::string>();
             LoadCSVData(file_name);
@@ -643,6 +643,7 @@ void InEKFilter::Propagate_and_Correct()
     robot_state.Hard_Contact = HARD_CONTACT_t[frame_count];
     robot_state.Slip = SLIP_t[frame_count];
     robot_state.d_v = d_v[frame_count];
+    robot_state.dv_norm = dv_norm[frame_count];
 
 
 }
@@ -740,9 +741,9 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
         // Implement hysteresis with probability thresholds (after sigmoid)
         for (int leg = 0; leg < robot.num_legs; ++leg) {
             double prob = predicted_contacts[leg]; // Extract probability value for this leg (post-sigmoid)
-            if (prob > 0.6) {
+            if (prob > 0.5) {
                 CONTACT_t[frame_count][leg] = true;
-            } else if (prob < 0.4) {
+            } else if (prob < 0.5) {
                 CONTACT_t[frame_count][leg] = false;
             } else if (frame_count > 0) {
                 // Keep previous state (hysteresis zone)
@@ -855,7 +856,7 @@ void InEKFilter::Onestep(){
                 for (int joint_idx : robot.Leg_indices_map[leg]) {
                     sum_sq += MOTOR_TORQUES[frame_count](joint_idx) * MOTOR_TORQUES[frame_count](joint_idx);
                 }
-                torqueSumSquared[frame_count](leg) = sum_sq;
+                torqueSumSquared[frame_count](leg) = sum_sq; // Average squared torque per joint for this leg
             }
 
 
@@ -889,9 +890,9 @@ void InEKFilter::Onestep(){
             // If probability is above 0.5 then contact is true, otherwise false
             for (int leg = 0; leg < robot.num_legs; ++leg) {
                 double prob = predicted_contacts[leg]; // Extract probability value for this leg (post-sigmoid)
-                if (prob > 0.6) {
+                if (prob > 0.5) {
                     CONTACT_t[frame_count][leg] = true;
-                } else if (prob < 0.4) {
+                } else if (prob < 0.5) {
                     CONTACT_t[frame_count][leg] = false;
                 } else if (frame_count > 0) {
                     // Keep previous state (hysteresis zone)

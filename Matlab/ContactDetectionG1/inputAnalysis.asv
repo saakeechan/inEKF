@@ -1,0 +1,58 @@
+clc;
+close all;
+
+%% Load data
+T = readtable('/home/saakee/Research/Saaketh_INEKF/Data/G1LoggingData.csv');
+
+%% Parameters
+tname = 'timestamp';
+n = min(height(T), 300);
+
+time = T.(tname)(1:n);
+
+%% Ground-truth contacts
+l_gt = logical(T.lfoot_contact(1:n));
+
+get_regions = @(contact) deal( ...
+    find(diff([0; contact(:); 0]) == 1), ...
+    find(diff([0; contact(:); 0]) == -1) - 1);
+
+[l_starts, l_ends] = get_regions(l_gt);
+
+%% Extract body acceleration
+acc_body_x = T.acc_body_x(1:n);
+
+%% Plot
+figure;
+hold on;
+grid on;
+
+% Plot acceleration
+plot(time, acc_body_x, 'b', 'DisplayName', 'acc\_body\_z');
+
+% Plot contact regions
+y_limits = ylim;
+
+
+% Plot contact regions in RED
+for k = 1:length(l_starts)
+    x1 = time(l_starts(k));
+    x2 = time(l_ends(k));
+
+    patch( ...
+        [x1 x2 x2 x1], ...
+        [y_limits(1) y_limits(1) y_limits(2) y_limits(2)], ...
+        [1.0 0.6 0.6], ...
+        'FaceAlpha', 0.3, ...
+        'EdgeColor', 'none', ...
+        'DisplayName', 'Left Foot Contact');
+end
+
+% Re-plot signal so it stays on top
+% plot(time, acc_body_x, 'b', 'DisplayName', 'acc_body_x');
+
+xlabel('Time [s]');
+ylabel('Body Acceleration X');
+title('acc\_body\_x with Left Foot Contact Regions');
+
+legend;

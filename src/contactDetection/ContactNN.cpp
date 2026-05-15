@@ -99,30 +99,22 @@ std::pair<Eigen::VectorXd, Eigen::VectorXd> ContactNN::predict_contact(const std
         
         // Get contact logits from first output
         float* contact_logits_data = output_tensors[0].GetTensorMutableData<float>();
-        auto output_shape = output_tensors[0].GetTensorTypeAndShapeInfo().GetShape();
         
         // Output shape is [batch_size, num_legs] = [1, 2] for both legs
         // Apply sigmoid to convert logits to probabilities [0, 1]
         Eigen::VectorXd contact_predictions = Eigen::VectorXd::Zero(robot.num_legs);
-        for (int leg = 0; leg < robot.num_legs; ++leg) {
+        for (int leg = 0; leg < 1; ++leg) {
             float logit = contact_logits_data[leg];  // Get logit for this leg
             float prob = 1.0f / (1.0f + std::exp(-logit));  // Sigmoid function
             contact_predictions(leg) = prob;  // Store probability
             // std::cout << "Leg " << leg << " - Logit: " << logit << ", Prob: " << prob << std::endl;
         }
         
-        // Extract foot velocity norms from second output
-        // CNN outputs dv_norm for both legs as [batch_size, num_legs] = [1, 2]
+        // Compute foot velocity norms: left leg only, right leg kept at 0
         Eigen::VectorXd foot_velocities = Eigen::VectorXd::Zero(robot.num_legs);
-        if (output_tensors.size() > 1) {
-            float* velocity_data = output_tensors[1].GetTensorMutableData<float>();
-            
-            // Output shape is [batch_size, num_legs] = [1, 2]
-            // Store dv_norm directly for each leg
-            for (int leg = 0; leg < robot.num_legs; ++leg) {
-                foot_velocities(leg) = velocity_data[leg];  // Store dv_norm at indices 0, 1
-            }
-        }
+        // Left leg (index 0 in vector, leg 1 in robot API)
+        foot_velocities(0) = robot.get_foot_velocity(1).norm();
+        // Right leg (index 1) remains 0
         
         return {contact_predictions, foot_velocities};
         
@@ -149,71 +141,93 @@ Eigen::VectorXd ContactNN::extract_nn_features(
     int idx = 0;
     
     
-    // acc: IMU acceleration (3 elements)
-    features(idx++) = imu_acc(0);
-    features(idx++) = imu_acc(1);
-    features(idx++) = imu_acc(2);
+    // // acc: IMU acceleration (3 elements)
+    // features(idx++) = imu_acc(0);
+    // features(idx++) = imu_acc(1);
+    // features(idx++) = imu_acc(2);
     
-    // omega: IMU angular velocity (3 elements)
-    features(idx++) = imu_gyro(0);
-    features(idx++) = imu_gyro(1);
-    features(idx++) = imu_gyro(2);
+    // // omega: IMU angular velocity (3 elements)
+    // features(idx++) = imu_gyro(0);
+    // features(idx++) = imu_gyro(1);
+    // features(idx++) = imu_gyro(2);
 
-    // q: joint positions (left leg first, right leg second)
-    for (int leg = 0; leg < robot.num_legs; ++leg) {
-        for (int joint_idx : robot.Leg_indices_map[leg]) {
-            features(idx++) = encoder(joint_idx);
-        }
-    }
+    // // q: joint positions (left leg first, right leg second)
+    // for (int leg = 0; leg < 1; ++leg) {
+    //     for (int joint_idx : robot.Leg_indices_map[leg]) {
+    //         features(idx++) = encoder(joint_idx);
+    //     }
+    // }
+
+    features(idx++) = std::abs(encoder(3));
+    features(idx++) = std::abs(encoder(4));
     
-    // qd: joint velocities (left leg first, right leg second)
-    for (int leg = 0; leg < robot.num_legs; ++leg) {
-        for (int joint_idx : robot.Leg_indices_map[leg]) {
-            features(idx++) = encoderdot(joint_idx);
-        }
-    }
+    // features(idx++) = std::abs(encoder(9));
+    // features(idx++) = std::abs(encoder(10));
+    
+    // // qd: joint velocities (left leg first, right leg second)
+    // for (int leg = 0; leg < 1; ++leg) {
+    //     for (int joint_idx : robot.Leg_indices_map[leg]) {
+    //         features(idx++) = encoderdot(joint_idx);
+    //     }
+    // }
+
+    // features(idx++) = encoderdot(0);
+    // features(idx++) = encoderdot(3);
+    // features(idx++) = encoderdot(3);
     
     // p: foot positions (left foot xyz, right foot xyz)
-    for (int leg = 1; leg <= robot.num_legs; ++leg) {
+    for (int leg = 1; leg <= 1; ++leg) {
         Eigen::Vector3d foot_pos = robot.get_foot_position(leg);
-        features(idx++) = foot_pos(0);
-        features(idx++) = foot_pos(1);
-        features(idx++) = foot_pos(2);
+        features(idx++) = std::abs(foot_pos(0));
+        // features(idx++) = foot_pos(1);
+        features(idx++) = std::abs(foot_pos(2));
     }
     
     // v: foot velocities (left foot xyz, right foot xyz)
-    for (int leg = 1; leg <= robot.num_legs; ++leg) {
+    for (int leg = 1; leg <= 1; ++leg) {
         Eigen::Vector3d foot_vel = robot.get_foot_velocity(leg);
-        features(idx++) = foot_vel(0);
-        features(idx++) = foot_vel(1);
-        features(idx++) = foot_vel(2);
+        features(idx++) = std::abs(foot_vel(0));
+        // features(idx++) = foot_vel(1);
+        features(idx++) = std::abs(foot_vel(2));
     }
     
-    // tau: joint torques (left leg first, right leg second)
-    for (int leg = 0; leg < robot.num_legs; ++leg) {
-        for (int joint_idx : robot.Leg_indices_map[leg]) {
-            features(idx++) = motor_torques(joint_idx);
-        }
-    }
+    // // tau: joint torques (left leg first, right leg second)
+    // for (int leg = 0; leg < 1; ++leg) {
+    //     for (int joint_idx : robot.Leg_indices_map[leg]) {
+    //         features(idx++) = motor_torques(joint_idx);
+    //     }
+    // }
+
+    features(idx++) = std::abs(motor_torques(1));
+    features(idx++) = std::abs(motor_torques(2));
+    features(idx++) = std::abs(motor_torques(3));
+    features(idx++) = std::abs(motor_torques(4));
+    features(idx++) = std::abs(motor_torques(5));
+
+    // features(idx++) = std::abs(motor_torques(7));
+    // features(idx++) = std::abs(motor_torques(8));
+    // features(idx++) = std::abs(motor_torques(9));
+    // features(idx++) = std::abs(motor_torques(10));
+    // features(idx++) = std::abs(motor_torques(11));
 
     // tau_mse: mean squared torques for each leg
-    for (int leg = 0; leg < robot.num_legs; ++leg) {
+    for (int leg = 0; leg < 1; ++leg) {
         double sum = 0;
         for (int joint_idx : robot.Leg_indices_map[leg]) {
             sum += motor_torques(joint_idx) * motor_torques(joint_idx);
         }
-        features(idx++) = sum / robot.Leg_indices_map[leg].size();  // Average squared torque for this leg
+        features(idx++) = sum;  // Average squared torque for this leg
     }
     
     // // tau_cmd: commanded joint torques (left leg first, right leg second)
-    // for (int leg = 0; leg < 1; ++leg) {
+    // for (int leg = 0; leg < robot.num_legs; ++leg) {
     //     for (int joint_idx : robot.Leg_indices_map[leg]) {
     //         features(idx++) = motor_torques_cmd(joint_idx);
     //     }
     // }
     
-    // v_cmd: commanded velocity (1 element)
-    features(idx++) = cmd_velocity(0);
+    // // v_cmd: commanded velocity (1 element)
+    // features(idx++) = cmd_velocity(0);
     
     // Validate that we filled exactly 57 elements
     if (idx != NN_FEATURE_SIZE) {
@@ -236,7 +250,7 @@ void ContactNN::update_nn_feature_buffer(const Eigen::VectorXd& features) {
 
 std::vector<float> ContactNN::create_nn_input_tensor() {
     // Create flattened float vector [1 * NN_WINDOW_SIZE * NN_FEATURE_SIZE]
-    // Total size: 1 * 10 * 67 = 670 elements
+    // Total size: 1 * 10 * 57 = 570 elements
     int total_size = NN_WINDOW_SIZE * NN_FEATURE_SIZE;
     std::vector<float> input_tensor(total_size, 0.0f);
     

@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
         csv_filename = argv[1];
     } else {
         // Default CSV file path
-        csv_filename = "/home/saakee/Research/Saaketh_INEKF/convex/Data/G1LoggingData.csv";
+        csv_filename = "/home/saakee/Research/Saaketh_INEKF/convex/Data/robotstate_0_env2.csv";
         cout << "No CSV file specified. Using default: " << csv_filename << endl;
     }
     
@@ -46,7 +46,7 @@ int main(int argc, char* argv[]) {
     // ========================================================================
     // STEP 2: Load robot model from G1 config file
     // ========================================================================
-    std::string config_file = "../G1_config_FootPosVel.yaml";
+    std::string config_file = "../config/G1_config_FootPosVel.yaml";
     cout << "\nLoading robot model from config: " << config_file << endl;
     
     RobotModel robot;

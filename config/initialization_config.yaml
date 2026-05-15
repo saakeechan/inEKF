@@ -27,7 +27,7 @@ variable_contact_covariance:
 
 Contact_estimation_NN:
   enabled: true  # Enable contact estimation using the neural network model
-  file_path: "../src/contactDetection/bipedal_contact_best_val_leg_acc.onnx"  # Path to the ONNX contact estimation model
+  file_path: "../src/contactDetection/bipedal_contact_best_val_acc.onnx"  # Path to the ONNX contact estimation model
 
 
 
