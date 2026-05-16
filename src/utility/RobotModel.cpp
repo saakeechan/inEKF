@@ -343,7 +343,7 @@ Eigen::MatrixXd RobotModel::get_foot_jacobian(int i_leg) const {
         pin_model,
         const_cast<pinocchio::Data&>(pin_data),
         foot_frame_ids[i_leg - 1],
-        pinocchio::WORLD,
+        pinocchio::LOCAL_WORLD_ALIGNED, // Get Jacobian in World frame to compute relative Jacobian with IMU
         J_foot_full
     );
     
@@ -353,7 +353,7 @@ Eigen::MatrixXd RobotModel::get_foot_jacobian(int i_leg) const {
         pin_model,
         const_cast<pinocchio::Data&>(pin_data),
         imu_frame_id,
-        pinocchio::WORLD,
+        pinocchio::LOCAL_WORLD_ALIGNED,
         J_imu_full
     );
     
@@ -383,7 +383,7 @@ Eigen::Vector3d RobotModel::get_foot_velocity(int i_leg) const {
         pin_model,
         const_cast<pinocchio::Data&>(pin_data),
         foot_frame_ids[i_leg - 1],
-        pinocchio::WORLD
+        pinocchio::LOCAL_WORLD_ALIGNED
     );
     
     // Get IMU velocity in Base Frame
@@ -391,7 +391,7 @@ Eigen::Vector3d RobotModel::get_foot_velocity(int i_leg) const {
         pin_model,
         const_cast<pinocchio::Data&>(pin_data),
         imu_frame_id,
-        pinocchio::WORLD
+        pinocchio::LOCAL_WORLD_ALIGNED
     );
     
     // Compute relative velocity in Base Frame
@@ -406,6 +406,47 @@ Eigen::Vector3d RobotModel::get_foot_velocity(int i_leg) const {
     // Transform relative velocity to IMU frame: v_imu = R_oi^T * v_base
     return R_oi.transpose() * v_rel_base;
 }
+
+// Eigen::Vector3d RobotModel::get_foot_velocity(int i_leg) const {
+//     if (foot_frame_ids.empty()) {
+//         std::cerr << "Error: Pinocchio not initialized properly" << std::endl;
+//         std::exit(EXIT_FAILURE);
+//     }
+
+//     if (i_leg < 1 || i_leg > static_cast<int>(foot_frame_ids.size())) {
+//         std::cerr << "Error: Invalid leg index " << i_leg << ". Must be between 1 and "
+//                   << foot_frame_ids.size() << std::endl;
+//         std::exit(EXIT_FAILURE);
+//     }
+
+//     const auto foot_id = foot_frame_ids[i_leg - 1];
+
+//     pinocchio::Motion v_foot_W = pinocchio::getFrameVelocity(
+//         pin_model,
+//         const_cast<pinocchio::Data&>(pin_data),
+//         foot_id,
+//         pinocchio::WORLD
+//     );
+
+//     pinocchio::Motion v_imu_W = pinocchio::getFrameVelocity(
+//         pin_model,
+//         const_cast<pinocchio::Data&>(pin_data),
+//         imu_frame_id,
+//         pinocchio::WORLD
+//     );
+
+//     const Eigen::Matrix3d R_WI = pin_data.oMf[imu_frame_id].rotation();
+
+//     Eigen::Vector3d p_IF = get_foot_position(i_leg);
+
+//     Eigen::Vector3d v_rel_I =
+//         R_WI.transpose() * (v_foot_W.linear() - v_imu_W.linear());
+
+//     Eigen::Vector3d omega_I =
+//         R_WI.transpose() * v_imu_W.angular();
+
+//     return v_rel_I - omega_I.cross(p_IF);
+// }
 
 void RobotModel::compute_joint_jacobians() const {
     

@@ -88,6 +88,8 @@ ENV PATH="/usr/lib/ccache:${PATH}"
 # Install GTSAM Python package and matplotlib for plotting
 RUN pip3 install gtsam pandas matplotlib
 
+
+
 # Install cvxpy with solvers for convex optimization
 RUN pip3 install cvxpy ecos scs osqp clarabel
 
@@ -100,6 +102,9 @@ RUN apt-get update && apt-get install -y \
     texlive-publishers \
     texlive-science \
     && rm -rf /var/lib/apt/lists/*
+
+# Install meshcat for Pinocchio visualization
+RUN pip3 install meshcat
 
 # Set working directory
 WORKDIR /workspace

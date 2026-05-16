@@ -1,0 +1,521 @@
+/* ----------------------------------------------------------------------------
+ * Dynamic Kinematic Slip Analysis
+ * Analyzes base velocity estimates from FK foot positions during contact regions
+ * using position-based differentiation and compares against ground truth.
+ * Also computes dynamics-based velocity using Pinocchio and zero-velocity constraint.
+ * -------------------------------------------------------------------------- */
+
+#include <iostream>
+#include <vector>
+#include <cmath>
+#include <string>
+#include <numeric>
+#include <fstream>
+#include <iomanip>
+#include <eigen3/Eigen/Dense>
+
+// Pinocchio includes
+#include <pinocchio/parsers/urdf.hpp>
+#include <pinocchio/algorithm/kinematics.hpp>
+#include <pinocchio/algorithm/jacobian.hpp>
+#include <pinocchio/algorithm/rnea.hpp>
+#include <pinocchio/algorithm/crba.hpp>
+#include <pinocchio/multibody/model.hpp>
+#include <pinocchio/multibody/data.hpp>
+
+// Include CSV parser and RobotModel
+#include "../src/utility/csvParser.hpp"
+#include "../src/utility/RobotModel.hpp"
+
+// Build rotation matrix from quaternion (w, x, y, z)
+Eigen::Matrix3d quat_to_rot(double w, double x, double y, double z) {
+    Eigen::Quaterniond q(w, x, y, z);
+    q.normalize();
+    return q.toRotationMatrix();
+}
+
+/**
+ * @brief Build Pinocchio configuration vector from CSV data at time index i
+ * @param data CSV data structure
+ * @param i Time index
+ * @return Configuration vector q (floating base + joints)
+ * 
+ * Configuration format: [x, y, z, qx, qy, qz, qw, joint1, joint2, ...]
+ * Floating base: position (3) + quaternion (4) = 7 DOF
+ * Joints: 29 DOF for G1 robot
+ */
+Eigen::VectorXd build_configuration(const DataStruct& data, size_t i) {
+    // Total DOF: 7 (floating base) + 29 (joints) = 36
+    Eigen::VectorXd q = Eigen::VectorXd::Zero(36);
+    
+    // Floating base position (x, y, z)
+    q[0] = data.pos_x[i];
+    q[1] = data.pos_y[i];
+    q[2] = data.pos_z[i];
+    
+    // Floating base orientation (quaternion: x, y, z, w)
+    // Pinocchio uses (x, y, z, w) ordering
+    q[3] = data.quat_i[i];  // qx
+    q[4] = data.quat_j[i];  // qy
+    q[5] = data.quat_k[i];  // qz
+    q[6] = data.quat_w[i];  // qw
+    
+    // Joint positions (29 joints for leg+torso, excluding arms/hands)
+    // Order matches the URDF joint ordering
+    int joint_idx = 7;
+    q[joint_idx++] = data.joint_pos_left_hip_pitch[i];
+    q[joint_idx++] = data.joint_pos_left_hip_roll[i];
+    q[joint_idx++] = data.joint_pos_left_hip_yaw[i];
+    q[joint_idx++] = data.joint_pos_left_knee[i];
+    q[joint_idx++] = data.joint_pos_left_ankle_pitch[i];
+    q[joint_idx++] = data.joint_pos_left_ankle_roll[i];
+    
+    q[joint_idx++] = data.joint_pos_right_hip_pitch[i];
+    q[joint_idx++] = data.joint_pos_right_hip_roll[i];
+    q[joint_idx++] = data.joint_pos_right_hip_yaw[i];
+    q[joint_idx++] = data.joint_pos_right_knee[i];
+    q[joint_idx++] = data.joint_pos_right_ankle_pitch[i];
+    q[joint_idx++] = data.joint_pos_right_ankle_roll[i];
+    
+    q[joint_idx++] = data.joint_pos_waist_yaw[i];
+    q[joint_idx++] = data.joint_pos_waist_roll[i];
+    q[joint_idx++] = data.joint_pos_waist_pitch[i];
+    
+    q[joint_idx++] = data.joint_pos_left_shoulder_pitch[i];
+    q[joint_idx++] = data.joint_pos_left_shoulder_roll[i];
+    q[joint_idx++] = data.joint_pos_left_shoulder_yaw[i];
+    q[joint_idx++] = data.joint_pos_left_elbow[i];
+    
+    q[joint_idx++] = data.joint_pos_right_shoulder_pitch[i];
+    q[joint_idx++] = data.joint_pos_right_shoulder_roll[i];
+    q[joint_idx++] = data.joint_pos_right_shoulder_yaw[i];
+    q[joint_idx++] = data.joint_pos_right_elbow[i];
+    
+    // Additional joints
+    q[joint_idx++] = data.joint_pos_left_wrist_roll[i];
+    q[joint_idx++] = data.joint_pos_left_wrist_pitch[i];
+    q[joint_idx++] = data.joint_pos_left_wrist_yaw[i];
+    q[joint_idx++] = data.joint_pos_right_wrist_roll[i];
+    q[joint_idx++] = data.joint_pos_right_wrist_pitch[i];
+    q[joint_idx++] = data.joint_pos_right_wrist_yaw[i];
+    
+    return q;
+}
+
+/**
+ * @brief Build joint velocity vector from CSV data at time index i
+ * @param data CSV data structure
+ * @param i Time index
+ * @return Joint velocity vector (29 DOF, excluding floating base)
+ */
+Eigen::VectorXd build_joint_velocities(const DataStruct& data, size_t i) {
+    Eigen::VectorXd v_joints = Eigen::VectorXd::Zero(29);
+    
+    int idx = 0;
+    v_joints[idx++] = data.joint_vel_left_hip_pitch[i];
+    v_joints[idx++] = data.joint_vel_left_hip_roll[i];
+    v_joints[idx++] = data.joint_vel_left_hip_yaw[i];
+    v_joints[idx++] = data.joint_vel_left_knee[i];
+    v_joints[idx++] = data.joint_vel_left_ankle_pitch[i];
+    v_joints[idx++] = data.joint_vel_left_ankle_roll[i];
+    
+    v_joints[idx++] = data.joint_vel_right_hip_pitch[i];
+    v_joints[idx++] = data.joint_vel_right_hip_roll[i];
+    v_joints[idx++] = data.joint_vel_right_hip_yaw[i];
+    v_joints[idx++] = data.joint_vel_right_knee[i];
+    v_joints[idx++] = data.joint_vel_right_ankle_pitch[i];
+    v_joints[idx++] = data.joint_vel_right_ankle_roll[i];
+    
+    v_joints[idx++] = data.joint_vel_waist_yaw[i];
+    v_joints[idx++] = data.joint_vel_waist_roll[i];
+    v_joints[idx++] = data.joint_vel_waist_pitch[i];
+    
+    v_joints[idx++] = data.joint_vel_left_shoulder_pitch[i];
+    v_joints[idx++] = data.joint_vel_left_shoulder_roll[i];
+    v_joints[idx++] = data.joint_vel_left_shoulder_yaw[i];
+    v_joints[idx++] = data.joint_vel_left_elbow[i];
+    
+    v_joints[idx++] = data.joint_vel_right_shoulder_pitch[i];
+    v_joints[idx++] = data.joint_vel_right_shoulder_roll[i];
+    v_joints[idx++] = data.joint_vel_right_shoulder_yaw[i];
+    v_joints[idx++] = data.joint_vel_right_elbow[i];
+    
+    v_joints[idx++] = data.joint_vel_left_wrist_roll[i];
+    v_joints[idx++] = data.joint_vel_left_wrist_pitch[i];
+    v_joints[idx++] = data.joint_vel_left_wrist_yaw[i];
+    v_joints[idx++] = data.joint_vel_right_wrist_roll[i];
+    v_joints[idx++] = data.joint_vel_right_wrist_pitch[i];
+    v_joints[idx++] = data.joint_vel_right_wrist_yaw[i];
+    
+    return v_joints;
+}
+
+/**
+ * @brief Compute base velocity using Pinocchio with zero-velocity constraint
+ * @param model Pinocchio robot model
+ * @param data Pinocchio model data
+ * @param q Configuration vector
+ * @param v_joints Joint velocities (29 DOF)
+ * @param foot_frame_id Frame ID of the contact foot
+ * @return Estimated base velocity in world frame (3D linear + 3D angular)
+ * 
+ * Uses the constraint: J_foot * v = 0 (foot velocity is zero during contact)
+ * Solves for base velocity v_base such that the foot remains stationary
+ */
+Eigen::Vector3d compute_base_velocity_dynamics(
+    pinocchio::Model& model,
+    pinocchio::Data& data_pin,
+    const Eigen::VectorXd& q,
+    const Eigen::VectorXd& v_joints,
+    pinocchio::FrameIndex foot_frame_id)
+{
+    // Update kinematics with arbitrary base velocity (will be solved for)
+    Eigen::VectorXd v_full = Eigen::VectorXd::Zero(model.nv);
+    v_full.tail(29) = v_joints;
+    
+    // Compute forward kinematics
+    pinocchio::forwardKinematics(model, data_pin, q, v_full);
+    pinocchio::updateFramePlacements(model, data_pin);
+    
+    // Compute Jacobian of foot frame in world frame
+    Eigen::MatrixXd J_foot = Eigen::MatrixXd::Zero(6, model.nv);
+    pinocchio::computeFrameJacobian(model, data_pin, q, foot_frame_id, 
+                                     pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, J_foot);
+    
+    // Split Jacobian: J_foot = [J_base | J_joints]
+    // J_base is 6x6 (foot velocity w.r.t. base velocity)
+    // J_joints is 6x29 (foot velocity w.r.t. joint velocities)
+    Eigen::MatrixXd J_base = J_foot.leftCols(6);
+    Eigen::MatrixXd J_joints = J_foot.rightCols(29);
+    
+    // Zero velocity constraint: J_base * v_base + J_joints * v_joints = 0
+    // Solve for v_base: v_base = -J_base^{-1} * J_joints * v_joints
+    // We only need linear velocity (first 3 components)
+    
+    // Use pseudo-inverse for robustness
+    Eigen::MatrixXd J_base_pinv = J_base.completeOrthogonalDecomposition().pseudoInverse();
+    Eigen::VectorXd v_base_full = -J_base_pinv * J_joints * v_joints;
+    
+    // Extract linear velocity (first 3 components)
+    Eigen::Vector3d v_base_linear = v_base_full.head(3);
+    
+    return v_base_linear;
+}
+
+/**
+ * @brief Compute ground truth foot velocity from actual simulated foot position
+ * @param data Parsed CSV data structure
+ * @param lfoot_velocity_world Output: N x 3 matrix of GT foot velocities
+ * @param lfoot_velocity_norm Output: N x 1 vector of GT foot velocity norms
+ */
+void compute_lfoot_velocity_world_GT(const DataStruct& data, 
+                                      std::vector<Eigen::Vector3d>& lfoot_velocity_world,
+                                      std::vector<double>& lfoot_velocity_norm) {
+    size_t N = data.num_rows;
+    
+    if (N < 2) {
+        std::cerr << "Error: Need at least 2 data points" << std::endl;
+        return;
+    }
+    
+    lfoot_velocity_world.clear();
+    lfoot_velocity_norm.clear();
+    lfoot_velocity_world.reserve(N);
+    lfoot_velocity_norm.reserve(N);
+    
+    // Compute numerical differentiation for GROUND TRUTH foot position
+    // Use actual simulated foot position from CSV (lfoot_pos_x/y/z)
+    for (size_t i = 0; i < N - 1; ++i) {
+        Eigen::Vector3d pos_i(data.lfoot_pos_x[i], data.lfoot_pos_y[i], data.lfoot_pos_z[i]);
+        Eigen::Vector3d pos_ip1(data.lfoot_pos_x[i+1], data.lfoot_pos_y[i+1], data.lfoot_pos_z[i+1]);
+
+        double dt = data.timestamp[i+1] - data.timestamp[i];
+        Eigen::Vector3d velocity = (pos_ip1 - pos_i) / dt;
+        
+        lfoot_velocity_world.push_back(velocity);
+        lfoot_velocity_norm.push_back(velocity.norm() + 1e-8);
+    }
+    
+    // Keep size consistent: duplicate the last velocity
+    lfoot_velocity_world.push_back(lfoot_velocity_world.back());
+    lfoot_velocity_norm.push_back(lfoot_velocity_norm.back());
+}
+
+/**
+ * @brief Compute FK-derived foot velocity from base position + FK foot position
+ * @param data Parsed CSV data structure
+ * @param lfoot_velocity_FK Output: N x 3 matrix of FK-derived foot velocities
+ * @param lfoot_velocity_FK_norm Output: N x 1 vector of FK foot velocity norms
+ */
+void compute_lfoot_velocity_world_FK(const DataStruct& data, 
+                                      std::vector<Eigen::Vector3d>& lfoot_velocity_FK,
+                                      std::vector<double>& lfoot_velocity_FK_norm) {
+    size_t N = data.num_rows;
+    
+    if (N < 2) {
+        std::cerr << "Error: Need at least 2 data points" << std::endl;
+        return;
+    }
+    
+    lfoot_velocity_FK.clear();
+    lfoot_velocity_FK_norm.clear();
+    lfoot_velocity_FK.reserve(N);
+    lfoot_velocity_FK_norm.reserve(N);
+    
+    // Compute numerical differentiation for FK-derived foot position
+    // FK foot position in world frame = base_pos + R * fk_foot_pos_base
+    for (size_t i = 0; i < N - 1; ++i) {
+        // Rotation matrix from quaternion
+        Eigen::Matrix3d R_i = quat_to_rot(data.quat_w[i], data.quat_i[i],
+                                          data.quat_j[i], data.quat_k[i]);
+        Eigen::Matrix3d R_ip1 = quat_to_rot(data.quat_w[i+1], data.quat_i[i+1],
+                                            data.quat_j[i+1], data.quat_k[i+1]);
+        
+        // FK foot position in base frame
+        Eigen::Vector3d fk_foot_base_i(data.fk_left_foot_pos_x[i],
+                                       data.fk_left_foot_pos_y[i],
+                                       data.fk_left_foot_pos_z[i]);
+        Eigen::Vector3d fk_foot_base_ip1(data.fk_left_foot_pos_x[i+1],
+                                         data.fk_left_foot_pos_y[i+1],
+                                         data.fk_left_foot_pos_z[i+1]);
+        
+        // Base position in world frame
+        Eigen::Vector3d base_pos_i(data.pos_x[i], data.pos_y[i], data.pos_z[i]);
+        Eigen::Vector3d base_pos_ip1(data.pos_x[i+1], data.pos_y[i+1], data.pos_z[i+1]);
+        
+        // FK foot position in world frame
+        Eigen::Vector3d fk_foot_world_i = base_pos_i + R_i * fk_foot_base_i;
+        Eigen::Vector3d fk_foot_world_ip1 = base_pos_ip1 + R_ip1 * fk_foot_base_ip1;
+        
+        // Differentiate to get velocity
+        double dt = data.timestamp[i+1] - data.timestamp[i];
+        Eigen::Vector3d velocity = (fk_foot_world_ip1 - fk_foot_world_i) / dt;
+        
+        lfoot_velocity_FK.push_back(velocity);
+        lfoot_velocity_FK_norm.push_back(velocity.norm() + 1e-8);
+    }
+    
+    // Keep size consistent: duplicate the last velocity
+    lfoot_velocity_FK.push_back(lfoot_velocity_FK.back());
+    lfoot_velocity_FK_norm.push_back(lfoot_velocity_FK_norm.back());
+}
+
+// ---------------------------------------------------------------------------
+// Contact region helpers
+// ---------------------------------------------------------------------------
+struct ContactRegion {
+    size_t start;
+    size_t end;   // inclusive
+};
+
+// Extract contiguous contact regions from a binary contact signal
+std::vector<ContactRegion> extract_contact_regions(
+    const std::vector<double>& contact_signal)
+{
+    std::vector<ContactRegion> regions;
+    size_t N = contact_signal.size();
+    size_t i = 0;
+    while (i < N) {
+        if (contact_signal[i] == 1) {
+            size_t start = i;
+            while (i < N && contact_signal[i] == 1) ++i;
+            size_t end = i - 1; // inclusive
+            regions.push_back({start, end});
+        } else {
+            ++i;
+        }
+    }
+    return regions;
+}
+
+struct DetailedSample {
+    double timestamp;
+    Eigen::Vector3d foot_vel_world_GT;    // GT foot velocity from lfoot_pos
+    Eigen::Vector3d foot_vel_world_FK;    // FK foot velocity from base_pos + R * fk_foot_pos
+    Eigen::Vector3d base_vel_GT;          // Ground truth base velocity
+    Eigen::Vector3d base_vel_FK;          // FK-based estimate: -foot_vel_world_FK
+    Eigen::Vector3d base_vel_dynamics;    // Dynamics-based estimate from Pinocchio
+    Eigen::Vector3d error_FK;             // Error: base_vel_FK - base_vel_GT
+    Eigen::Vector3d error_dynamics;       // Error: base_vel_dynamics - base_vel_GT
+    size_t region_id;
+};
+
+// Collect detailed samples from contact region
+void analyse_region(
+    const DataStruct& data,
+    const ContactRegion& region,
+    const std::vector<Eigen::Vector3d>& lfoot_velocity_world_GT,
+    const std::vector<Eigen::Vector3d>& lfoot_velocity_world_FK,
+    pinocchio::Model& model,
+    pinocchio::Data& data_pin,
+    pinocchio::FrameIndex lfoot_frame_id,
+    std::vector<DetailedSample>* detailed_samples,
+    size_t region_id)
+{
+    for (size_t i = region.start; i <= region.end; ++i) {
+        // Ground truth base velocity in world frame
+        Eigen::Vector3d v_base_gt(data.vel_x[i], data.vel_y[i], data.vel_z[i]);
+
+        // FK-based estimate: v_base_est = -v_foot_world_FK
+        Eigen::Vector3d v_foot_world_FK = lfoot_velocity_world_FK[i];
+        Eigen::Vector3d v_base_FK = -v_foot_world_FK;
+        
+        // Dynamics-based estimate using Pinocchio with zero-velocity constraint
+        Eigen::VectorXd q = build_configuration(data, i);
+        Eigen::VectorXd v_joints = build_joint_velocities(data, i);
+        Eigen::Vector3d v_base_dynamics = compute_base_velocity_dynamics(
+            model, data_pin, q, v_joints, lfoot_frame_id);
+        
+        // Compute errors
+        Eigen::Vector3d err_FK = v_base_FK - v_base_gt;
+        Eigen::Vector3d err_dynamics = v_base_dynamics - v_base_gt;
+
+        // Store detailed sample
+        DetailedSample sample;
+        sample.timestamp = data.timestamp[i];
+        sample.foot_vel_world_GT = lfoot_velocity_world_GT[i];
+        sample.foot_vel_world_FK = v_foot_world_FK;
+        sample.base_vel_GT = v_base_gt;
+        sample.base_vel_FK = v_base_FK;
+        sample.base_vel_dynamics = v_base_dynamics;
+        sample.error_FK = err_FK;
+        sample.error_dynamics = err_dynamics;
+        sample.region_id = region_id;
+        detailed_samples->push_back(sample);
+    }
+}
+
+int main(int argc, char** argv) {
+    std::cout << "=== Dynamic Kinematic Slip Analysis ===\n" << std::endl;
+
+    // Load CSV file
+    std::string csv_path = (argc > 1) ? argv[1] : "../Data/robotstate_0_env3.csv";
+    DataStruct data = ParseCSV(csv_path);
+    std::cout << "Loaded " << data.num_rows << " rows from: " << csv_path << "\n" << std::endl;
+
+    // Load robot model (used for name/config and Pinocchio model)
+    std::string config_path = "../config/G1_config.yaml";
+    RobotModel robot;
+    if (!robot.load_config(config_path)) {
+        std::cerr << "Error: Failed to load robot configuration!" << std::endl;
+        return -1;
+    }
+    std::cout << "Robot model: " << robot.robot_name << std::endl;
+    std::cout << "Pinocchio model: " << robot.pin_model.name << std::endl;
+    std::cout << "Total DOF: " << robot.pin_model.nv << std::endl;
+    
+    // Get left foot frame ID (first contact point is left foot)
+    pinocchio::FrameIndex lfoot_frame_id = robot.foot_frame_ids[0];
+    std::cout << "Left foot frame ID: " << lfoot_frame_id << "\n" << std::endl;
+
+    // -------------------------------------------------------------------------
+    // Compute left foot velocities
+    // -------------------------------------------------------------------------
+    std::vector<Eigen::Vector3d> lfoot_velocity_world_GT, lfoot_velocity_world_FK;
+    std::vector<double> lfoot_velocity_norm_GT, lfoot_velocity_norm_FK;
+    
+    compute_lfoot_velocity_world_GT(data, lfoot_velocity_world_GT, lfoot_velocity_norm_GT);
+    compute_lfoot_velocity_world_FK(data, lfoot_velocity_world_FK, lfoot_velocity_norm_FK);
+    
+    std::cout << "Computed GT foot velocity from lfoot_pos" << std::endl;
+    std::cout << "Computed FK foot velocity from base_pos + R * fk_foot_pos" << std::endl;
+
+    // -------------------------------------------------------------------------
+    // 1. Extract left foot contact regions from ground truth contact signal
+    // -------------------------------------------------------------------------
+    auto lfoot_regions = extract_contact_regions(data.lfoot_contact);
+
+    std::cout << "Left foot contact regions: " << lfoot_regions.size() << "\n" << std::endl;
+
+    // -------------------------------------------------------------------------
+    // 2. Analyse each contact region
+    // -------------------------------------------------------------------------
+    std::vector<DetailedSample> detailed_samples;
+    size_t region_idx = 0;
+
+    for (const auto& region : lfoot_regions) {
+        analyse_region(data, region, lfoot_velocity_world_GT, lfoot_velocity_world_FK,
+                       robot.pin_model, robot.pin_data, lfoot_frame_id,
+                       &detailed_samples, ++region_idx);
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. Write detailed data to CSV for plotting
+    // -------------------------------------------------------------------------
+    // std::string output_csv = "../Extra_Files/DynKinSlipAnalysis/contact_analysis_output.csv";
+    std::string output_csv = "contact_analysis_output.csv";
+    
+    std::ofstream outfile(output_csv);
+    if (outfile.is_open()) {
+        outfile << "timestamp,region_id,"
+                << "foot_vel_GT_x,foot_vel_GT_y,foot_vel_GT_z,"
+                << "foot_vel_FK_x,foot_vel_FK_y,foot_vel_FK_z,"
+                << "base_vel_GT_x,base_vel_GT_y,base_vel_GT_z,"
+                << "base_vel_FK_x,base_vel_FK_y,base_vel_FK_z,"
+                << "base_vel_dyn_x,base_vel_dyn_y,base_vel_dyn_z,"
+                << "error_FK_x,error_FK_y,error_FK_z,"
+                << "error_dyn_x,error_dyn_y,error_dyn_z\n";
+        
+        for (const auto& sample : detailed_samples) {
+            outfile << std::fixed << std::setprecision(6)
+                    << sample.timestamp << "," << sample.region_id << ","
+                    << sample.foot_vel_world_GT.x() << ","
+                    << sample.foot_vel_world_GT.y() << ","
+                    << sample.foot_vel_world_GT.z() << ","
+                    << sample.foot_vel_world_FK.x() << ","
+                    << sample.foot_vel_world_FK.y() << ","
+                    << sample.foot_vel_world_FK.z() << ","
+                    << sample.base_vel_GT.x() << ","
+                    << sample.base_vel_GT.y() << ","
+                    << sample.base_vel_GT.z() << ","
+                    << sample.base_vel_FK.x() << ","
+                    << sample.base_vel_FK.y() << ","
+                    << sample.base_vel_FK.z() << ","
+                    << sample.base_vel_dynamics.x() << ","
+                    << sample.base_vel_dynamics.y() << ","
+                    << sample.base_vel_dynamics.z() << ","
+                    << sample.error_FK.x() << ","
+                    << sample.error_FK.y() << ","
+                    << sample.error_FK.z() << ","
+                    << sample.error_dynamics.x() << ","
+                    << sample.error_dynamics.y() << ","
+                    << sample.error_dynamics.z() << "\n";
+        }
+        outfile.close();
+        std::cout << "\nDetailed analysis written to: " << output_csv << std::endl;
+        std::cout << "Total samples: " << detailed_samples.size() << std::endl;
+        
+        // -------------------------------------------------------------------------
+        // 4. Compute summary statistics
+        // -------------------------------------------------------------------------
+        double mean_error_FK = 0.0, mean_error_dyn = 0.0;
+        double max_error_FK = 0.0, max_error_dyn = 0.0;
+        
+        for (const auto& sample : detailed_samples) {
+            double err_FK = sample.error_FK.norm();
+            double err_dyn = sample.error_dynamics.norm();
+            mean_error_FK += err_FK;
+            mean_error_dyn += err_dyn;
+            max_error_FK = std::max(max_error_FK, err_FK);
+            max_error_dyn = std::max(max_error_dyn, err_dyn);
+        }
+        mean_error_FK /= detailed_samples.size();
+        mean_error_dyn /= detailed_samples.size();
+        
+        std::cout << "\n=== Summary Statistics ===" << std::endl;
+        std::cout << "FK-based estimates:" << std::endl;
+        std::cout << "  Mean error: " << mean_error_FK << " m/s" << std::endl;
+        std::cout << "  Max error:  " << max_error_FK << " m/s" << std::endl;
+        std::cout << "\nDynamics-based estimates (Pinocchio):" << std::endl;
+        std::cout << "  Mean error: " << mean_error_dyn << " m/s" << std::endl;
+        std::cout << "  Max error:  " << max_error_dyn << " m/s" << std::endl;
+        std::cout << "\nImprovement ratio: " << mean_error_FK / mean_error_dyn << "x" << std::endl;
+    } else {
+        std::cerr << "Error: Could not write output CSV file" << std::endl;
+    }
+
+    return 0;
+}
+ 
+
+
