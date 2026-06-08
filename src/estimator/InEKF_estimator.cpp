@@ -587,12 +587,17 @@ void InEKFilter::Propagate_and_Correct()
         // Store dv norms for this time step
         std::vector<double> dv_norms_current(robot.num_legs);
 
-        // Always compute d_v and dv_norm from kinematics (not using NN for velocity prediction)
+        // Compute d_v from kinematics (full 3D velocity)
+        // Note: dv_norm is either from NN (if contact_nn_enabled) or computed kinematically below
         for (int k=0; k<robot.num_legs; k++){
             d_v[frame_count].block(3*k,0,3,1) = filter.getState().getVelocity()
                     + filter.getState().getRotation()*robot.get_foot_velocity(k+1)
                     + filter.getState().getRotation()*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias())*robot.get_foot_position(k+1);
-            dv_norm[frame_count](k) = d_v[frame_count].block(3*k,0,3,1).norm();
+            
+            // Only compute kinematic dv_norm if NN is not enabled or didn't run this frame
+            if (!contact_nn_enabled || (time_count % static_cast<int>(0.02 / dt) != 0 && frame_count != 0)) {
+                dv_norm[frame_count](k) = d_v[frame_count].block(3*k,0,3,1).norm();
+            }
         }
         
         for (int k=0; k<robot.num_legs; k++){
@@ -741,7 +746,7 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
         // Implement hysteresis with probability thresholds (after sigmoid)
         for (int leg = 0; leg < robot.num_legs; ++leg) {
             double prob = predicted_contacts[leg]; // Extract probability value for this leg (post-sigmoid)
-            if (prob > 0.5) {
+            if (prob > 0.65) {
                 CONTACT_t[frame_count][leg] = true;
             } else if (prob < 0.5) {
                 CONTACT_t[frame_count][leg] = false;
@@ -751,12 +756,10 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
             }
         }
         
-        // Note: predicted_foot_velocities contains NN-predicted dv_norms for both legs
-        // - predicted_foot_velocities(0) = left leg dv_norm
-        // - predicted_foot_velocities(1) = right leg dv_norm
-        // Currently not used; dv is computed kinematically in Propagate_and_Correct()
-
-        dv_norm[frame_count] = predicted_foot_velocities; // Store NN-predicted foot velocities for potential future use/analysis
+        // Store NN-predicted foot velocities
+        // predicted_foot_velocities(0) = left leg dv_norm
+        // predicted_foot_velocities(1) = right leg dv_norm
+        dv_norm[frame_count] = predicted_foot_velocities;
     }
     else {
 
@@ -955,9 +958,10 @@ void InEKFilter::Onestep(){
     }
     GroundTruthContact = CSVData.contact_state[j]; // For evaluation purposes, store ground truth contact from CSV
     
-    // Print contact and d_v info for debugging
-    std::cout << "Contacts: [" << CONTACT_t[frame_count][0] << ", " << CONTACT_t[frame_count][1] << "]";
-    std::cout << " GT: [" << GroundTruthContact[0] << ", " << GroundTruthContact[1] << "]" << std::endl;
+    // // Print contact and d_v info for debugging
+    // std::cout << "Contacts: [" << CONTACT_t[frame_count][0] << ", " << CONTACT_t[frame_count][1] << "]";
+    // std::cout << " GT: [" << GroundTruthContact[0] << ", " << GroundTruthContact[1] << "]" << std::endl;
+    // std::cout << "d_v norms: [" << d_v[frame_count].block(0,0,3,1).norm() << ", " << d_v[frame_count].block(3,0,3,1).norm() << "]" << std::endl;
 
     // Compare detected contact with ground truth and update counters
     for (int k = 0; k < robot.num_legs; k++) {

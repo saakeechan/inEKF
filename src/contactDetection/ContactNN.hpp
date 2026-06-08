@@ -18,8 +18,8 @@
 class ContactNN {
 public:
     // Constants for NN input shape
-    static constexpr int NN_WINDOW_SIZE = 8;  // Number of timesteps
-    static constexpr int NN_FEATURE_SIZE = 12;  // Number of features per timestep (acc, omega, q, qd, p, v, tau, tau_sq_sum, v_cmd) for both legs
+    static constexpr int NN_WINDOW_SIZE = 24;  // Number of timesteps
+    static constexpr int NN_FEATURE_SIZE = 32;  // Number of features per timestep (acc, omega, q, qd, p, v, tau, tau_sq_sum, v_cmd) for both legs
     
     // Constructor
     ContactNN(RobotModel& robot_ref);
