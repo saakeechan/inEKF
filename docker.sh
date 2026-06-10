@@ -18,6 +18,7 @@ function print_usage() {
     echo ""
     echo "Commands:"
     echo "  build       - Build the Docker image"
+    echo "  compile     - Compile the project (builds into local ./build/)"
     echo "  run         - Run the container interactively"
     echo "  exec        - Execute a command in running container"
     echo "  fix-perms   - Fix workspace file ownership to current user"
@@ -40,7 +41,7 @@ function build_image() {
 
 function run_container() {
     echo -e "${BLUE}Running Docker container: ${CONTAINER_NAME}${NC}"
-    mkdir -p .ccache
+    mkdir -p .ccache && chmod 777 .ccache
     docker run -it --rm \
         --name ${CONTAINER_NAME} \
         --user ${HOST_UID}:${HOST_GID} \
@@ -51,6 +52,24 @@ function run_container() {
         -v $(pwd):/workspace \
         ${IMAGE_NAME} \
         /bin/bash
+}
+
+function compile_project() {
+    echo -e "${BLUE}Compiling project inside container${NC}"
+    mkdir -p .ccache && chmod 777 .ccache
+    docker run --rm \
+        --name ${CONTAINER_NAME}-build \
+        -e CCACHE_DIR=/workspace/.ccache \
+        -v $(pwd):/workspace \
+        -w /workspace \
+        ${IMAGE_NAME} \
+        bash -c "cmake -S . -B build -G Ninja -DCMAKE_CXX_COMPILER_LAUNCHER=ccache && cmake --build build -j\$(nproc)"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Compile successful${NC}"
+    else
+        echo -e "${RED}✗ Compile failed${NC}"
+        exit 1
+    fi
 }
 
 function exec_container() {
@@ -96,6 +115,9 @@ function rebuild() {
 case "$1" in
     build)
         build_image
+        ;;
+    compile)
+        compile_project
         ;;
     run)
         run_container
