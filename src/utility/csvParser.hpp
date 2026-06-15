@@ -127,24 +127,24 @@ struct DataStruct {
     std::vector<double> joint_torque_left_hand_thumb_2, joint_torque_right_hand_thumb_2;
     
     // Joint actions (columns 190-232) - 43 joints total
-    std::vector<double> joint_action_left_hip_pitch, joint_action_right_hip_pitch, joint_action_waist_yaw;
-    std::vector<double> joint_action_left_hip_roll, joint_action_right_hip_roll, joint_action_waist_roll;
-    std::vector<double> joint_action_left_hip_yaw, joint_action_right_hip_yaw, joint_action_waist_pitch;
-    std::vector<double> joint_action_left_knee, joint_action_right_knee;
-    std::vector<double> joint_action_left_shoulder_pitch, joint_action_right_shoulder_pitch;
-    std::vector<double> joint_action_left_ankle_pitch, joint_action_right_ankle_pitch;
-    std::vector<double> joint_action_left_shoulder_roll, joint_action_right_shoulder_roll;
-    std::vector<double> joint_action_left_ankle_roll, joint_action_right_ankle_roll;
-    std::vector<double> joint_action_left_shoulder_yaw, joint_action_right_shoulder_yaw;
-    std::vector<double> joint_action_left_elbow, joint_action_right_elbow;
-    std::vector<double> joint_action_left_wrist_roll, joint_action_right_wrist_roll;
-    std::vector<double> joint_action_left_wrist_pitch, joint_action_right_wrist_pitch;
-    std::vector<double> joint_action_left_wrist_yaw, joint_action_right_wrist_yaw;
-    std::vector<double> joint_action_left_hand_index_0, joint_action_left_hand_middle_0, joint_action_left_hand_thumb_0;
-    std::vector<double> joint_action_right_hand_index_0, joint_action_right_hand_middle_0, joint_action_right_hand_thumb_0;
-    std::vector<double> joint_action_left_hand_index_1, joint_action_left_hand_middle_1, joint_action_left_hand_thumb_1;
-    std::vector<double> joint_action_right_hand_index_1, joint_action_right_hand_middle_1, joint_action_right_hand_thumb_1;
-    std::vector<double> joint_action_left_hand_thumb_2, joint_action_right_hand_thumb_2;
+    std::vector<double> joint_cmd_left_hip_pitch, joint_cmd_right_hip_pitch, joint_cmd_waist_yaw;
+    std::vector<double> joint_cmd_left_hip_roll, joint_cmd_right_hip_roll, joint_cmd_waist_roll;
+    std::vector<double> joint_cmd_left_hip_yaw, joint_cmd_right_hip_yaw, joint_cmd_waist_pitch;
+    std::vector<double> joint_cmd_left_knee, joint_cmd_right_knee;
+    std::vector<double> joint_cmd_left_shoulder_pitch, joint_cmd_right_shoulder_pitch;
+    std::vector<double> joint_cmd_left_ankle_pitch, joint_cmd_right_ankle_pitch;
+    std::vector<double> joint_cmd_left_shoulder_roll, joint_cmd_right_shoulder_roll;
+    std::vector<double> joint_cmd_left_ankle_roll, joint_cmd_right_ankle_roll;
+    std::vector<double> joint_cmd_left_shoulder_yaw, joint_cmd_right_shoulder_yaw;
+    std::vector<double> joint_cmd_left_elbow, joint_cmd_right_elbow;
+    std::vector<double> joint_cmd_left_wrist_roll, joint_cmd_right_wrist_roll;
+    std::vector<double> joint_cmd_left_wrist_pitch, joint_cmd_right_wrist_pitch;
+    std::vector<double> joint_cmd_left_wrist_yaw, joint_cmd_right_wrist_yaw;
+    std::vector<double> joint_cmd_left_hand_index_0, joint_cmd_left_hand_middle_0, joint_cmd_left_hand_thumb_0;
+    std::vector<double> joint_cmd_right_hand_index_0, joint_cmd_right_hand_middle_0, joint_cmd_right_hand_thumb_0;
+    std::vector<double> joint_cmd_left_hand_index_1, joint_cmd_left_hand_middle_1, joint_cmd_left_hand_thumb_1;
+    std::vector<double> joint_cmd_right_hand_index_1, joint_cmd_right_hand_middle_1, joint_cmd_right_hand_thumb_1;
+    std::vector<double> joint_cmd_left_hand_thumb_2, joint_cmd_right_hand_thumb_2;
     
     // Command velocities and stability (columns 233-237)
     std::vector<double> cmd_vel_x, cmd_vel_y, cmd_vel_z;

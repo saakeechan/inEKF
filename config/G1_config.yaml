@@ -12,7 +12,7 @@ robot_name: "G1"
 # ============================================================================
 model:
   # Path to robot model file
-  model_path: "../src/utility/G1/g1_29dof_floatingBase.urdf"
+  model_path: "../src/utility/G1/g1_29dof_rev_1_0_wFootFrames.urdf"
   
   # Model format: "urdf" or "mjcf"
   format: "urdf"
@@ -25,8 +25,8 @@ structure:
   num_legs: 2
   
   # Contact point frame IDs in the Pinocchio model - size should match num of legs
-  # For G1: Left foot=18, Right foot=34 - open up a visualization tool to verify
-  contact_frame_ids: [18 , 34]
+  # For G1: Left foot=16, Right foot=32 - open up a visualization tool to verify
+  contact_frame_ids: [16 , 32]
 
 # ============================================================================
 # IMU2BD Frame ID of the IMU in the Pinocchio model - select from the frames in the URDF (run

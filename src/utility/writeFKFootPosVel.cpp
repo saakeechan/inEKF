@@ -103,7 +103,17 @@ int main() {
         // "../contactData/robotstate_120000_env17.csv",
         // "../contactData/robotstate_120000_env18.csv",
         // "../contactData/robotstate_120000_env19.csv",
-        "../Data/robotstate_0_env3.csv"
+        // "../Data/synced.csv"
+        // "../Data/synced copy.csv",
+        // "../Data/synced copy 2.csv",
+        // "../Data/synced copy 3.csv",
+        // "../Data/synced copy 4.csv",
+        // "../Data/synced copy 5.csv",
+        // "../Data/synced copy 6.csv",
+        // "../Data/synced copy 7.csv",
+        // "../Data/synced copy 8.csv",
+        "../Data/synced copy 9.csv",
+        "../Data/synced copy 10.csv"
     };
 
     // ========================================================================
@@ -157,6 +167,16 @@ int main() {
         // Use pre-populated encoder arrays from csvParser (29 joints for G1)
         Eigen::VectorXd q = Eigen::Map<const Eigen::VectorXd>(data.encoders[t].data(), data.encoders[t].size());
         Eigen::VectorXd q_dot = Eigen::Map<const Eigen::VectorXd>(data.encoderdots[t].data(), data.encoderdots[t].size());
+        
+        // Debug: Print joint data for first timestep
+        if (t == 0) {
+            cout << "\n=== Joint data at timestep 0 ===" << endl;
+            cout << "Total joints: " << q.size() << endl;
+            cout << "Left leg positions (0-5):  " << q.segment(0, 6).transpose() << endl;
+            cout << "Right leg positions (6-11): " << q.segment(6, 6).transpose() << endl;
+            cout << "Left leg velocities (0-5):  " << q_dot.segment(0, 6).transpose() << endl;
+            cout << "Right leg velocities (6-11): " << q_dot.segment(6, 6).transpose() << endl;
+        }
         
         // Compute forward kinematics
         robot.Forward_Kinematics(q, q_dot);
