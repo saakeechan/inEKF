@@ -168,8 +168,8 @@ struct DataStruct {
     // Motor torques - 2D array [num_rows x num_motors]
     std::vector<std::vector<double>> motor_torques;
     
-    // Motor torque commands - 2D array [num_rows x num_motors]
-    std::vector<std::vector<double>> motor_torques_cmd;
+    // Motor position commands - 2D array [num_rows x num_motors]
+    std::vector<std::vector<double>> motor_pos_cmd;
     
     // Command velocity - 2D array [num_rows x 3] (x, y, z)
     std::vector<std::vector<double>> CMD_V;

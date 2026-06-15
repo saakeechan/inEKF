@@ -132,7 +132,7 @@ Eigen::VectorXd ContactNN::extract_nn_features(
     const Eigen::Vector3d& imu_acc,
     const Eigen::Vector3d& imu_gyro,
     const Eigen::VectorXd& motor_torques,
-    const Eigen::VectorXd& motor_torques_cmd,
+    const Eigen::VectorXd& motor_pos_cmd,
     const Eigen::VectorXd& cmd_velocity
 ) {
     // Extract 57-element feature vector for both legs
@@ -143,22 +143,22 @@ Eigen::VectorXd ContactNN::extract_nn_features(
     int idx = 0;
     
     
-    // // acc: IMU acceleration (3 elements)
-    // features(idx++) = imu_acc(0);
-    // features(idx++) = imu_acc(1);
-    // features(idx++) = imu_acc(2);
+    // acc: IMU acceleration (3 elements)
+    features(idx++) = imu_acc(0);
+    features(idx++) = imu_acc(1);
+    features(idx++) = imu_acc(2);
     
-    // // omega: IMU angular velocity (3 elements)
-    // features(idx++) = imu_gyro(0);
-    // features(idx++) = imu_gyro(1);
-    // features(idx++) = imu_gyro(2);
+    // omega: IMU angular velocity (3 elements)
+    features(idx++) = imu_gyro(0);
+    features(idx++) = imu_gyro(1);
+    features(idx++) = imu_gyro(2);
 
-    // // q: joint positions (left leg first, right leg second)
-    // for (int leg = 0; leg < 1; ++leg) {
-    //     for (int joint_idx : robot.Leg_indices_map[leg]) {
-    //         features(idx++) = encoder(joint_idx);
-    //     }
-    // }
+    // q: joint positions (left leg first, right leg second)
+    for (int leg = 0; leg < 1; ++leg) {
+        for (int joint_idx : robot.Leg_indices_map[leg]) {
+            features(idx++) = encoder(joint_idx);
+        }
+    }
 
     // features(idx++) = std::abs(encoder(3));
     // features(idx++) = std::abs(encoder(4));
@@ -166,12 +166,12 @@ Eigen::VectorXd ContactNN::extract_nn_features(
     // features(idx++) = std::abs(encoder(9));
     // features(idx++) = std::abs(encoder(10));
     
-    // // qd: joint velocities (left leg first, right leg second)
-    // for (int leg = 0; leg < 1; ++leg) {
-    //     for (int joint_idx : robot.Leg_indices_map[leg]) {
-    //         features(idx++) = encoderdot(joint_idx);
-    //     }
-    // }
+    // qd: joint velocities (left leg first, right leg second)
+    for (int leg = 0; leg < 1; ++leg) {
+        for (int joint_idx : robot.Leg_indices_map[leg]) {
+            features(idx++) = encoderdot(joint_idx);
+        }
+    }
 
     // features(idx++) = encoderdot(0);
     // features(idx++) = encoderdot(3);
@@ -180,25 +180,25 @@ Eigen::VectorXd ContactNN::extract_nn_features(
     // p: foot positions (left foot xyz, right foot xyz)
     for (int leg = 1; leg <= 1; ++leg) {
         Eigen::Vector3d foot_pos = robot.get_foot_position(leg);
-        features(idx++) = (foot_pos(0));
+        features(idx++) = foot_pos(0);
         features(idx++) = foot_pos(1);
-        features(idx++) = (foot_pos(2));
+        features(idx++) = foot_pos(2);
     }
     
     // v: foot velocities (left foot xyz, right foot xyz)
     for (int leg = 1; leg <= 1; ++leg) {
         Eigen::Vector3d foot_vel = robot.get_foot_velocity(leg);
-        features(idx++) = (foot_vel(0));
+        features(idx++) = foot_vel(0);
         features(idx++) = foot_vel(1);
-        features(idx++) = (foot_vel(2));
+        features(idx++) = foot_vel(2);
     }
     
-    // // tau: joint torques (left leg first, right leg second)
-    // for (int leg = 0; leg < 1; ++leg) {
-    //     for (int joint_idx : robot.Leg_indices_map[leg]) {
-    //         features(idx++) = motor_torques(joint_idx);
-    //     }
-    // }
+    // tau: joint torques (left leg first, right leg second)
+    for (int leg = 0; leg < 1; ++leg) {
+        for (int joint_idx : robot.Leg_indices_map[leg]) {
+            features(idx++) = motor_torques(joint_idx);
+        }
+    }
 
     // features(idx++) = std::abs(motor_torques(1));
     // features(idx++) = std::abs(motor_torques(2));
@@ -224,11 +224,11 @@ Eigen::VectorXd ContactNN::extract_nn_features(
     // // tau_cmd: commanded joint torques (left leg first, right leg second)
     // for (int leg = 0; leg < robot.num_legs; ++leg) {
     //     for (int joint_idx : robot.Leg_indices_map[leg]) {
-    //         features(idx++) = motor_torques_cmd(joint_idx);
+    //         features(idx++) = motor_pos_cmd(joint_idx);
     //     }
     // }
     
-    // v_cmd: commanded velocity (1 element)
+    // // v_cmd: commanded velocity (1 element)
     // features(idx++) = cmd_velocity(0);
     
     // Validate that we filled exactly 57 elements

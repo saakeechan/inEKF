@@ -123,7 +123,7 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
     ENCODER.resize(SLIDING_WINDOW_SIZE);
     ENCODERDOT.resize(SLIDING_WINDOW_SIZE);
     MOTOR_TORQUES.resize(SLIDING_WINDOW_SIZE);
-    MOTOR_TORQUES_CMD.resize(SLIDING_WINDOW_SIZE);
+    MOTOR_POS_CMD.resize(SLIDING_WINDOW_SIZE);
     CMD_V.resize(SLIDING_WINDOW_SIZE);
     torqueSumSquared.resize(SLIDING_WINDOW_SIZE);
     
@@ -152,7 +152,7 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
         ENCODER[i] = Eigen::VectorXd::Zero(robot.encoder_size);
         ENCODERDOT[i] = Eigen::VectorXd::Zero(robot.encoderdot_size);
         MOTOR_TORQUES[i] = Eigen::VectorXd::Zero(robot.encoder_size);  // Same size as encoder
-        MOTOR_TORQUES_CMD[i] = Eigen::VectorXd::Zero(robot.encoder_size);  // Same size as encoder
+        MOTOR_POS_CMD[i] = Eigen::VectorXd::Zero(robot.encoder_size);  // Same size as encoder
         
         d_v[i] = Eigen::VectorXd::Constant(3 * robot.num_legs, std::numeric_limits<double>::infinity());
         dv_norm[i] = Eigen::VectorXd::Zero(robot.num_legs);
@@ -273,12 +273,6 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
 void InEKFilter::InitializeFromYAML(const std::string& config_path) {
     // Load YAML configuration
     YAML::Node config = YAML::LoadFile(config_path);
-    
-    // // Load robot configuration path (only if not already loaded)
-    // if (robot.num_legs == 0) {  // Check if robot config already loaded
-    //     std::string robot_config_path = config["robot_config_path"].as<std::string>();
-    //     load_robot_config(robot_config_path);
-    // }
     
     // Load estimator parameters
     int sliding_window_size = config["sliding_window_size"].as<int>();
@@ -521,10 +515,6 @@ void InEKFilter::new_measurement()
     robot.Forward_Kinematics(ENCODER[frame_count], ENCODERDOT[frame_count]);
     robot.compute_joint_jacobians();
     
-    // std::cout << "Frame " << frame_count << " Encoder values: " << ENCODER[frame_count].transpose() << std::endl;
-    // std::cout << "Frame " << frame_count << " EncoderDot values: " << ENCODERDOT[frame_count].transpose() << std::endl;
-
-    // exit(0); // Exit after one measurement for debugging - remove this in actual use
 }
 
 void InEKFilter::Propagate_and_Correct()
@@ -615,30 +605,28 @@ void InEKFilter::Propagate_and_Correct()
                 SLIP_t[frame_count][k] = true;
             }
             HARD_CONTACT_t[frame_count][k]  = CONTACT_t[frame_count][k] - SLIP_t[frame_count][k];
-            // std::cout << "Frame Position " << k << ": " << robot.get_foot_position(k+1).transpose() << std::endl;
-            // std::cout << "Frame Velocity " << k << ": " << robot.get_foot_velocity(k+1).transpose() << std::endl;
     }
     
     
     // Append dv norms to history
     dv_history.push_back(dv_norms_current);
 
-    // Eigen::Vector3d w_IMU_world = filter.getState().getRotation() * (IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias()); // assuming bias is in body frame.
-    //     robot.transform_state_to_base(
-    //     filter.getState().getRotation(),
-    //     filter.getState().getPosition(),
-    //     filter.getState().getVelocity(),
-    //     w_IMU_world,
-    //     robot_state.Rotation,
-    //     robot_state.Position,
-    //     robot_state.Velocity,
-    //     robot_state.Angular_Velocity
-    // );
+    Eigen::Vector3d w_IMU_world = filter.getState().getRotation() * (IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias()); // assuming bias is in body frame.
+        robot.transform_state_to_base(
+        filter.getState().getRotation(),
+        filter.getState().getPosition(),
+        filter.getState().getVelocity(),
+        w_IMU_world,
+        robot_state.Rotation,
+        robot_state.Position,
+        robot_state.Velocity,
+        robot_state.Angular_Velocity
+    );
 
-    robot_state.Rotation = filter.getState().getRotation();
-    robot_state.Position = filter.getState().getPosition();
-    robot_state.Velocity = filter.getState().getVelocity();
-    robot_state.Angular_Velocity = IMU_Gyro[frame_count]; // assuming bias is in body frame.
+    // robot_state.Rotation = filter.getState().getRotation();
+    // robot_state.Position = filter.getState().getPosition();
+    // robot_state.Velocity = filter.getState().getVelocity();
+    // robot_state.Angular_Velocity = IMU_Gyro[frame_count]; // assuming bias is in body frame.
 
     
     // Populate remaining robot_state fields (sensor-specific and contact data)
@@ -694,7 +682,7 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
 
 }
 void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i,
-     const Eigen::VectorXd &motor_torques_i, const Eigen ::VectorXd &motor_torques_cmd_i, const Eigen::VectorXd &Cmd_Velocity_i){
+     const Eigen::VectorXd &motor_torques_i, const Eigen ::VectorXd &motor_pos_cmd_i, const Eigen::VectorXd &Cmd_Velocity_i){
 
     new_measurement(imu_i, motor_data_i); // read motor and IMU data first
 
@@ -704,7 +692,7 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
 
         // Store raw motor torques for NN feature extraction
         MOTOR_TORQUES[frame_count] = motor_torques_i;
-        MOTOR_TORQUES_CMD[frame_count] = motor_torques_cmd_i; // Store commanded torques for potential future use/analysis
+        MOTOR_POS_CMD[frame_count] = motor_pos_cmd_i; // Store commanded positions for potential future use/analysis
         CMD_V[frame_count] = Cmd_Velocity_i; // Store commanded velocities for potential future use/analysis
 
         // Compute sum of squared torques for each leg
@@ -733,7 +721,7 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
             IMU_Acc[frame_count],
             IMU_Gyro[frame_count],
             MOTOR_TORQUES[frame_count],
-            MOTOR_TORQUES_CMD[frame_count],
+            MOTOR_POS_CMD[frame_count],
             CMD_V[frame_count]
         );
         
@@ -746,7 +734,7 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
         // Implement hysteresis with probability thresholds (after sigmoid)
         for (int leg = 0; leg < robot.num_legs; ++leg) {
             double prob = predicted_contacts[leg]; // Extract probability value for this leg (post-sigmoid)
-            if (prob > 0.65) {
+            if (prob > 0.5) {
                 CONTACT_t[frame_count][leg] = true;
             } else if (prob < 0.5) {
                 CONTACT_t[frame_count][leg] = false;
@@ -842,11 +830,11 @@ void InEKFilter::Onestep(){
                 }
             }
 
-            // Store commanded motor torques for NN features
-            MOTOR_TORQUES_CMD[frame_count] = Eigen::VectorXd::Zero(robot.encoder_size);
+            // Store commanded motor positions for NN features
+            MOTOR_POS_CMD[frame_count] = Eigen::VectorXd::Zero(robot.encoder_size);
             for (int i = 0; i < robot.num_legs; i++) {
                 for (int idx : robot.Leg_indices_map[i]) {
-                    MOTOR_TORQUES_CMD[frame_count](idx) = CSVData.motor_torques_cmd[j][idx];
+                    MOTOR_POS_CMD[frame_count](idx) = CSVData.motor_pos_cmd[j][idx];
                 }
             }
 
@@ -880,7 +868,7 @@ void InEKFilter::Onestep(){
                 IMU_Acc[frame_count],
                 IMU_Gyro[frame_count],
                 MOTOR_TORQUES[frame_count],
-                MOTOR_TORQUES_CMD[frame_count],
+                MOTOR_POS_CMD[frame_count],
                 CMD_V[frame_count]
             );
             
@@ -908,28 +896,6 @@ void InEKFilter::Onestep(){
 
             dv_norm[frame_count] = predicted_foot_velocities; // Store NN-predicted foot velocities for potential future use/analysis
 
-            // Note: dv and dv_norm are computed in Propagate_and_Correct() using kinematics
-
-            // // If torque sum squared exceeds threshold for any leg, set contact to true for that leg
-            // for (int leg = 0; leg < robot.num_legs; ++leg) {
-            //     if (torqueSumSquared[frame_count](leg) >= 2000) {
-            //         CONTACT_t[frame_count][leg] = true;
-            //     }
-            // }
-
-            // // If all leg speeds are low (< 1.0), assume standing (all legs in contact)
-            // bool all_legs_slow = true;
-            // for (int i = 0; i < robot.num_legs; i++) {
-            //     if (leg_speeds(i) >= 1.0) {
-            //         all_legs_slow = false;
-            //         break;
-            //     }
-            // }
-            // if (all_legs_slow) {
-            //     for (int i = 0; i < robot.num_legs; i++) {
-            //         CONTACT_t[frame_count][i] = true;
-            //     }
-            // }
         } else {
             // Use previous frame's contact detection result
             CONTACT_t[frame_count] = CONTACT_t[frame_count - 1];

@@ -563,7 +563,7 @@ void RobotModel::transform_state_to_base(
         pin_model,
         const_cast<pinocchio::Data&>(pin_data),
         imu_frame_id,
-        pinocchio::WORLD
+        pinocchio::LOCAL_WORLD_ALIGNED
     );
     
     const Eigen::Vector3d v_imu_Base = imu_velocity_world.linear();   // Joint-induced linear velocity in Base frame

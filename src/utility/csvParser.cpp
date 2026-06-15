@@ -425,7 +425,7 @@ DataStruct ParseCSV(const std::string& csv_filename) {
     data.encoders.resize(row_count, std::vector<double>(data.num_encoders));
     data.encoderdots.resize(row_count, std::vector<double>(data.num_encoders));
     data.motor_torques.resize(row_count, std::vector<double>(data.num_encoders));
-    data.motor_torques_cmd.resize(row_count, std::vector<double>(data.num_encoders));
+    data.motor_pos_cmd.resize(row_count, std::vector<double>(data.num_encoders));
     data.CMD_V.resize(row_count, std::vector<double>(3));
     data.contact_state.resize(row_count, std::vector<bool>(data.num_contacts));
     
@@ -542,36 +542,36 @@ DataStruct ParseCSV(const std::string& csv_filename) {
         data.motor_torques[i][27] = data.joint_torque_right_wrist_pitch[i];
         data.motor_torques[i][28] = data.joint_torque_right_wrist_yaw[i];
         
-        // Motor torque commands
-        data.motor_torques_cmd[i][0] = data.joint_cmd_left_hip_pitch[i];
-        data.motor_torques_cmd[i][1] = data.joint_cmd_left_hip_roll[i];
-        data.motor_torques_cmd[i][2] = data.joint_cmd_left_hip_yaw[i];
-        data.motor_torques_cmd[i][3] = data.joint_cmd_left_knee[i];
-        data.motor_torques_cmd[i][4] = data.joint_cmd_left_ankle_pitch[i];
-        data.motor_torques_cmd[i][5] = data.joint_cmd_left_ankle_roll[i];
-        data.motor_torques_cmd[i][6] = data.joint_cmd_right_hip_pitch[i];
-        data.motor_torques_cmd[i][7] = data.joint_cmd_right_hip_roll[i];
-        data.motor_torques_cmd[i][8] = data.joint_cmd_right_hip_yaw[i];
-        data.motor_torques_cmd[i][9] = data.joint_cmd_right_knee[i];
-        data.motor_torques_cmd[i][10] = data.joint_cmd_right_ankle_pitch[i];
-        data.motor_torques_cmd[i][11] = data.joint_cmd_right_ankle_roll[i];
-        data.motor_torques_cmd[i][12] = data.joint_cmd_waist_yaw[i];
-        data.motor_torques_cmd[i][13] = data.joint_cmd_waist_roll[i];
-        data.motor_torques_cmd[i][14] = data.joint_cmd_waist_pitch[i];
-        data.motor_torques_cmd[i][15] = data.joint_cmd_left_shoulder_pitch[i];
-        data.motor_torques_cmd[i][16] = data.joint_cmd_left_shoulder_roll[i];
-        data.motor_torques_cmd[i][17] = data.joint_cmd_left_shoulder_yaw[i];
-        data.motor_torques_cmd[i][18] = data.joint_cmd_left_elbow[i];
-        data.motor_torques_cmd[i][19] = data.joint_cmd_left_wrist_roll[i];
-        data.motor_torques_cmd[i][20] = data.joint_cmd_left_wrist_pitch[i];
-        data.motor_torques_cmd[i][21] = data.joint_cmd_left_wrist_yaw[i];
-        data.motor_torques_cmd[i][22] = data.joint_cmd_right_shoulder_pitch[i];
-        data.motor_torques_cmd[i][23] = data.joint_cmd_right_shoulder_roll[i];
-        data.motor_torques_cmd[i][24] = data.joint_cmd_right_shoulder_yaw[i];
-        data.motor_torques_cmd[i][25] = data.joint_cmd_right_elbow[i];
-        data.motor_torques_cmd[i][26] = data.joint_cmd_right_wrist_roll[i];
-        data.motor_torques_cmd[i][27] = data.joint_cmd_right_wrist_pitch[i];
-        data.motor_torques_cmd[i][28] = data.joint_cmd_right_wrist_yaw[i];
+        // Motor position commands
+        data.motor_pos_cmd[i][0] = data.joint_cmd_left_hip_pitch[i];
+        data.motor_pos_cmd[i][1] = data.joint_cmd_left_hip_roll[i];
+        data.motor_pos_cmd[i][2] = data.joint_cmd_left_hip_yaw[i];
+        data.motor_pos_cmd[i][3] = data.joint_cmd_left_knee[i];
+        data.motor_pos_cmd[i][4] = data.joint_cmd_left_ankle_pitch[i];
+        data.motor_pos_cmd[i][5] = data.joint_cmd_left_ankle_roll[i];
+        data.motor_pos_cmd[i][6] = data.joint_cmd_right_hip_pitch[i];
+        data.motor_pos_cmd[i][7] = data.joint_cmd_right_hip_roll[i];
+        data.motor_pos_cmd[i][8] = data.joint_cmd_right_hip_yaw[i];
+        data.motor_pos_cmd[i][9] = data.joint_cmd_right_knee[i];
+        data.motor_pos_cmd[i][10] = data.joint_cmd_right_ankle_pitch[i];
+        data.motor_pos_cmd[i][11] = data.joint_cmd_right_ankle_roll[i];
+        data.motor_pos_cmd[i][12] = data.joint_cmd_waist_yaw[i];
+        data.motor_pos_cmd[i][13] = data.joint_cmd_waist_roll[i];
+        data.motor_pos_cmd[i][14] = data.joint_cmd_waist_pitch[i];
+        data.motor_pos_cmd[i][15] = data.joint_cmd_left_shoulder_pitch[i];
+        data.motor_pos_cmd[i][16] = data.joint_cmd_left_shoulder_roll[i];
+        data.motor_pos_cmd[i][17] = data.joint_cmd_left_shoulder_yaw[i];
+        data.motor_pos_cmd[i][18] = data.joint_cmd_left_elbow[i];
+        data.motor_pos_cmd[i][19] = data.joint_cmd_left_wrist_roll[i];
+        data.motor_pos_cmd[i][20] = data.joint_cmd_left_wrist_pitch[i];
+        data.motor_pos_cmd[i][21] = data.joint_cmd_left_wrist_yaw[i];
+        data.motor_pos_cmd[i][22] = data.joint_cmd_right_shoulder_pitch[i];
+        data.motor_pos_cmd[i][23] = data.joint_cmd_right_shoulder_roll[i];
+        data.motor_pos_cmd[i][24] = data.joint_cmd_right_shoulder_yaw[i];
+        data.motor_pos_cmd[i][25] = data.joint_cmd_right_elbow[i];
+        data.motor_pos_cmd[i][26] = data.joint_cmd_right_wrist_roll[i];
+        data.motor_pos_cmd[i][27] = data.joint_cmd_right_wrist_pitch[i];
+        data.motor_pos_cmd[i][28] = data.joint_cmd_right_wrist_yaw[i];
         
         // Command velocity
         data.CMD_V[i][0] = data.cmd_vel_x[i];

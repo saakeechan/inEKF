@@ -86,7 +86,7 @@ public:
     void sliding_window();
 
     void Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const std::vector<bool> &Contact_i);
-    void Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const Eigen::VectorXd &motor_torques_i, const Eigen::VectorXd &motor_torques_cmd_i, const Eigen::VectorXd &Cmd_Velocity_i);  // Contact detection from torques
+    void Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const Eigen::VectorXd &motor_torques_i, const Eigen::VectorXd &motor_pos_cmd_i, const Eigen::VectorXd &Cmd_Velocity_i);  // Contact detection from torques
     void Onestep();  // No-argument version for CSV mode
     // void Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const Eigen::VectorXd &motor_torques_i);  // Contact detection from torques
 
@@ -138,7 +138,7 @@ public:
     std::vector<Eigen::VectorXd>   ENCODER;      // Dynamic size, set after robot config loaded
     std::vector<Eigen::VectorXd>   ENCODERDOT;   // Dynamic size, set after robot config loaded
     std::vector<Eigen::VectorXd>   MOTOR_TORQUES;     // Raw motor torques for NN features
-    std::vector<Eigen::VectorXd>   MOTOR_TORQUES_CMD; // Commanded motor torques for logging and potential use in contact detection
+    std::vector<Eigen::VectorXd>   MOTOR_POS_CMD; // Commanded motor positions for logging and potential use in contact detection
     std::vector<Eigen::VectorXd>   CMD_V;            // Commanded velocities (if available in CSV data)
     std::vector<Eigen::VectorXd>   torqueSumSquared;  // Sliding window buffer for torque sum squared
     //SAVE PARAMETER
