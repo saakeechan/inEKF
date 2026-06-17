@@ -27,3 +27,6 @@ unitree_ros/
 results/
 
 convex/assignment
+
+.ccache/
+Data/
