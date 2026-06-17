@@ -339,13 +339,33 @@ void InEKFilter::InitializeFromYAML(const std::string& config_path) {
     // Load CSV settings if present
     if (config["textfile"]) {
         csv_mode = config["textfile"]["enabled"].as<bool>();
-        // Load saved results folder path
-        saved_results_folder = config["saved_results_folder"].as<std::string>();
+        // Load saved results configuration
+        save_results = config["textfile"]["save_results"].as<bool>();
+        saved_results_folder = config["textfile"]["saved_results_folder"].as<std::string>();
         if (csv_mode) {
             std::string file_name = config["textfile"]["file_name"].as<std::string>();
             LoadCSVData(file_name);
-            start_index = config["textfile"]["starting_point"].as<int>();
-            time_length = config["textfile"]["time_length"].as<int>();
+            start_index = config["textfile"]["start_count"].as<int>();
+            time_length = config["textfile"]["end_count"].as<int>();
+            
+            // Cap end_count at actual CSV data size (accounting for starting point)
+            int csv_data_size = static_cast<int>(CSVData.timestamp.size());
+
+            
+            if (start_index >= csv_data_size) {
+                std::cerr << "Error: start_count (" << start_index 
+                          << ") exceeds or equals CSV data size (" << csv_data_size << ")" << std::endl;
+                time_length = start_index;  // No data to process
+            } else if (time_length > csv_data_size) {
+                std::cout << "Warning: Configured end_count (" << time_length 
+                          << ") exceeds CSV data size (" << csv_data_size 
+                          << "). Capping at CSV data size." << std::endl;
+                time_length = csv_data_size;
+            }
+            
+            std::cout << "Processing data from index " << start_index 
+                      << " to " << time_length 
+                      << " (" << (time_length - start_index) << " data points)" << std::endl;
         }
     }
     else {

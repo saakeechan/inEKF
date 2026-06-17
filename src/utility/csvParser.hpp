@@ -6,7 +6,7 @@
 #include <cstddef>
 
 // Structure to hold parsed G1 robot CSV data
-// Matches all 238 columns from G1LoggingData.csv
+// Matches all 250 columns from G1LoggingData.csv
 struct DataStruct {
     // Counter and timestamp (columns 0-1)
     std::vector<double> count;

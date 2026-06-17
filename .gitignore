@@ -28,8 +28,13 @@ results/
 
 # IDE and build cache
 .vscode/
+
 .ccache/
 
 Data/
 contactData/
+splitData/
+
+.codex/
+
 

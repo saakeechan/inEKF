@@ -22,6 +22,12 @@ namespace InEKF_SaveUtils {
      */
     void write_saved_data_impl(InEKFilter& filter);
 
+    /**
+     * @brief Print contact detection accuracy statistics to stdout
+     * @param filter Reference to the InEKFilter instance
+     */
+    void print_contact_accuracy_impl(const InEKFilter& filter);
+
 } // namespace InEKF_SaveUtils
 
 #endif // SRC_INEKF_SAVE_UTILS_HPP

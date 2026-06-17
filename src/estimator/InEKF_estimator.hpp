@@ -191,6 +191,7 @@ public:
     bool variable_contact_cov_mode = false;
     double cov_amplifier = 2;
 
+    bool save_results = true;
     std::string saved_results_folder = "../results";
 
     // dv history for CSV logging: [time_step][leg] = dv_norm

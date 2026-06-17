@@ -9,11 +9,14 @@ dt: 0.02
 # TextFile data file configuration
 textfile:
   enabled: true # Set to true to use TextFile data, false to use sensor data
-  file_name: "../Data/synced copy 10.csv"
-  time_length: 1000 # Total number of data points to process from the TextFile
-  starting_point: 0 # Number of initial data points to skip in TextFile
+  file_name: "../splitData/robotstate_40000_env16_run4.csv"
+  start_count: 0 # Number of initial data points to skip in TextFile
+  end_count: 9999 # End of data points to read from TextFile (inclusive)
+  save_results: true  # Whether to save estimation results to a file
+  saved_results_folder: "../results"  # Name of the folder to save estimation results
 
-saved_results_folder: "../results"  # Name of the folder to save estimation results
+
+
 
 # Slip rejection configuration
 slip_rejection:

@@ -155,6 +155,22 @@ void save_onestep_impl(InEKFilter& filter, int save_index) {
     }
 }
 
+void print_contact_accuracy_impl(const InEKFilter& filter) {
+    if (filter.total_comparisons <= 0) {
+        return;
+    }
+
+    cout << "\n=== Contact Detection Accuracy ==="<< endl;
+    cout << "Total comparisons: " << filter.total_comparisons << endl;
+    for (int k = 0; k < filter.robot.num_legs; k++) {
+        int total_leg = filter.contact_match_count[k] + filter.contact_mismatch_count[k];
+        double accuracy = (total_leg > 0) ? (100.0 * filter.contact_match_count[k] / total_leg) : 0.0;
+        cout << "Leg " << (k+1) << ": Matches=" << filter.contact_match_count[k] 
+             << ", Mismatches=" << filter.contact_mismatch_count[k]
+             << ", Accuracy=" << std::fixed << std::setprecision(2) << accuracy << "%" << endl;
+    }
+}
+
 void write_saved_data_impl(InEKFilter& filter) {
     
     // Create output directory if it doesn't exist
@@ -378,18 +394,6 @@ void write_saved_data_impl(InEKFilter& filter) {
     cout << filename << endl;
     cout << "Saving to a file done" << endl;
     
-    // Print contact detection accuracy statistics
-    if (filter.total_comparisons > 0) {
-        cout << "\n=== Contact Detection Accuracy ==="<< endl;
-        cout << "Total comparisons: " << filter.total_comparisons << endl;
-        for (int k = 0; k < filter.robot.num_legs; k++) {
-            int total_leg = filter.contact_match_count[k] + filter.contact_mismatch_count[k];
-            double accuracy = (total_leg > 0) ? (100.0 * filter.contact_match_count[k] / total_leg) : 0.0;
-            cout << "Leg " << (k+1) << ": Matches=" << filter.contact_match_count[k] 
-                 << ", Mismatches=" << filter.contact_mismatch_count[k]
-                 << ", Accuracy=" << std::fixed << std::setprecision(2) << accuracy << "%" << endl;
-        }
-    }
 }
 
 } // namespace InEKF_SaveUtils

@@ -93,12 +93,17 @@ int main() {
         std::cout << "  Total time:            " << std::fixed 
                   << std::setprecision(8) << total_time << " s" << std::endl;
 
-        InEKF_SaveUtils::write_saved_data_impl(estimator_IEKF);
-        cout << "Reached after InEKF_SaveUtils::write_saved_data_impl()" << endl;
+        InEKF_SaveUtils::print_contact_accuracy_impl(estimator_IEKF);
+
+        if (estimator_IEKF.save_results) {
+            InEKF_SaveUtils::write_saved_data_impl(estimator_IEKF);
+            cout << "Reached after InEKF_SaveUtils::write_saved_data_impl()" << endl;
+        } else {
+            cout << "Skipping result saving (save_results = false)" << endl;
+        }
 
     return 0;
 }
-
 
 
 
