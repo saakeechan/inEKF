@@ -59,7 +59,6 @@ void ContactNN::load_contact_model(const std::string& model_path) {
         
         contact_nn_enabled = true;
         std::cout << "Contact model loaded successfully!" << std::endl;
-        std::cout << "Input name: " << input_name_storage << std::endl;
         std::cout << "Input shape: [" << input_shape[0] << ", " << input_shape[1] << ", " << input_shape[2] << "]" << std::endl;
         
     } catch (const Ort::Exception& e) {

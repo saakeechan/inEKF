@@ -97,7 +97,6 @@ int main() {
 
         if (estimator_IEKF.save_results) {
             InEKF_SaveUtils::write_saved_data_impl(estimator_IEKF);
-            cout << "Reached after InEKF_SaveUtils::write_saved_data_impl()" << endl;
         } else {
             cout << "Skipping result saving (save_results = false)" << endl;
         }

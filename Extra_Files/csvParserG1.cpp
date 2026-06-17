@@ -86,7 +86,6 @@ DataStruct ParseG1CSV(const std::string& csv_filename) {
         header_map[column_name] = col_index++;
     }
     
-    std::cout << "Parsed " << header_map.size() << " column headers" << std::endl;
     
     // Parse each data row
     std::string line;
@@ -415,21 +414,14 @@ DataStruct ParseG1CSV(const std::string& csv_filename) {
     
     file.close();
     data.num_rows = row_count;
-    
-    std::cout << "Parsed " << row_count << " rows from G1 CSV file" << std::endl;
-    std::cout << "Total columns parsed: " << header_map.size() << " (from header)" << std::endl;
-    
-    // Now populate the 2D arrays for easier access
-    std::cout << "Populating 2D encoder and contact arrays..." << std::endl;
-    
+
+
     data.encoders.resize(row_count, std::vector<double>(data.num_encoders));
     data.encoderdots.resize(row_count, std::vector<double>(data.num_encoders));
     data.motor_torques.resize(row_count, std::vector<double>(data.num_encoders));
     data.motor_pos_cmd.resize(row_count, std::vector<double>(data.num_encoders));
     data.CMD_V.resize(row_count, std::vector<double>(3));
     data.contact_state.resize(row_count, std::vector<bool>(data.num_contacts));
-    
-    std::cout << "  Resized encoders to " << data.encoders.size() << " rows x " << data.num_encoders << " cols" << std::endl;
     
     // Map according to G1 joint order (q[0] to q[28])
     for (size_t i = 0; i < row_count; i++) {
@@ -582,8 +574,7 @@ DataStruct ParseG1CSV(const std::string& csv_filename) {
         data.contact_state[i][0] = data.lfoot_contact[i];
         data.contact_state[i][1] = data.rfoot_contact[i];
     }
-    
-    std::cout << "Successfully populated 2D arrays" << std::endl;
+
     
     return data;
 }
