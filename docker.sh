@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Docker helper script for INEKF with GTSAM
+# Docker helper script for INEKF
 
-IMAGE_NAME="inekf-gtsam"
-CONTAINER_NAME="inekf-gtsam-container"
+IMAGE_NAME="inekf"
+CONTAINER_NAME="inekf-container"
 HOST_UID=$(id -u)
 HOST_GID=$(id -g)
 

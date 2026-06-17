@@ -34,35 +34,9 @@ ENV PATH="/opt/venv/bin:$PATH"
 ENV CCACHE_DIR=/ccache
 ENV PATH="/usr/lib/ccache:${PATH}"
 
-# Upgrade pip and install Python packages required for GTSAM Python wrapper (cached layer)
+# Upgrade pip (cached layer)
 RUN /opt/venv/bin/pip install --upgrade pip && \
-    /opt/venv/bin/pip install pyparsing pybind11 numpy
-
-# Install additional Boost libraries for GTSAM (cached layer)
-RUN apt-get update && apt-get install -y \
-    libboost-system-dev \
-    libboost-filesystem-dev \
-    libboost-thread-dev \
-    libboost-date-time-dev \
-    libboost-timer-dev \
-    libboost-chrono-dev \
-    libboost-serialization-dev \
-    libtbb-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install GTSAM (cached layer - this takes a long time)
-WORKDIR /tmp
-RUN git clone https://github.com/borglab/gtsam.git && \
-    cd gtsam && \
-    mkdir build && cd build && \
-    cmake .. -DGTSAM_BUILD_PYTHON=ON \
-        -DPython3_EXECUTABLE=/opt/venv/bin/python3 \
-        -DGTSAM_PYTHON_VERSION=3 \
-        -DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
-    make -j$(nproc) && \
-    make install && \
-    cd ../.. && rm -rf gtsam
-    
+    /opt/venv/bin/pip install numpy
 
 # Install Pinocchio dependencies (cached layer)
 RUN apt-get update && apt-get install -y \
@@ -91,25 +65,8 @@ RUN wget https://github.com/microsoft/onnxruntime/releases/download/v1.25.1/onnx
     ldconfig && \
     rm -rf onnxruntime-linux-x64-1.25.1*
 
-
-
-# Install GTSAM Python package and matplotlib for plotting
-RUN /opt/venv/bin/pip install gtsam pandas matplotlib
-
-
-
-# Install cvxpy with solvers for convex optimization
-RUN /opt/venv/bin/pip install cvxpy ecos scs osqp clarabel
-
-# Install LaTeX packages for document generation
-RUN apt-get update && apt-get install -y \
-    texlive-latex-base \
-    texlive-latex-extra \
-    texlive-fonts-recommended \
-    texlive-fonts-extra \
-    texlive-publishers \
-    texlive-science \
-    && rm -rf /var/lib/apt/lists/*
+# Install Python packages for data analysis and plotting
+RUN /opt/venv/bin/pip install pandas matplotlib
 
 # Install meshcat for Pinocchio visualization
 RUN /opt/venv/bin/pip install meshcat
@@ -121,7 +78,6 @@ WORKDIR /workspace
 COPY CMakeLists.txt .
 COPY src/ src/
 COPY config/ config/
-COPY convex/ convex/
 COPY Extra_Files/ Extra_Files/
 
 CMD ["/bin/bash"]

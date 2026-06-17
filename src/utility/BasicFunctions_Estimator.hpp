@@ -519,7 +519,6 @@ public:
                     + C * ( W*W*V + V*W*W - 3*W*V*W )
                     + D * ( W*V*W*W + W*W*V*W );
 
-//                //gtsam
                 A = -0.5;
                 B = (norm - sin(norm))/pow(norm,3);
                 C = (1 - 0.5*pow(norm,2) - cos(norm))/(pow(norm,4));

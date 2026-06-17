@@ -1,7 +1,0 @@
-key,value_0,value_1
-format_version,2
-sequence_name,g1_walking
-foot_names,left_foot,right_foot
-dense_contact_stream,1
-contact_state_value,1
-timestamp_source,record
