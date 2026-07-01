@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate left-leg slip profile plots for all result CSV files."""
+"""Generate slip profile plots for selected legs across all result CSV files."""
 
 import os
 from pathlib import Path
@@ -14,15 +14,30 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-REQUIRED_COLUMNS = (
-    "time",
-    "EST_Contact_leg1",
-    "GT_Contact_leg1",
-    "EST_dv_norm_leg1",
-    "GT_dv_norm_leg1",
-    "EST_dv_leg1_x",
-    "EST_dv_leg1_y",
-    "EST_dv_leg1_z",
+PLOT_LEFT_LEG = True
+PLOT_RIGHT_LEG = True
+
+LEG_CONFIGS = (
+    {
+        "flag_name": "PLOT_LEFT_LEG",
+        "enabled": lambda: PLOT_LEFT_LEG,
+        "leg_key": "leg1",
+        "display_name": "Left Leg",
+        "contact_label": "Estimated left contact",
+        "gt_label": "Ground truth left dv norm",
+        "nn_label": "NN left dv norm",
+        "model_label": "Model-based left dv norm",
+    },
+    {
+        "flag_name": "PLOT_RIGHT_LEG",
+        "enabled": lambda: PLOT_RIGHT_LEG,
+        "leg_key": "leg2",
+        "display_name": "Right Leg",
+        "contact_label": "Estimated right contact",
+        "gt_label": "Ground truth right dv norm",
+        "nn_label": "NN right dv norm",
+        "model_label": "Model-based right dv norm",
+    },
 )
 
 
@@ -30,8 +45,30 @@ def read_column(data, column_name):
     return np.atleast_1d(data[column_name]).astype(float)
 
 
+def get_required_columns():
+    required_columns = ["time"]
+    for leg_config in LEG_CONFIGS:
+        if not leg_config["enabled"]():
+            continue
+
+        leg_key = leg_config["leg_key"]
+        required_columns.extend(
+            (
+                f"EST_Contact_{leg_key}",
+                f"GT_Contact_{leg_key}",
+                f"EST_dv_norm_{leg_key}",
+                f"GT_dv_norm_{leg_key}",
+                f"EST_dv_{leg_key}_x",
+                f"EST_dv_{leg_key}_y",
+                f"EST_dv_{leg_key}_z",
+            )
+        )
+    return tuple(required_columns)
+
+
 def validate_columns(csv_path, data):
-    missing_columns = [column for column in REQUIRED_COLUMNS if column not in data.dtype.names]
+    required_columns = get_required_columns()
+    missing_columns = [column for column in required_columns if column not in data.dtype.names]
     if missing_columns:
         missing_text = ", ".join(missing_columns)
         raise ValueError(f"{csv_path.name} is missing required columns: {missing_text}")
@@ -66,7 +103,17 @@ def format_error_label(name, mae, mse):
     return f"{name} MAE: {mae:.4f}\n{name} MSE: {mse:.4f}"
 
 
-def plot_dv_profile(ax, time, est_contact, gt_contact, nn_dv_norm, model_dv_norm, gt_dv_norm, title):
+def plot_dv_profile(
+    ax,
+    time,
+    est_contact,
+    gt_contact,
+    nn_dv_norm,
+    model_dv_norm,
+    gt_dv_norm,
+    title,
+    leg_config,
+):
     mismatch = est_contact != gt_contact
     nn_mae, nn_mse = calculate_contact_errors(nn_dv_norm, gt_dv_norm, gt_contact)
     model_mae, model_mse = calculate_contact_errors(model_dv_norm, gt_dv_norm, gt_contact)
@@ -80,7 +127,7 @@ def plot_dv_profile(ax, time, est_contact, gt_contact, nn_dv_norm, model_dv_norm
         step="post",
         color="lightcoral",
         alpha=0.25,
-        label="Estimated left contact",
+        label=leg_config["contact_label"],
     )
 
     if np.any(mismatch):
@@ -102,7 +149,7 @@ def plot_dv_profile(ax, time, est_contact, gt_contact, nn_dv_norm, model_dv_norm
         gt_dv_norm,
         color="black",
         linewidth=1.8,
-        label="Ground truth left dv norm",
+        label=leg_config["gt_label"],
     )
     ax.plot(
         time,
@@ -110,7 +157,7 @@ def plot_dv_profile(ax, time, est_contact, gt_contact, nn_dv_norm, model_dv_norm
         color="tab:blue",
         linestyle="--",
         linewidth=1.6,
-        label="NN left dv norm",
+        label=leg_config["nn_label"],
     )
     ax.plot(
         time,
@@ -118,7 +165,7 @@ def plot_dv_profile(ax, time, est_contact, gt_contact, nn_dv_norm, model_dv_norm
         color="purple",
         linestyle="--",
         linewidth=1.6,
-        label="Model-based left dv norm",
+        label=leg_config["model_label"],
     )
 
     ax.set_title(title)
@@ -137,27 +184,36 @@ def plot_slip_profile(csv_path, output_path):
     validate_columns(csv_path, data)
 
     time = read_column(data, "time")
-    est_contact = read_column(data, "EST_Contact_leg1").astype(bool)
-    gt_contact = read_column(data, "GT_Contact_leg1").astype(bool)
-    est_dv_norm = read_column(data, "EST_dv_norm_leg1")
-    gt_dv_norm = read_column(data, "GT_dv_norm_leg1")
-    est_dv_norm_from_components = calculate_vector_norm(
-        read_column(data, "EST_dv_leg1_x"),
-        read_column(data, "EST_dv_leg1_y"),
-        read_column(data, "EST_dv_leg1_z"),
-    )
+    selected_legs = [leg_config for leg_config in LEG_CONFIGS if leg_config["enabled"]()]
+    if not selected_legs:
+        raise ValueError("At least one plot flag must be True.")
 
-    fig, ax = plt.subplots(figsize=(14, 6))
-    plot_dv_profile(
-        ax,
-        time,
-        est_contact,
-        gt_contact,
-        est_dv_norm,
-        est_dv_norm_from_components,
-        gt_dv_norm,
-        f"Left Leg Slip Profile: {csv_path.stem}",
-    )
+    fig, axes = plt.subplots(len(selected_legs), 1, figsize=(14, 6 * len(selected_legs)), sharex=True)
+    axes = np.atleast_1d(axes)
+
+    for ax, leg_config in zip(axes, selected_legs):
+        leg_key = leg_config["leg_key"]
+        est_contact = read_column(data, f"EST_Contact_{leg_key}").astype(bool)
+        gt_contact = read_column(data, f"GT_Contact_{leg_key}").astype(bool)
+        est_dv_norm = read_column(data, f"EST_dv_norm_{leg_key}")
+        gt_dv_norm = read_column(data, f"GT_dv_norm_{leg_key}")
+        est_dv_norm_from_components = calculate_vector_norm(
+            read_column(data, f"EST_dv_{leg_key}_x"),
+            read_column(data, f"EST_dv_{leg_key}_y"),
+            read_column(data, f"EST_dv_{leg_key}_z"),
+        )
+
+        plot_dv_profile(
+            ax,
+            time,
+            est_contact,
+            gt_contact,
+            est_dv_norm,
+            est_dv_norm_from_components,
+            gt_dv_norm,
+            f"{leg_config['display_name']} Slip Profile: {csv_path.stem}",
+            leg_config,
+        )
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=200)

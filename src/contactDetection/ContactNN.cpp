@@ -102,7 +102,7 @@ std::pair<Eigen::VectorXd, Eigen::VectorXd> ContactNN::predict_contact(const std
         // Output shape is [batch_size, 1] = [1, 1] (left leg only, current timestep)
         // Apply sigmoid to convert logits to probabilities [0, 1]
         Eigen::VectorXd contact_predictions = Eigen::VectorXd::Zero(robot.num_legs);
-        for (int leg = 0; leg < 1; ++leg) {
+        for (int leg = 0; leg < robot.num_legs; ++leg) {
             float logit = contact_logits_data[leg];  // Get logit for this leg
             float prob = 1.0f / (1.0f + std::exp(-logit));  // Sigmoid function
             contact_predictions(leg) = prob;  // Store probability
@@ -114,8 +114,9 @@ std::pair<Eigen::VectorXd, Eigen::VectorXd> ContactNN::predict_contact(const std
         
         // Output shape is [batch_size, 1] = [1, 1] (left leg only, current timestep)
         Eigen::VectorXd foot_velocities = Eigen::VectorXd::Zero(robot.num_legs);
-        foot_velocities(0) = foot_velocity_data[0];  // Current timestep for left leg
-        
+        for (int leg = 0; leg < robot.num_legs; ++leg) {
+            foot_velocities(leg) = foot_velocity_data[leg];  // Current timestep for each leg
+        }
         
         return {contact_predictions, foot_velocities};
         
@@ -134,9 +135,9 @@ Eigen::VectorXd ContactNN::extract_nn_features(
     const Eigen::VectorXd& motor_pos_cmd,
     const Eigen::VectorXd& cmd_velocity
 ) {
-    // Extract 57-element feature vector for both legs
-    // Order: acc, omega, q, qd, p, v, tau, tau_sq_sum, v_cmd
-    // For G1 (both legs): 3 + 3 + 12 + 12 + 6 + 6 + 12 + 2 + 1 = 57 features
+    // Extract 56-element feature vector for both legs.
+    // Order: acc, omega, q, qd, p, v, tau, tau_sq_sum
+    // For G1 (both legs): 3 + 3 + 12 + 12 + 6 + 6 + 12 + 2 = 56 features
     
     Eigen::VectorXd features(NN_FEATURE_SIZE);
     int idx = 0;
@@ -153,7 +154,7 @@ Eigen::VectorXd ContactNN::extract_nn_features(
     features(idx++) = imu_gyro(2);
 
     // q: joint positions (left leg first, right leg second)
-    for (int leg = 0; leg < 1; ++leg) {
+    for (int leg = 0; leg < robot.num_legs; ++leg) {
         for (int joint_idx : robot.Leg_indices_map[leg]) {
             features(idx++) = encoder(joint_idx);
         }
@@ -166,7 +167,7 @@ Eigen::VectorXd ContactNN::extract_nn_features(
     // features(idx++) = std::abs(encoder(10));
     
     // qd: joint velocities (left leg first, right leg second)
-    for (int leg = 0; leg < 1; ++leg) {
+    for (int leg = 0; leg < robot.num_legs; ++leg) {
         for (int joint_idx : robot.Leg_indices_map[leg]) {
             features(idx++) = encoderdot(joint_idx);
         }
@@ -177,23 +178,23 @@ Eigen::VectorXd ContactNN::extract_nn_features(
     // features(idx++) = encoderdot(3);
     
     // p: foot positions (left foot xyz, right foot xyz)
-    for (int leg = 1; leg <= 1; ++leg) {
-        Eigen::Vector3d foot_pos = robot.get_foot_position(leg);
+    for (int leg = 0; leg < robot.num_legs; ++leg) {
+        Eigen::Vector3d foot_pos = robot.get_foot_position(leg + 1);
         features(idx++) = foot_pos(0);
         features(idx++) = foot_pos(1);
         features(idx++) = foot_pos(2);
     }
     
     // v: foot velocities (left foot xyz, right foot xyz)
-    for (int leg = 1; leg <= 1; ++leg) {
-        Eigen::Vector3d foot_vel = robot.get_foot_velocity(leg);
+    for (int leg = 0; leg < robot.num_legs; ++leg) {
+        Eigen::Vector3d foot_vel = robot.get_foot_velocity(leg + 1);
         features(idx++) = foot_vel(0);
         features(idx++) = foot_vel(1);
         features(idx++) = foot_vel(2);
     }
     
     // tau: joint torques (left leg first, right leg second)
-    for (int leg = 0; leg < 1; ++leg) {
+    for (int leg = 0; leg < robot.num_legs; ++leg) {
         for (int joint_idx : robot.Leg_indices_map[leg]) {
             features(idx++) = motor_torques(joint_idx);
         }
@@ -211,13 +212,13 @@ Eigen::VectorXd ContactNN::extract_nn_features(
     // features(idx++) = std::abs(motor_torques(10));
     // features(idx++) = std::abs(motor_torques(11));
 
-    // tau_mse: mean squared torques for each leg
-    for (int leg = 0; leg < 1; ++leg) {
-        double sum = 0;
+    // tau_mse: sum of squared torques for each leg
+    for (int leg = 0; leg < robot.num_legs; ++leg) {
+        double sum = 0.0;
         for (int joint_idx : robot.Leg_indices_map[leg]) {
             sum += motor_torques(joint_idx) * motor_torques(joint_idx);
         }
-        features(idx++) = sum;  // Average squared torque for this leg
+        features(idx++) = sum;
     }
     
     // // tau_cmd: commanded joint torques (left leg first, right leg second)
@@ -230,7 +231,7 @@ Eigen::VectorXd ContactNN::extract_nn_features(
     // // v_cmd: commanded velocity (1 element)
     // features(idx++) = cmd_velocity(0);
     
-    // Validate that we filled exactly 57 elements
+    // Validate that we filled exactly NN_FEATURE_SIZE elements
     if (idx != NN_FEATURE_SIZE) {
         std::cerr << "Warning: Extracted " << idx << " features, expected " 
                   << NN_FEATURE_SIZE << std::endl;
