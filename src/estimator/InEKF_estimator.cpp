@@ -363,9 +363,9 @@ void InEKFilter::InitializeFromYAML(const std::string& config_path) {
                 time_length = csv_data_size;
             }
             
-            std::cout << "Processing data from index " << start_index 
-                      << " to " << time_length 
-                      << " (" << (time_length - start_index) << " data points)" << std::endl;
+            std::cout << "Initializing from CSV index " << start_index
+                      << " and running updates from index " << (start_index + 1)
+                      << " to " << (time_length - 1) << std::endl;
         }
     }
     else {
@@ -492,7 +492,7 @@ void InEKFilter::new_measurement()
         return;
     }
     
-    int j = time_count + start_index;
+    int j = time_count + start_index + 1;
     
     // IMU data from CSV
     IMU_Gyro[frame_count] << CSVData.gyro_body_x[j], CSVData.gyro_body_y[j], CSVData.gyro_body_z[j];
@@ -507,20 +507,6 @@ void InEKFilter::new_measurement()
     }
     // IMU_Gyro[frame_count] = filter.getState().getRotation() * IMU_Gyro[frame_count];
 
-    // cout << "Frame " << frame_count << " IMU Gyro: " << IMU_Gyro[frame_count].transpose() << endl;
-    // cout << "Frame " << frame_count << " IMU Acc: " << IMU_Acc[frame_count].transpose() << endl;
-
-    // ========================================================================
-    // ROBOT-SPECIFIC ENCODER ASSIGNMENT
-    // This section assigns encoder and encoder velocity data from CSV to 
-    // the appropriate indices for Pinocchio FK.
-    // 
-    // When creating a new robot model:
-    // 1. Map CSV joint data to the robot's joint configuration
-    // 2. Ensure joint ordering matches your URDF/MJCF model
-    // 3. Use robot.map_indices_to_encoders() for proper mapping
-    // ========================================================================
-    
     // Map CSV data to encoder vectors
     robot.map_indices_to_encoders(CSVData.encoders[j], ENCODER[frame_count], "encoder");
     robot.map_indices_to_encoders(CSVData.encoderdots[j], ENCODERDOT[frame_count], "encoderdot");
@@ -534,7 +520,6 @@ void InEKFilter::new_measurement()
     // Compute forward kinematics and Jacobians
     robot.Forward_Kinematics(ENCODER[frame_count], ENCODERDOT[frame_count]);
     robot.compute_joint_jacobians();
-    
 }
 
 void InEKFilter::Propagate_and_Correct()
@@ -585,7 +570,8 @@ void InEKFilter::Propagate_and_Correct()
         for (int axis = 0; axis < 3; axis++) {
             jac_norm_sq(axis) = FK_Jacobian.row(axis).squaredNorm();
         }
-        covariance.block(3,3, 3,3) = jac_norm_sq.asDiagonal() * robot.cov_enc_const;
+        // covariance.block(3,3, 3,3) = jac_norm_sq.asDiagonal() * robot.cov_enc_const;
+        covariance.block(3,3, 3,3) = Eigen::Matrix3d::Identity() * robot.cov_enc_const; // Use contact covariance for kinematic measurement noise
 
         inekf::Kinematics frame(id, pose, covariance);
         measured_kinematics.push_back(frame);
@@ -836,7 +822,7 @@ void InEKFilter::Onestep(){
     new_measurement(); // reads from CSV when csv_mode is true
     
     // Extract leg torques from CSV data
-    int j = time_count + start_index;
+    int j = time_count + start_index + 1;
 
     if(contact_nn_enabled) {
         
@@ -925,7 +911,7 @@ void InEKFilter::Onestep(){
     else
     {
         // Extract leg torques from CSV data
-        int j = time_count + start_index;
+        int j = time_count + start_index + 1;
         Eigen::VectorXd leg_torques(robot.num_legs);
         for (int i = 0; i < robot.num_legs; i++) {
             // Sum squared torques for all motors in this leg

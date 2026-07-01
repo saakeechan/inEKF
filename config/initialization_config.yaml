@@ -9,10 +9,10 @@ dt: 0.02
 # TextFile data file configuration
 textfile:
   enabled: true # Set to true to use TextFile data, false to use sensor data
-  file_name: "../splitData/robotstate_80000_env7_run1.csv"
+  file_name: "../splitData/robotstate_0_env6_run1_short.csv"
   start_count: 0 # Number of initial data points to skip in TextFile
   end_count: 9999 # End of data points to read from TextFile (inclusive)
-  save_results: true  # Whether to save estimation results to a file
+  save_results: false  # Whether to save estimation results to a file
   saved_results_folder: "../results"  # Name of the folder to save estimation results
 
 
@@ -25,11 +25,11 @@ slip_rejection:
 
 # Variable contact covariance configuration
 variable_contact_covariance:
-  enabled: true  # Variable contact covariance mode
+  enabled: false  # Variable contact covariance mode
   amplifier: 1.0  # Multiplied to contact covariance when VCC is enabled
 
 Contact_estimation_NN:
-  enabled: true  # Enable contact estimation using the neural network model
+  enabled: false  # Enable contact estimation using the neural network model
   file_path: "../src/contactDetection/model_final_epoch.onnx"  # Path to the ONNX contact estimation model
 
 
@@ -39,8 +39,8 @@ Contact_estimation_NN:
 #        prior_ori, prior_vel, prior_pos, prior_bias_gyro, prior_bias_acc
 
 covariance_exponents:
-  gyro: -5
-  acc: -1
+  gyro: -6
+  acc: -2
   slip: -2
   contact: -5
   encoder: -8

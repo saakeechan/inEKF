@@ -34,7 +34,7 @@ void save_onestep_impl(InEKFilter& filter, int save_index) {
     
     if(filter.csv_mode) {
         //Sending True States----------------------------------------------------------------------------
-        int j = filter.time_count + filter.start_index;
+        int j = filter.time_count + filter.start_index + 1;
 
         // Build rotation matrix from CSV quaternion data
         Eigen::Vector4d quat_true;

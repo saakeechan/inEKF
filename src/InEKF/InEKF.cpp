@@ -13,6 +13,7 @@
 
 #include "InEKF.h"
 #include "../utility/BasicFunctions_Estimator.hpp"
+#include <cmath>
 #include <unsupported/Eigen/MatrixFunctions>
 
 namespace inekf {
@@ -21,6 +22,25 @@ using namespace std;
 using namespace Eigen;
 
 void removeRowAndColumn(Eigen::MatrixXd& M, int index);
+
+Eigen::Vector3d rotationToRPY(const Eigen::Matrix3d& R) {
+    Eigen::Vector3d rpy;
+    rpy << std::atan2(R(2,1), R(2,2)),
+           std::atan2(-R(2,0), std::sqrt(R(2,1)*R(2,1) + R(2,2)*R(2,2))),
+           std::atan2(R(1,0), R(0,0));
+    return rpy;
+}
+
+void printDebugState(const char* label, RobotState& state, bool print_covariance) {
+    cout << "========== " << label << " ==========" << endl;
+    cout << "Position:\n" << state.getPosition() << endl;
+    cout << "RPY:\n" << rotationToRPY(state.getRotation()) << endl;
+    cout << "Velocity:\n" << state.getVelocity() << endl;
+    if (print_covariance) {
+        cout << "Covariance P:\n" << state.getP() << endl;
+    }
+    cout << "====================================" << endl;
+}
 
 // ------------ Observation -------------
 // Default constructor
@@ -143,8 +163,8 @@ void InEKF::Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector
     // Strapdown IMU motion model
     Eigen::Vector3d phi = w*dt; // Infinitesimal rotation
     Eigen::Matrix3d R_pred = R * Exp_SO3(phi); // Rotation update
-    JacobiSVD<Matrix3d> svd(R_pred, ComputeFullU|ComputeFullV); // Re-orthogonalization
-    R_pred = svd.matrixU() * svd.matrixV().transpose();
+    // JacobiSVD<Matrix3d> svd(R_pred, ComputeFullU|ComputeFullV); // Re-orthogonalization
+    // R_pred = svd.matrixU() * svd.matrixV().transpose();
 
     Eigen::Vector3d v_pred = v + (R*a + g_)*dt; // I could do it with the new R but whatever, 
                                                 //or even the average of the two but its more expensive
@@ -163,7 +183,7 @@ void InEKF::Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector
     // Inertial terms
     A.block<3,3>(3,0) = skew(g_); // TODO: Efficiency could be improved by not computing the constant terms every time; just declare it in the header bro
     A.block<3,3>(6,3) = Eigen::Matrix3d::Identity();
-    A.block<3,3>(6,0) = 0.5 * BasicFunctions_Estimator::Hat_so3(g_) * dt; //added by Z1
+    // A.block<3,3>(6,0) = 0.5 * BasicFunctions_Estimator::Hat_so3(g_) * dt; //added by Z1
     // Bias terms
     A.block<3,3>(0,dimP-dimTheta) = -R;
     A.block<3,3>(3,dimP-dimTheta+3) = -R;
@@ -178,7 +198,7 @@ void InEKF::Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector
 
 
     Qk.block<3,3>(3,3) = noise_params_.getAccelerometerCov();
-    Qk.block<3,3>(6,6) = noise_params_.getAccelerometerCov() * (0.5*dt*dt); // Added by Z1
+    // Qk.block<3,3>(6,6) = noise_params_.getAccelerometerCov() * (0.5*dt*dt); // Added by Z1
     for(map<int,int>::iterator it=estimated_contact_positions_.begin(); it!=estimated_contact_positions_.end(); ++it) {
         Qk.block<3,3>(3+3*(it->second-3),3+3*(it->second-3)) = contact_cov_array[it->first] * Eigen::MatrixXd::Identity(3,3); // Contact noise terms
     }
@@ -196,13 +216,14 @@ void InEKF::Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector
     Eigen::MatrixXd Adj = I;
     Adj.block(0,0,dimP-dimTheta,dimP-dimTheta) = Adjoint_SEK3(X); // Approx 200 microseconds
     Eigen::MatrixXd PhiAdj = Phi * Adj;
-    Eigen::MatrixXd Qk_hat = PhiAdj * Qk * PhiAdj.transpose();
+    Eigen::MatrixXd Qk_hat = PhiAdj * Qk * PhiAdj.transpose() * dt;
     // Eigen::MatrixXd Qk_hat = Adj*dt * Qk * dt*Adj.transpose(); // Further simplified from PhiAdj*Qk*PhiAdj.transpose() to reduce computation time
     // Propagate Covariance
     Eigen::MatrixXd P_pred = Phi * P * Phi.transpose() + Qk_hat;
 
     // Set new covariance
     state_.setP(P_pred);
+    printDebugState("After Propagation", state_, true);
 
     return;
 }
@@ -213,7 +234,7 @@ void InEKF::Correct(const Observation& obs) {
     Eigen::MatrixXd P = state_.getP();
     Eigen::MatrixXd PHT = P * obs.H.transpose();
     Eigen::MatrixXd S = obs.H * PHT + obs.N;
-    Eigen::MatrixXd K = PHT * S.inverse();
+    Eigen::MatrixXd K = S.ldlt().solve(PHT.transpose()).transpose();
 
     // Copy X along the diagonals if more than one measurement
     Eigen::MatrixXd BigX;
@@ -237,6 +258,7 @@ void InEKF::Correct(const Observation& obs) {
     Eigen::MatrixXd P_new = IKH * P * IKH.transpose()+ K*obs.N*K.transpose(); // Joseph update form
 
     state_.setP(P_new); 
+    printDebugState("After Correction", state_, true);
 }   
 
 // Create Observation from vector of landmark measurements

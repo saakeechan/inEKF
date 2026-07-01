@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
 
+find_program(CLANGXX_PROGRAM clang++)
+if(CLANGXX_PROGRAM AND (NOT DEFINED CMAKE_CXX_COMPILER OR CMAKE_CXX_COMPILER STREQUAL "/usr/bin/c++"))
+    set(CMAKE_CXX_COMPILER "${CLANGXX_PROGRAM}" CACHE FILEPATH "C++ compiler" FORCE)
+endif()
+
 project(INEKF_Estimator LANGUAGES CXX)
 
 
@@ -18,8 +23,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
-    set(CMAKE_CXX_COMPILER_LAUNCHER ccache)
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}" CACHE FILEPATH "C++ compiler launcher" FORCE)
 endif()
+message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER}")
+message(STATUS "C++ compiler launcher: ${CMAKE_CXX_COMPILER_LAUNCHER}")
 set(CMAKE_UNITY_BUILD OFF)  # Disabled to avoid symbol conflicts between robot implementations
 
 # Set default build type to Release if not specified

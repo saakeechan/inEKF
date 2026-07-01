@@ -63,7 +63,7 @@ int main() {
 
     std::vector<double> step_times;
 
-        for (int time = 0; time < (estimator_IEKF.time_length - estimator_IEKF.start_index); time++) {
+        for (int time = 0; time < (estimator_IEKF.time_length - estimator_IEKF.start_index - 1); time++) {
             auto start = std::chrono::high_resolution_clock::now();
 
             estimator_IEKF.Onestep();  // Contact detection from torques
@@ -103,6 +103,5 @@ int main() {
 
     return 0;
 }
-
 
 

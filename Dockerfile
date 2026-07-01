@@ -6,6 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Install basic dependencies (cached layer)
 RUN apt-get update && apt-get install -y \
     build-essential \
+    clang \
     cmake \
     git \
     wget \
@@ -33,6 +34,11 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Enable ccache for faster rebuilds
 ENV CCACHE_DIR=/ccache
 ENV PATH="/usr/lib/ccache:${PATH}"
+
+# Default container builds to Clang, ccache, and Ninja.
+ENV CC=clang
+ENV CXX=clang++
+ENV CMAKE_GENERATOR=Ninja
 
 # Upgrade pip (cached layer)
 RUN /opt/venv/bin/pip install --upgrade pip && \

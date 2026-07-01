@@ -20,6 +20,7 @@ function print_usage() {
     echo "  build       - Build the Docker image"
     echo "  run         - Run the container interactively"
     echo "  exec        - Execute a command in running container"
+    echo "  configure   - Configure CMake with Clang, ccache, and Ninja"
     echo "  fix-perms   - Fix workspace file ownership to current user"
     echo "  stop        - Stop the running container"
     echo "  clean       - Remove container and image"
@@ -46,6 +47,9 @@ function run_container() {
         --user ${HOST_UID}:${HOST_GID} \
         -e HOME=/tmp \
         -e CCACHE_DIR=/workspace/.ccache \
+        -e CC=clang \
+        -e CXX=clang++ \
+        -e CMAKE_GENERATOR=Ninja \
         -v /etc/passwd:/etc/passwd:ro \
         -v /etc/group:/etc/group:ro \
         -v $(pwd):/workspace \
@@ -59,6 +63,34 @@ function exec_container() {
     else
         docker exec -it --user ${HOST_UID}:${HOST_GID} ${CONTAINER_NAME} "${@:2}"
     fi
+}
+
+function configure_cmake() {
+    echo -e "${BLUE}Configuring CMake with Clang, ccache, and Ninja${NC}"
+    if [ ! -f /.dockerenv ]; then
+        mkdir -p .ccache && chmod 777 .ccache
+        docker run --rm \
+            --user ${HOST_UID}:${HOST_GID} \
+            -e HOME=/tmp \
+            -e CCACHE_DIR=/workspace/.ccache \
+            -e CC=clang \
+            -e CXX=clang++ \
+            -e CMAKE_GENERATOR=Ninja \
+            -v /etc/passwd:/etc/passwd:ro \
+            -v /etc/group:/etc/group:ro \
+            -v $(pwd):/workspace \
+            ${IMAGE_NAME} \
+            /bin/bash -lc "./docker.sh configure"
+        return $?
+    fi
+
+    mkdir -p build .ccache
+    rm -f build/CMakeCache.txt build/build.ninja build/.ninja_deps build/.ninja_log
+    rm -rf build/CMakeFiles
+    cmake -S . -B build -G Ninja \
+        -DCMAKE_C_COMPILER=clang \
+        -DCMAKE_CXX_COMPILER=clang++ \
+        -DCMAKE_CXX_COMPILER_LAUNCHER=/usr/bin/ccache
 }
 
 function fix_permissions() {
@@ -102,6 +134,9 @@ case "$1" in
         ;;
     exec)
         exec_container "$@"
+        ;;
+    configure)
+        configure_cmake
         ;;
     fix-perms)
         fix_permissions
