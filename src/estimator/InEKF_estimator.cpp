@@ -195,9 +195,10 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
 
     inekf::RobotState initial_state(ForP);
 
+    int init_csv_index = start_index;
     if(csv_mode){
 
-        int idx = 0 + start_index; // Skip initial rows in CSV if needed
+        int idx = init_csv_index; // Skip initial rows in CSV if needed
 
         // Initialize from CSV data + initial condition offset
 
@@ -248,7 +249,6 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
     // Initial State has initial states + prior covariance
 
     imu_measurement = Eigen::Matrix<double,6,1>::Zero();
-    imu_measurement_prev = Eigen::Matrix<double,6,1>::Zero();
 
     // Initialize state covariance
     inekf::NoiseParams noise_params;
@@ -263,11 +263,42 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
     filter.setState(initial_state);
     filter.setNoiseParams(noise_params);
 
+    if (csv_mode) {
+        int init_frame = frame_count;
+
+        robot.map_indices_to_encoders(CSVData.encoders[init_csv_index], ENCODER[init_frame], "encoder");
+        robot.map_indices_to_encoders(CSVData.encoderdots[init_csv_index], ENCODERDOT[init_frame], "encoderdot");
+        CONTACT_t[init_frame] = CSVData.contact_state[init_csv_index];
+
+        robot.Forward_Kinematics(ENCODER[init_frame], ENCODERDOT[init_frame]);
+        robot.compute_joint_jacobians();
+
+        std::vector<std::pair<int, bool>> contactConstraints;
+        inekf::vectorKinematics measured_kinematics;
+
+        for (int k = 0; k < robot.num_legs; k++) {
+            contactConstraints.emplace_back(k, CONTACT_t[init_frame][k]);
+
+            Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+            pose.block<3,1>(0,3) = robot.get_foot_position(k + 1);
+
+            Eigen::Matrix<double,6,6> covariance = Eigen::Matrix<double,6,6>::Zero();
+            covariance.block<3,3>(3,3) = Eigen::Matrix3d::Identity() * robot.cov_enc_const;
+
+            measured_kinematics.emplace_back(k, pose, covariance);
+        }
+
+        filter.setContacts(contactConstraints);
+        filter.CorrectKinematics(measured_kinematics, false);
+    }
+
    cout << "Noise parameters are initialized to: \n";
    cout << filter.getNoiseParams() << endl;
    cout << "Robot's state is initialized to: \n";
    cout << filter.getState() << endl;
    // Theta is bias of sensors 6x1 vector
+
+   frame_count++; // Reset frame counter
 }
 
 void InEKFilter::InitializeFromYAML(const std::string& config_path) {
@@ -495,8 +526,8 @@ void InEKFilter::new_measurement()
     int j = time_count + start_index + 1;
     
     // IMU data from CSV
-    IMU_Gyro[frame_count] << CSVData.gyro_body_x[j], CSVData.gyro_body_y[j], CSVData.gyro_body_z[j];
-    IMU_Acc[frame_count] << CSVData.acc_body_x[j], CSVData.acc_body_y[j], CSVData.acc_body_z[j];
+    IMU_Gyro[frame_count] << CSVData.gyro_body_x[j-1], CSVData.gyro_body_y[j-1], CSVData.gyro_body_z[j-1];
+    IMU_Acc[frame_count] << CSVData.acc_body_x[j-1], CSVData.acc_body_y[j-1], CSVData.acc_body_z[j-1];
 
     if (robot.robot_name == "G1") {
     // Convert gravity-compensated body IMU to world frame with gravity added back
@@ -526,14 +557,9 @@ void InEKFilter::Propagate_and_Correct()
 
 {
 
-    if(frame_count>0) {
 
-        filter.Propagate(imu_measurement_prev, dt, Variable_Contact_Cov(frame_count - 1)); // propagate with previous imu measurement and dt and also the contact covariance for static foot assumption
+    filter.Propagate(imu_measurement, dt, Variable_Contact_Cov(frame_count - 1)); // propagate with previous imu measurement and dt and also the contact covariance for static foot assumption
 
-    }
-
-    // change imu measurement_prev after inputting to propagation
-    imu_measurement_prev = imu_measurement;
 
     // // Build contact constraint list from slip-filtered hard contacts
     std::vector<pair<int,bool>> contactConstraints;
@@ -617,22 +643,22 @@ void InEKFilter::Propagate_and_Correct()
     // Append dv norms to history
     dv_history.push_back(dv_norms_current);
 
-    Eigen::Vector3d w_IMU_world = filter.getState().getRotation() * (IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias()); // assuming bias is in body frame.
-        robot.transform_state_to_base(
-        filter.getState().getRotation(),
-        filter.getState().getPosition(),
-        filter.getState().getVelocity(),
-        w_IMU_world,
-        robot_state.Rotation,
-        robot_state.Position,
-        robot_state.Velocity,
-        robot_state.Angular_Velocity
-    );
+    // Eigen::Vector3d w_IMU_world = filter.getState().getRotation() * (IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias()); // assuming bias is in body frame.
+    //     robot.transform_state_to_base(
+    //     filter.getState().getRotation(),
+    //     filter.getState().getPosition(),
+    //     filter.getState().getVelocity(),
+    //     w_IMU_world,
+    //     robot_state.Rotation,
+    //     robot_state.Position,
+    //     robot_state.Velocity,
+    //     robot_state.Angular_Velocity
+    // );
 
-    // robot_state.Rotation = filter.getState().getRotation();
-    // robot_state.Position = filter.getState().getPosition();
-    // robot_state.Velocity = filter.getState().getVelocity();
-    // robot_state.Angular_Velocity = IMU_Gyro[frame_count]; // assuming bias is in body frame.
+    robot_state.Rotation = filter.getState().getRotation();
+    robot_state.Position = filter.getState().getPosition();
+    robot_state.Velocity = filter.getState().getVelocity();
+    robot_state.Angular_Velocity = IMU_Gyro[frame_count]; // assuming bias is in body frame.
 
     
     // Populate remaining robot_state fields (sensor-specific and contact data)
@@ -804,11 +830,7 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
         dt = 0;
     }
 
-    // Keep frame_count in [0, 1] range for sliding window
-    frame_count++;
-    if(frame_count > 1) {
-        frame_count = 1;
-    }
+
 
     // Frame 1 information is now moved to frame 0
     sliding_window();
@@ -949,10 +971,10 @@ void InEKFilter::Onestep(){
 
     InEKF_SaveUtils::save_onestep_impl(*this, time_count); // save estimated and true states to SAVE_MATRIX
     
-    if(filter.getState().getVelocity().norm()>10 && dt!=0){
-       cout<<"Diverged!! from time "<<time_count<<endl;
-        dt = 0;
-    }
+    // if(filter.getState().getVelocity().norm()>10 && dt!=0){
+    //    cout<<"Diverged!! from time "<<time_count<<endl;
+        // dt = 0;
+    // }
     
     // Keep frame_count in [0, 1] range for sliding window
     frame_count++;

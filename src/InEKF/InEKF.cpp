@@ -166,8 +166,7 @@ void InEKF::Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector
     // JacobiSVD<Matrix3d> svd(R_pred, ComputeFullU|ComputeFullV); // Re-orthogonalization
     // R_pred = svd.matrixU() * svd.matrixV().transpose();
 
-    Eigen::Vector3d v_pred = v + (R*a + g_)*dt; // I could do it with the new R but whatever, 
-                                                //or even the average of the two but its more expensive
+    Eigen::Vector3d v_pred = v + (R*a + g_)*dt;
     Eigen::Vector3d p_pred = p + v*dt + 0.5*(R*a + g_)*dt*dt;
 
     // Set new state (bias has constant dynamics)
@@ -181,7 +180,7 @@ void InEKF::Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector
     int dimTheta = state_.dimTheta();
     Eigen::MatrixXd A = Eigen::MatrixXd::Zero(dimP,dimP); // they included bias terms in A
     // Inertial terms
-    A.block<3,3>(3,0) = skew(g_); // TODO: Efficiency could be improved by not computing the constant terms every time; just declare it in the header bro
+    A.block<3,3>(3,0) = skew(g_);
     A.block<3,3>(6,3) = Eigen::Matrix3d::Identity();
     // A.block<3,3>(6,0) = 0.5 * BasicFunctions_Estimator::Hat_so3(g_) * dt; //added by Z1
     // Bias terms
@@ -206,9 +205,6 @@ void InEKF::Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector
     Qk.block<3,3>(dimP-dimTheta+3,dimP-dimTheta+3) = noise_params_.getAccelerometerBiasCov();
 
 
-//    cout << "Qk: \n";
-//    cout << Qk << endl;
-
     // Discretization
     Eigen::MatrixXd I = Eigen::MatrixXd::Identity(dimP,dimP);
     // Eigen::MatrixXd Phi = I + A*dt; // Fast approximation of exp(A*dt). TODO: explore using the full exp() instead
@@ -219,30 +215,48 @@ void InEKF::Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector
     Eigen::MatrixXd Qk_hat = PhiAdj * Qk * PhiAdj.transpose() * dt;
     // Eigen::MatrixXd Qk_hat = Adj*dt * Qk * dt*Adj.transpose(); // Further simplified from PhiAdj*Qk*PhiAdj.transpose() to reduce computation time
     // Propagate Covariance
-    Eigen::MatrixXd P_pred = Phi * P * Phi.transpose() + Qk_hat;
+    Eigen::MatrixXd P_pred = (Phi * P * Phi.transpose() + Qk_hat);
+    // std::cout << "Q_hat: \n" << Qk_hat << std::endl;
 
     // Set new covariance
     state_.setP(P_pred);
-    printDebugState("After Propagation", state_, true);
+    // printDebugState("After Propagation", state_, true);
 
     return;
 }
 
 // Correct State: Right-Invariant Observation
 void InEKF::Correct(const Observation& obs) {
-    // Compute Kalman Gain
+
+
     Eigen::MatrixXd P = state_.getP();
+
+    // Eigen::MatrixXd N = 1e-2 * Eigen::MatrixXd::Identity(obs.N.rows(),obs.N.cols()); // Add small value to avoid singularity
+    // P = Eigen::MatrixXd::Identity(state_.dimP(),state_.dimP()); // Copy covariance
+
+
     Eigen::MatrixXd PHT = P * obs.H.transpose();
-    Eigen::MatrixXd S = obs.H * PHT + obs.N;
+    Eigen::MatrixXd S = (obs.H * PHT + obs.N); //* 0 + Eigen::MatrixXd::Identity(obs.N.rows(),obs.N.cols());
     Eigen::MatrixXd K = S.ldlt().solve(PHT.transpose()).transpose();
+    // Eigen::MatrixXd K = PHT * S.inverse(); // Kalman Gain
+    std::cout << "Kalman Gain K: \n" << K << std::endl;
 
     // Copy X along the diagonals if more than one measurement
     Eigen::MatrixXd BigX;
     state_.copyDiagX(obs.Y.rows()/state_.dimX(), BigX);
+
+    printDebugState("Before Correction", state_, true);
    
     // Compute correction terms
     Eigen::MatrixXd Z = BigX*obs.Y - obs.b;
+    // Z = Eigen::MatrixXd::Identity(Z.rows(),Z.cols()); // Add small value to avoid singularity
+    // std::cout << "Z: \n" << Z << std::endl;
+    // std::cout << "PI: \n" << obs.PI << std::endl;
+    std::cout << "Z: \n" << Z << std::endl;
+
+
     Eigen::VectorXd delta = K*obs.PI*Z;
+    std::cout << "delta: \n" << delta << std::endl;
     Eigen::MatrixXd dX = Exp_SEK3(delta.segment(0,delta.rows()-state_.dimTheta()));
     Eigen::VectorXd dTheta = delta.segment(delta.rows()-state_.dimTheta(), state_.dimTheta());
 
@@ -258,7 +272,7 @@ void InEKF::Correct(const Observation& obs) {
     Eigen::MatrixXd P_new = IKH * P * IKH.transpose()+ K*obs.N*K.transpose(); // Joseph update form
 
     state_.setP(P_new); 
-    printDebugState("After Correction", state_, true);
+    // printDebugState("After Correction", state_, true);
 }   
 
 // Create Observation from vector of landmark measurements

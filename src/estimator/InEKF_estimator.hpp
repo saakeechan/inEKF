@@ -116,7 +116,6 @@ public:
     inekf::InEKF filter;
 
     Eigen::Vector<double,6> imu_measurement;
-    Eigen::Vector<double,6> imu_measurement_prev;
     
     // Estimated State Values Window Buffer (dynamically allocated based on SLIDING_WINDOW_SIZE)
     std::vector<Vector3d>                   Position_s;

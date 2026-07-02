@@ -1,6 +1,7 @@
 
 #include <iostream>
 #include <string>
+#include <algorithm>
 
 #include <cmath> // for std::pow
 #include <chrono> // for timing
@@ -63,15 +64,45 @@ int main() {
 
     std::vector<double> step_times;
 
-        for (int time = 0; time < (estimator_IEKF.time_length - estimator_IEKF.start_index - 1); time++) {
+        for (int time = 1; time < (estimator_IEKF.time_length - estimator_IEKF.start_index); time++) {
             auto start = std::chrono::high_resolution_clock::now();
 
             estimator_IEKF.Onestep();  // Contact detection from torques
+            std::cout << "Loop " << time;
+            if (estimator_IEKF.csv_mode) {
+                const int csv_index = estimator_IEKF.start_index + estimator_IEKF.time_count;
+                if (csv_index >= 0 && csv_index < static_cast<int>(estimator_IEKF.CSVData.timestamp.size())) {
+                    std::cout << " timestep: " << estimator_IEKF.CSVData.timestamp[csv_index];
+                }
+            }
+            std::cout << " position: "
+                      << estimator_IEKF.robot_state.Position.transpose()
+                      << std::endl;
 
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
             step_times.push_back(elapsed.count());
 
+        }
+        std::cout << "Final robot state:" << std::endl;
+        std::cout << "  Position: " << estimator_IEKF.robot_state.Position.transpose() << std::endl;
+        std::cout << "  Velocity: " << estimator_IEKF.robot_state.Velocity.transpose() << std::endl;
+        std::cout << "  Orientation: " << estimator_IEKF.robot_state.Rotation << std::endl;
+        std::cout << "  Bias Gyro: " << std::scientific << std::setprecision(6) 
+                  << estimator_IEKF.robot_state.Bias_Gyro.transpose() << std::endl;
+        std::cout << "  Bias Acc: " << std::scientific << std::setprecision(6) 
+                  << estimator_IEKF.robot_state.Bias_Acc.transpose() << std::endl;
+        if (estimator_IEKF.csv_mode && !estimator_IEKF.CSVData.pos_x.empty() && !estimator_IEKF.CSVData.timestamp.empty()) {
+            const int last_gt_index = estimator_IEKF.time_length - 1;
+            Eigen::Vector3d gt_position;
+            gt_position << estimator_IEKF.CSVData.pos_x[last_gt_index],
+                           estimator_IEKF.CSVData.pos_y[last_gt_index],
+                           estimator_IEKF.CSVData.pos_z[last_gt_index];
+            std::cout << "  Ground truth position: " << gt_position.transpose() << std::endl;
+            std::cout << "  Time index: " << estimator_IEKF.CSVData.timestamp[last_gt_index] << std::endl;
+        } else {
+            std::cout << "  Ground truth position: unavailable" << std::endl;
+            std::cout << "  Time index: unavailable" << std::endl;
         }
         
         // Compute and print timing statistics
@@ -103,5 +134,3 @@ int main() {
 
     return 0;
 }
-
-
