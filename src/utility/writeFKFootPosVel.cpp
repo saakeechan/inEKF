@@ -182,13 +182,13 @@ int main() {
         // Compute forward kinematics
         robot.Forward_Kinematics(q, q_dot);
         
-        // Get foot positions (1 = left foot, 2 = right foot)
-        Eigen::Vector3d left_pos = robot.get_foot_position(1);
-        Eigen::Vector3d right_pos = robot.get_foot_position(2);
+        // Get foot positions (0 = left foot, 1 = right foot)
+        Eigen::Vector3d left_pos = robot.get_foot_position(0);
+        Eigen::Vector3d right_pos = robot.get_foot_position(1);
         
         // Get foot velocities
-        Eigen::Vector3d left_vel = robot.get_foot_velocity(1);
-        Eigen::Vector3d right_vel = robot.get_foot_velocity(2);
+        Eigen::Vector3d left_vel = robot.get_foot_velocity(0);
+        Eigen::Vector3d right_vel = robot.get_foot_velocity(1);
         
         // Store results
         left_foot_positions.push_back(left_pos);

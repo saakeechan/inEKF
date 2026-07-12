@@ -280,7 +280,7 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
             contactConstraints.emplace_back(k, CONTACT_t[init_frame][k]);
 
             Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
-            pose.block<3,1>(0,3) = robot.get_foot_position(k + 1);
+            pose.block<3,1>(0,3) = robot.get_foot_position(k);
 
             Eigen::Matrix<double,6,6> covariance = Eigen::Matrix<double,6,6>::Zero();
             covariance.block<3,3>(3,3) = Eigen::Matrix3d::Identity() * robot.cov_enc_const;
@@ -580,10 +580,10 @@ void InEKFilter::Propagate_and_Correct()
     for (int k=0; k<robot.num_legs; k++) {
         id = k;
         pose.block<3,3>(0,0) = Eigen::Matrix3d::Identity();
-        pose.block<3,1>(0,3) = robot.get_foot_position(k+1);
+        pose.block<3,1>(0,3) = robot.get_foot_position(k);
         
         // Extract Jacobian for this leg and compute measurement covariance
-        Eigen::MatrixXd FK_Jacobian_full = robot.get_foot_jacobian(k+1);
+        Eigen::MatrixXd FK_Jacobian_full = robot.get_foot_jacobian(k);
 
         // Extract only the active encoder columns (removes base DOFs + unused joints)
         Eigen::MatrixXd FK_Jacobian = robot.extract_active_encoder_jacobian(FK_Jacobian_full);
@@ -613,8 +613,8 @@ void InEKFilter::Propagate_and_Correct()
         // Note: dv_norm is either from NN (if contact_nn_enabled) or computed kinematically below
         for (int k=0; k<robot.num_legs; k++){
             d_v[frame_count].block(3*k,0,3,1) = filter.getState().getVelocity()
-                    + filter.getState().getRotation()*robot.get_foot_velocity(k+1)
-                    + filter.getState().getRotation()*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias())*robot.get_foot_position(k+1);
+                    + filter.getState().getRotation()*robot.get_foot_velocity(k)
+                    + filter.getState().getRotation()*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias())*robot.get_foot_position(k);
             
             // Only compute kinematic dv_norm if NN is not enabled or didn't run this frame
             if (!contact_nn_enabled || (time_count % static_cast<int>(0.02 / dt) != 0 && frame_count != 0)) {
@@ -658,7 +658,7 @@ void InEKFilter::Propagate_and_Correct()
     robot_state.Rotation = filter.getState().getRotation();
     robot_state.Position = filter.getState().getPosition();
     robot_state.Velocity = filter.getState().getVelocity();
-    robot_state.Angular_Velocity = IMU_Gyro[frame_count]; // assuming bias is in body frame.
+    robot_state.Angular_Velocity = IMU_Gyro[frame_count] - filter.getState().getGyroscopeBias(); // assuming bias is in body frame.
 
     
     // Populate remaining robot_state fields (sensor-specific and contact data)
@@ -869,25 +869,25 @@ void InEKFilter::Onestep(){
             // Store commanded velocity from CSV data
             CMD_V[frame_count] = Eigen::Vector3d(CSVData.CMD_V[j][0], CSVData.CMD_V[j][1], CSVData.CMD_V[j][2]);
 
-            // Compute sum of squared torques for each leg
-            for (int leg = 0; leg < robot.num_legs; ++leg) {
-                double sum_sq = 0.0;
-                for (int joint_idx : robot.Leg_indices_map[leg]) {
-                    sum_sq += MOTOR_TORQUES[frame_count](joint_idx) * MOTOR_TORQUES[frame_count](joint_idx);
-                }
-                torqueSumSquared[frame_count](leg) = sum_sq; // Average squared torque per joint for this leg
-            }
+            // // Compute sum of squared torques for each leg
+            // for (int leg = 0; leg < robot.num_legs; ++leg) {
+            //     double sum_sq = 0.0;
+            //     for (int joint_idx : robot.Leg_indices_map[leg]) {
+            //         sum_sq += MOTOR_TORQUES[frame_count](joint_idx) * MOTOR_TORQUES[frame_count](joint_idx);
+            //     }
+            //     torqueSumSquared[frame_count](leg) = sum_sq; // Average squared torque per joint for this leg
+            // }
 
 
-            // Calculate leg speeds by summing absolute encoder velocities for each leg
-            Eigen::VectorXd leg_speeds(robot.num_legs);
-            for (int i = 0; i < robot.num_legs; i++) {
-                double leg_speed_sum = 0.0;
-                for (int idx : robot.Leg_indices_map[i]) {
-                    leg_speed_sum += std::abs(ENCODERDOT[frame_count](idx));
-                }
-                leg_speeds(i) = leg_speed_sum;
-            }
+            // // Calculate leg speeds by summing absolute encoder velocities for each leg
+            // Eigen::VectorXd leg_speeds(robot.num_legs);
+            // for (int i = 0; i < robot.num_legs; i++) {
+            //     double leg_speed_sum = 0.0;
+            //     for (int idx : robot.Leg_indices_map[i]) {
+            //         leg_speed_sum += std::abs(ENCODERDOT[frame_count](idx));
+            //     }
+            //     leg_speeds(i) = leg_speed_sum;
+            // }
 
             // Extract NN features from current state (includes q, qd, acc, omega, p, v, tau)
             Eigen::VectorXd features = contact_nn->extract_nn_features(

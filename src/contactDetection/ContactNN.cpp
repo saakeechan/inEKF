@@ -179,7 +179,7 @@ Eigen::VectorXd ContactNN::extract_nn_features(
     
     // p: foot positions (left foot xyz, right foot xyz)
     for (int leg = 0; leg < robot.num_legs; ++leg) {
-        Eigen::Vector3d foot_pos = robot.get_foot_position(leg + 1);
+        Eigen::Vector3d foot_pos = robot.get_foot_position(leg);
         features(idx++) = foot_pos(0);
         features(idx++) = foot_pos(1);
         features(idx++) = foot_pos(2);
@@ -187,7 +187,7 @@ Eigen::VectorXd ContactNN::extract_nn_features(
     
     // v: foot velocities (left foot xyz, right foot xyz)
     for (int leg = 0; leg < robot.num_legs; ++leg) {
-        Eigen::Vector3d foot_vel = robot.get_foot_velocity(leg + 1);
+        Eigen::Vector3d foot_vel = robot.get_foot_velocity(leg);
         features(idx++) = foot_vel(0);
         features(idx++) = foot_vel(1);
         features(idx++) = foot_vel(2);

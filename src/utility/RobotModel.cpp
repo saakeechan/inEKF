@@ -308,16 +308,16 @@ Eigen::Vector3d RobotModel::get_foot_position(int i_leg) const {
         std::exit(EXIT_FAILURE);
     }
     
-    if (i_leg < 1 || i_leg > static_cast<int>(foot_frame_ids.size())) {
-        std::cerr << "Error: Invalid leg index " << i_leg << ". Must be between 1 and " 
-                  << foot_frame_ids.size() << std::endl;
+    if (i_leg < 0 || i_leg >= static_cast<int>(foot_frame_ids.size())) {
+        std::cerr << "Error: Invalid leg index " << i_leg << ". Must be between 0 and "
+                  << foot_frame_ids.size() - 1 << std::endl;
         std::exit(EXIT_FAILURE);
     }
     
     // Get foot position relative to IMU frame
     // Formula: foot_in_imu = inv(SE3_imu) * SE3_foot
     const pinocchio::SE3& imu_placement = pin_data.oMf[imu_frame_id];
-    const pinocchio::SE3& foot_placement = pin_data.oMf[foot_frame_ids[i_leg - 1]];
+    const pinocchio::SE3& foot_placement = pin_data.oMf[foot_frame_ids[i_leg]];
     
     // Use actInv for efficient computation: imu.actInv(foot) = inv(imu) * foot
     pinocchio::SE3 foot_relative_to_imu = imu_placement.actInv(foot_placement);
@@ -331,9 +331,9 @@ Eigen::MatrixXd RobotModel::get_foot_jacobian(int i_leg) const {
         std::exit(EXIT_FAILURE);
     }
     
-    if (i_leg < 1 || i_leg > static_cast<int>(foot_frame_ids.size())) {
-        std::cerr << "Error: Invalid leg index " << i_leg << ". Must be between 1 and " 
-                  << foot_frame_ids.size() << std::endl;
+    if (i_leg < 0 || i_leg >= static_cast<int>(foot_frame_ids.size())) {
+        std::cerr << "Error: Invalid leg index " << i_leg << ". Must be between 0 and "
+                  << foot_frame_ids.size() - 1 << std::endl;
         std::exit(EXIT_FAILURE);
     }
     
@@ -342,7 +342,7 @@ Eigen::MatrixXd RobotModel::get_foot_jacobian(int i_leg) const {
     pinocchio::getFrameJacobian(
         pin_model,
         const_cast<pinocchio::Data&>(pin_data),
-        foot_frame_ids[i_leg - 1],
+        foot_frame_ids[i_leg],
         pinocchio::LOCAL_WORLD_ALIGNED, // Get Jacobian in World frame to compute relative Jacobian with IMU
         J_foot_full
     );
@@ -372,9 +372,9 @@ Eigen::Vector3d RobotModel::get_foot_velocity(int i_leg) const {
         std::exit(EXIT_FAILURE);
     }
     
-    if (i_leg < 1 || i_leg > static_cast<int>(foot_frame_ids.size())) {
-        std::cerr << "Error: Invalid leg index " << i_leg << ". Must be between 1 and " 
-                  << foot_frame_ids.size() << std::endl;
+    if (i_leg < 0 || i_leg >= static_cast<int>(foot_frame_ids.size())) {
+        std::cerr << "Error: Invalid leg index " << i_leg << ". Must be between 0 and "
+                  << foot_frame_ids.size() - 1 << std::endl;
         std::exit(EXIT_FAILURE);
     }
     
@@ -382,7 +382,7 @@ Eigen::Vector3d RobotModel::get_foot_velocity(int i_leg) const {
     pinocchio::Motion foot_velocity_Base = pinocchio::getFrameVelocity(
         pin_model,
         const_cast<pinocchio::Data&>(pin_data),
-        foot_frame_ids[i_leg - 1],
+        foot_frame_ids[i_leg],
         pinocchio::LOCAL_WORLD_ALIGNED
     );
     
@@ -413,13 +413,13 @@ Eigen::Vector3d RobotModel::get_foot_velocity(int i_leg) const {
 //         std::exit(EXIT_FAILURE);
 //     }
 
-//     if (i_leg < 1 || i_leg > static_cast<int>(foot_frame_ids.size())) {
-//         std::cerr << "Error: Invalid leg index " << i_leg << ". Must be between 1 and "
-//                   << foot_frame_ids.size() << std::endl;
+//     if (i_leg < 0 || i_leg >= static_cast<int>(foot_frame_ids.size())) {
+//         std::cerr << "Error: Invalid leg index " << i_leg << ". Must be between 0 and "
+//                   << foot_frame_ids.size() - 1 << std::endl;
 //         std::exit(EXIT_FAILURE);
 //     }
 
-//     const auto foot_id = foot_frame_ids[i_leg - 1];
+//     const auto foot_id = foot_frame_ids[i_leg];
 
 //     pinocchio::Motion v_foot_W = pinocchio::getFrameVelocity(
 //         pin_model,

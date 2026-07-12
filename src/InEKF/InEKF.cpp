@@ -238,25 +238,20 @@ void InEKF::Correct(const Observation& obs) {
     Eigen::MatrixXd PHT = P * obs.H.transpose();
     Eigen::MatrixXd S = (obs.H * PHT + obs.N); //* 0 + Eigen::MatrixXd::Identity(obs.N.rows(),obs.N.cols());
     Eigen::MatrixXd K = S.ldlt().solve(PHT.transpose()).transpose();
-    // Eigen::MatrixXd K = PHT * S.inverse(); // Kalman Gain
-    std::cout << "Kalman Gain K: \n" << K << std::endl;
+
 
     // Copy X along the diagonals if more than one measurement
     Eigen::MatrixXd BigX;
     state_.copyDiagX(obs.Y.rows()/state_.dimX(), BigX);
 
-    printDebugState("Before Correction", state_, true);
+    // printDebugState("Before Correction", state_, true);
    
     // Compute correction terms
     Eigen::MatrixXd Z = BigX*obs.Y - obs.b;
-    // Z = Eigen::MatrixXd::Identity(Z.rows(),Z.cols()); // Add small value to avoid singularity
-    // std::cout << "Z: \n" << Z << std::endl;
-    // std::cout << "PI: \n" << obs.PI << std::endl;
-    std::cout << "Z: \n" << Z << std::endl;
 
 
     Eigen::VectorXd delta = K*obs.PI*Z;
-    std::cout << "delta: \n" << delta << std::endl;
+
     Eigen::MatrixXd dX = Exp_SEK3(delta.segment(0,delta.rows()-state_.dimTheta()));
     Eigen::VectorXd dTheta = delta.segment(delta.rows()-state_.dimTheta(), state_.dimTheta());
 

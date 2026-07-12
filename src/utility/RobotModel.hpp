@@ -161,21 +161,21 @@ public:
     
     /**
      * @brief Get foot position after calling Forward_Kinematics
-     * @param i_leg Leg index (1-indexed)
+     * @param i_leg Leg index (0-indexed)
      * @return 3D position vector of the foot
      */
     Eigen::Vector3d get_foot_position(int i_leg) const;
     
     /**
      * @brief Get foot Jacobian after calling Forward_Kinematics
-     * @param i_leg Leg index (1-indexed)
+     * @param i_leg Leg index (0-indexed)
      * @return Jacobian matrix for the foot frame
      */
     Eigen::MatrixXd get_foot_jacobian(int i_leg) const;
 
     /**
      * @brief Get foot velocity after calling Forward_Kinematics
-     * @param i_leg Leg index (1-indexed)
+     * @param i_leg Leg index (0-indexed)
      * @return 3D velocity vector of the foot
      */
     Eigen::Vector3d get_foot_velocity(int i_leg) const;
