@@ -68,16 +68,16 @@ int main() {
             auto start = std::chrono::high_resolution_clock::now();
 
             estimator_IEKF.Onestep();  // Contact detection from torques
-            std::cout << "Loop " << time;
+            // std::cout << "Loop " << time;
             if (estimator_IEKF.csv_mode) {
                 const int csv_index = estimator_IEKF.start_index + estimator_IEKF.time_count;
                 if (csv_index >= 0 && csv_index < static_cast<int>(estimator_IEKF.CSVData.timestamp.size())) {
                     // std::cout << " timestep: " << estimator_IEKF.CSVData.timestamp[csv_index];
                 }
             }
-            std::cout << " position: "
-                      << estimator_IEKF.robot_state.Position.transpose()
-                      << std::endl;
+            // std::cout << " position: "
+            //           << estimator_IEKF.robot_state.Position.transpose()
+            //           << std::endl;
 
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;

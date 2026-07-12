@@ -430,7 +430,12 @@ void InEKF::CorrectLandmarks(const vectorLandmarks& measured_landmarks) {
 }
 
 // Correct state using kinematics measured between imu and contact point
-void InEKF::CorrectKinematics(const vectorKinematics& measured_kinematics, bool flag) {
+void InEKF::CorrectKinematics(const std::string& mode, const vectorKinematics& measured_kinematics, bool flag) {
+    if (mode != "pkm" && mode != "vkm") {
+        std::cerr << "Unknown kinematics mode: " << mode << std::endl;
+        return;
+    }
+
 #if INEKF_USE_MUTEX
     lock_guard<mutex> mlock(estimated_contacts_mutex_);
 #endif
@@ -474,6 +479,75 @@ void InEKF::CorrectKinematics(const vectorKinematics& measured_kinematics, bool 
             int dimX = state_.dimX();
             int dimP = state_.dimP();
             int startIndex;
+
+            if (mode == "vkm") {
+                if (it->use_world_foot_velocity) {
+                    // NN VKM: direct world-frame foot-velocity measurement.
+                    startIndex = Y.rows();
+                    Y.conservativeResize(startIndex+dimX, Eigen::NoChange);
+                    Y.segment(startIndex,dimX) = Eigen::VectorXd::Zero(dimX);
+                    Y(startIndex+3) = 1;
+
+                    startIndex = b.rows();
+                    b.conservativeResize(startIndex+dimX, Eigen::NoChange);
+                    b.segment(startIndex,dimX) = Eigen::VectorXd::Zero(dimX);
+                    b.segment(startIndex,3) = it->world_foot_velocity;
+
+                    startIndex = H.rows();
+                    H.conservativeResize(startIndex+3, dimP);
+                    H.block(startIndex,0,3,dimP) = Eigen::MatrixXd::Zero(3,dimP);
+                    H.block(startIndex,3,3,3) = -Eigen::Matrix3d::Identity();
+
+                    startIndex = N.rows();
+                    N.conservativeResize(startIndex+3, startIndex+3);
+                    N.block(startIndex,0,3,startIndex) = Eigen::MatrixXd::Zero(3,startIndex);
+                    N.block(0,startIndex,startIndex,3) = Eigen::MatrixXd::Zero(startIndex,3);
+                    N.block(startIndex,startIndex,3,3) = it->covariance.block<3,3>(0,0);
+
+                    startIndex = PI.rows();
+                    int startIndex2 = PI.cols();
+                    PI.conservativeResize(startIndex+3, startIndex2+dimX);
+                    PI.block(startIndex,0,3,startIndex2) = Eigen::MatrixXd::Zero(3,startIndex2);
+                    PI.block(0,startIndex2,startIndex,dimX) = Eigen::MatrixXd::Zero(startIndex,dimX);
+                    PI.block(startIndex,startIndex2,3,dimX) = Eigen::MatrixXd::Zero(3,dimX);
+                    PI.block(startIndex,startIndex2,3,3) = Eigen::Matrix3d::Identity();
+                    continue;
+                }
+
+                // r_v = R * (-(omega - b_g) x p_BF - v_F/B) - v.
+                const Eigen::Vector3d y_v = -skew(it->angular_velocity - state_.getGyroscopeBias()) * it->pose.block<3,1>(0,3) - it->foot_velocity;
+
+                startIndex = Y.rows();
+                Y.conservativeResize(startIndex+dimX, Eigen::NoChange);
+                Y.segment(startIndex,dimX) = Eigen::VectorXd::Zero(dimX);
+                Y.segment(startIndex,3) = y_v;
+                Y(startIndex+3) = -1;
+
+                startIndex = b.rows();
+                b.conservativeResize(startIndex+dimX, Eigen::NoChange);
+                b.segment(startIndex,dimX) = Eigen::VectorXd::Zero(dimX);
+                b(startIndex+3) = -1;
+
+                startIndex = H.rows();
+                H.conservativeResize(startIndex+3, dimP);
+                H.block(startIndex,0,3,dimP) = Eigen::MatrixXd::Zero(3,dimP);
+                H.block(startIndex,3,3,3) = -Eigen::Matrix3d::Identity();
+
+                startIndex = N.rows();
+                N.conservativeResize(startIndex+3, startIndex+3);
+                N.block(startIndex,0,3,startIndex) = Eigen::MatrixXd::Zero(3,startIndex);
+                N.block(0,startIndex,startIndex,3) = Eigen::MatrixXd::Zero(startIndex,3);
+                N.block(startIndex,startIndex,3,3) = R * it->covariance.block<3,3>(0,0) * R.transpose();
+
+                startIndex = PI.rows();
+                int startIndex2 = PI.cols();
+                PI.conservativeResize(startIndex+3, startIndex2+dimX);
+                PI.block(startIndex,0,3,startIndex2) = Eigen::MatrixXd::Zero(3,startIndex2);
+                PI.block(0,startIndex2,startIndex,dimX) = Eigen::MatrixXd::Zero(startIndex,dimX);
+                PI.block(startIndex,startIndex2,3,dimX) = Eigen::MatrixXd::Zero(3,dimX);
+                PI.block(startIndex,startIndex2,3,3) = Eigen::Matrix3d::Identity();
+                continue;
+            }
 
             // Fill out Y Selector matrix to access X to itself (basically X has both the measurements and IMU readings both in it)
             startIndex = Y.rows();

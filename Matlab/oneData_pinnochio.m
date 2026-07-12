@@ -2,7 +2,7 @@
 
 clear; close all; clc;
 
-filePath = "/home/saaketh/Research/inEKF/results/2026-07-01_23-31-11.csv"
+filePath = "/home/saaketh/Research/inEKF/results/2026-07-12_20-51-09.csv"
 savePlots = false;
 
 % --- Read the file ---
@@ -26,6 +26,8 @@ t = t .* dt;
 % --- Contact point velocity magnitudes ---
 d1_v = result1.GT_dv_norm_leg1(1:finish-1);
 d2_v = result1.GT_dv_norm_leg2(1:finish-1);
+est_d1_v = result1.EST_dv_norm_leg1(1:finish-1);
+est_d2_v = result1.EST_dv_norm_leg2(1:finish-1);
 contact_leg1 = result1.GT_Contact_leg1(start:finish-1);
 contact_leg2 = result1.GT_Contact_leg2(start:finish-1);
 
@@ -41,8 +43,8 @@ set(gcf, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
 set(gcf, 'Name', 'Per-Leg Contact Regions and dV Norm', 'NumberTitle', 'off');
 
 leg_data = {
-    contact_leg1, d1_v(start:finish-1), 'Left Leg';
-    contact_leg2, d2_v(start:finish-1), 'Right Leg'
+    contact_leg1, d1_v(start:finish-1), est_d1_v(start:finish-1), 'Left Leg';
+    contact_leg2, d2_v(start:finish-1), est_d2_v(start:finish-1), 'Right Leg'
 };
 
 for subplot_idx = 1:2
@@ -52,10 +54,11 @@ for subplot_idx = 1:2
 
     contact_mask = logical(leg_data{subplot_idx, 1});
     dv_series = leg_data{subplot_idx, 2};
-    title_text = leg_data{subplot_idx, 3};
+    est_dv_series = leg_data{subplot_idx, 3};
+    title_text = leg_data{subplot_idx, 4};
 
-    y_min = min([0; dv_series(:)]);
-    y_max = max(dv_series(:));
+    y_min = min([0; dv_series(:); est_dv_series(:)]);
+    y_max = max([dv_series(:); est_dv_series(:)]);
     if y_max <= y_min
         y_max = y_min + 1;
     end
@@ -85,13 +88,14 @@ for subplot_idx = 1:2
              'r', 'FaceAlpha', 0.15, 'EdgeColor', 'none', 'HandleVisibility', 'off');
     end
 
-    hDv = plot(t_plot, dv_series, 'k', 'LineWidth', 0.8, 'DisplayName', 'dV Norm');
+    hDv = plot(t_plot, dv_series, 'k', 'LineWidth', 0.8, 'DisplayName', 'GT dV Norm');
+    hEstDv = plot(t_plot, est_dv_series, '--b', 'LineWidth', 1.2, 'DisplayName', 'Estimated dV Norm');
     ylim([y_min y_max]);
 
     title([title_text ' Contact and dV Norm']);
     xlabel('Time [s]');
     ylabel('Velocity magnitude [m/s]');
-    legend([hContact, hDv], 'Location', 'best');
+    legend([hContact, hDv, hEstDv], 'Location', 'best');
 end
 
 sgtitle('Per-Leg Contact Regions and dV Norm');

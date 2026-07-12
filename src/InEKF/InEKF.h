@@ -15,6 +15,7 @@
 #define INEKF_H 
 #include <eigen3/Eigen/Dense>
 #include <iostream>
+#include <string>
 #include <vector>
 #include <map>
 #if INEKF_USE_MUTEX
@@ -30,11 +31,17 @@ namespace inekf {
 class Kinematics {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-        Kinematics(int id_in, Eigen::Matrix4d pose_in, Eigen::Matrix<double,6,6> covariance_in) : id(id_in), pose(pose_in), covariance(covariance_in) { }
+        Kinematics(int id_in, Eigen::Matrix4d pose_in, Eigen::Matrix<double,6,6> covariance_in) : id(id_in), pose(pose_in), covariance(covariance_in), foot_velocity(Eigen::Vector3d::Zero()), angular_velocity(Eigen::Vector3d::Zero()), world_foot_velocity(Eigen::Vector3d::Zero()), use_world_foot_velocity(false) { }
+        Kinematics(int id_in, Eigen::Matrix4d pose_in, Eigen::Matrix<double,6,6> covariance_in, Eigen::Vector3d foot_velocity_in, Eigen::Vector3d angular_velocity_in) : id(id_in), pose(pose_in), covariance(covariance_in), foot_velocity(foot_velocity_in), angular_velocity(angular_velocity_in), world_foot_velocity(Eigen::Vector3d::Zero()), use_world_foot_velocity(false) { }
+        Kinematics(int id_in, Eigen::Matrix4d pose_in, Eigen::Matrix<double,6,6> covariance_in, Eigen::Vector3d world_foot_velocity_in, bool use_world_foot_velocity_in) : id(id_in), pose(pose_in), covariance(covariance_in), foot_velocity(Eigen::Vector3d::Zero()), angular_velocity(Eigen::Vector3d::Zero()), world_foot_velocity(world_foot_velocity_in), use_world_foot_velocity(use_world_foot_velocity_in) { }
 
         int id;
         Eigen::Matrix4d pose;
         Eigen::Matrix<double,6,6> covariance;
+        Eigen::Vector3d foot_velocity;    // ^B v_{F_i/B}
+        Eigen::Vector3d angular_velocity; // Raw body-frame gyro measurement
+        Eigen::Vector3d world_foot_velocity;
+        bool use_world_foot_velocity;
 };
 
 class Landmark {
@@ -93,7 +100,7 @@ class InEKF {
         void Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector<double> contact_cov_array);
         void Correct(const Observation& obs);
         void CorrectLandmarks(const vectorLandmarks& measured_landmarks);
-        void CorrectKinematics(const vectorKinematics& measured_kinematics, bool flag);
+        void CorrectKinematics(const std::string& mode, const vectorKinematics& measured_kinematics, bool flag);
         void Reset();
 
 

@@ -1,7 +1,7 @@
 /* ----------------------------------------------------------------------------
  * Contact Neural Network Estimator Implementation
  * Handles neural network-based contact detection functionality
- * Note: NN outputs contact predictions only; foot velocities are computed via kinematics
+ * Note: NN outputs contact predictions and world-frame foot velocities
  * -------------------------------------------------------------------------- */
 
 #include "ContactNN.hpp"
@@ -36,7 +36,7 @@ void ContactNN::load_contact_model(const std::string& model_path) {
         input_name_storage = input_name_ptr.get();
         input_shape = {1, NN_WINDOW_SIZE, NN_FEATURE_SIZE};
         
-        // Auto-detect output names (expecting 2 outputs: contact_logits and foot_velocities)
+        // Auto-detect the five exported model outputs.
         size_t num_outputs = contact_model_session->GetOutputCount();
         std::cout << "Model has " << num_outputs << " outputs" << std::endl;
         
@@ -67,10 +67,10 @@ void ContactNN::load_contact_model(const std::string& model_path) {
     }
 }
 
-std::pair<Eigen::VectorXd, Eigen::VectorXd> ContactNN::predict_contact(const std::vector<float>& input_features) {
+ContactNN::Prediction ContactNN::predict_contact(const std::vector<float>& input_features) {
     if (!contact_nn_enabled) {
         std::cerr << "Warning: Contact model not loaded. Using default contact detection." << std::endl;
-        return {Eigen::VectorXd::Zero(robot.num_legs), Eigen::VectorXd::Zero(robot.num_legs)};
+        return {Eigen::VectorXd::Zero(robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs)};
     }
     
     try {
@@ -83,10 +83,7 @@ std::pair<Eigen::VectorXd, Eigen::VectorXd> ContactNN::predict_contact(const std
             input_shape.size()
         );
         
-        // Run inference
-        // Model outputs:
-        // - contact_logits: [batch_size, 1] = [1, 1] with logit for left leg (current timestep)
-        // - foot_velocities: [batch_size, 1] = [1, 1] with velocity norm for left leg (current timestep)
+        // Expected outputs: mean_seq, mean_last, cov_seq, cov_last, contact_logits.
         auto output_tensors = contact_model_session->Run(
             Ort::RunOptions{nullptr},
             input_names.data(),
@@ -96,10 +93,20 @@ std::pair<Eigen::VectorXd, Eigen::VectorXd> ContactNN::predict_contact(const std
             output_names.size()
         );
         
-        // Get contact logits from first output
-        float* contact_logits_data = output_tensors[2].GetTensorMutableData<float>();
+        if (output_tensors.size() != 5) {
+            std::cerr << "Expected mean_seq, mean_last, cov_seq, cov_last, and contact_logits from the NN" << std::endl;
+            return {Eigen::VectorXd::Zero(robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs)};
+        }
+
+        // contact_logits is [1, num_legs].
+        const auto contact_shape = output_tensors[4].GetTensorTypeAndShapeInfo().GetShape();
+        if (contact_shape.size() != 2 || contact_shape[0] != 1 || contact_shape[1] != robot.num_legs) {
+            std::cerr << "Expected NN contact_logits shape [1, " << robot.num_legs << "]" << std::endl;
+            return {Eigen::VectorXd::Zero(robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs)};
+        }
+        float* contact_logits_data = output_tensors[4].GetTensorMutableData<float>();
         
-        // Output shape is [batch_size, 1] = [1, 1] (left leg only, current timestep)
+        // contact_output shape is [batch_size, num_legs].
         // Apply sigmoid to convert logits to probabilities [0, 1]
         Eigen::VectorXd contact_predictions = Eigen::VectorXd::Zero(robot.num_legs);
         for (int leg = 0; leg < robot.num_legs; ++leg) {
@@ -109,20 +116,37 @@ std::pair<Eigen::VectorXd, Eigen::VectorXd> ContactNN::predict_contact(const std
             // std::cout << "Leg " << leg << " - Logit: " << logit << ", Prob: " << prob << std::endl;
         }
         
-        // Get foot velocity norms from second output
+        // mean_last and cov_last are [batch_size, num_legs, 3]. ONNX stores them
+        // contiguously as [left_x, left_y, left_z, right_x, right_y, right_z].
+        const auto velocity_shape = output_tensors[1].GetTensorTypeAndShapeInfo().GetShape();
+        const auto covariance_shape = output_tensors[3].GetTensorTypeAndShapeInfo().GetShape();
+        const size_t expected_velocity_elements = 3 * robot.num_legs;
+        if (velocity_shape.size() != 3 || velocity_shape[0] != 1 ||
+            velocity_shape[1] != robot.num_legs || velocity_shape[2] != 3 ||
+            covariance_shape != velocity_shape) {
+            std::cerr << "Expected NN mean_last and cov_last shapes [1, " << robot.num_legs
+                      << ", 3]" << std::endl;
+            return {contact_predictions, Eigen::VectorXd::Zero(expected_velocity_elements), Eigen::VectorXd::Zero(expected_velocity_elements)};
+        }
         float* foot_velocity_data = output_tensors[1].GetTensorMutableData<float>();
-        
-        // Output shape is [batch_size, 1] = [1, 1] (left leg only, current timestep)
-        Eigen::VectorXd foot_velocities = Eigen::VectorXd::Zero(robot.num_legs);
+        float* foot_covariance_data = output_tensors[3].GetTensorMutableData<float>();
+        Eigen::VectorXd foot_velocities = Eigen::VectorXd::Zero(3 * robot.num_legs);
+        Eigen::VectorXd foot_velocity_variances = Eigen::VectorXd::Zero(3 * robot.num_legs);
         for (int leg = 0; leg < robot.num_legs; ++leg) {
-            foot_velocities(leg) = foot_velocity_data[leg];  // Current timestep for each leg
+            foot_velocities.segment<3>(3 * leg) = Eigen::Map<const Eigen::Vector3f>(foot_velocity_data + 3 * leg).cast<double>();
+            foot_velocity_variances.segment<3>(3 * leg) = Eigen::Map<const Eigen::Vector3f>(foot_covariance_data + 3 * leg).cast<double>();
+            if (!foot_velocity_variances.segment<3>(3 * leg).allFinite() ||
+                (foot_velocity_variances.segment<3>(3 * leg).array() <= 0.0).any()) {
+                std::cerr << "NN cov_last must contain finite positive diagonal variances" << std::endl;
+                return {contact_predictions, foot_velocities, Eigen::VectorXd::Zero(expected_velocity_elements)};
+            }
         }
         
-        return {contact_predictions, foot_velocities};
+        return {contact_predictions, foot_velocities, foot_velocity_variances};
         
     } catch (const Ort::Exception& e) {
         std::cerr << "Error during ONNX contact prediction: " << e.what() << std::endl;
-        return {Eigen::VectorXd::Zero(robot.num_legs), Eigen::VectorXd::Zero(robot.num_legs)};
+        return {Eigen::VectorXd::Zero(robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs)};
     }
 }
 
@@ -273,7 +297,7 @@ std::vector<float> ContactNN::create_nn_input_tensor() {
     return input_tensor;
 }
 
-std::pair<Eigen::VectorXd, Eigen::VectorXd> ContactNN::nn_predict_contact() {
+ContactNN::Prediction ContactNN::nn_predict_contact() {
     // Create input tensor from buffer (returns flattened float vector)
     auto input_features = create_nn_input_tensor();
     

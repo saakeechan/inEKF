@@ -126,6 +126,8 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
     MOTOR_POS_CMD.resize(SLIDING_WINDOW_SIZE);
     CMD_V.resize(SLIDING_WINDOW_SIZE);
     torqueSumSquared.resize(SLIDING_WINDOW_SIZE);
+    NN_foot_velocity_world = Eigen::VectorXd::Zero(3 * robot.num_legs);
+    NN_foot_velocity_variance_world = Eigen::VectorXd::Zero(3 * robot.num_legs);
     
     // Initialize dv_history for tracking dv norms over time
     dv_history.clear();
@@ -283,13 +285,14 @@ void InEKFilter::Initialize(double dt_arg, Eigen::Matrix<double,12,1> cov_val_se
             pose.block<3,1>(0,3) = robot.get_foot_position(k);
 
             Eigen::Matrix<double,6,6> covariance = Eigen::Matrix<double,6,6>::Zero();
+            covariance.block<3,3>(0,0) = Eigen::Matrix3d::Identity() * robot.cov_enc_const;
             covariance.block<3,3>(3,3) = Eigen::Matrix3d::Identity() * robot.cov_enc_const;
 
             measured_kinematics.emplace_back(k, pose, covariance);
         }
 
         filter.setContacts(contactConstraints);
-        filter.CorrectKinematics(measured_kinematics, false);
+        filter.CorrectKinematics(kinematics_mode, measured_kinematics, false);
     }
 
    cout << "Noise parameters are initialized to: \n";
@@ -308,6 +311,8 @@ void InEKFilter::InitializeFromYAML(const std::string& config_path) {
     // Load estimator parameters
     int sliding_window_size = config["sliding_window_size"].as<int>();
     double dt_val = config["dt"].as<double>();
+
+    kinematics_mode = config["kinematics_mode"].as<std::string>();
     
     // Load covariance exponents
     auto cov_exp = config["covariance_exponents"];
@@ -572,7 +577,7 @@ void InEKFilter::Propagate_and_Correct()
 
     int id;
     Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
-    Eigen::Matrix<double,6,6> covariance;
+    Eigen::Matrix<double,6,6> covariance = Eigen::Matrix<double,6,6>::Zero();
     inekf::vectorKinematics measured_kinematics;
     
 
@@ -597,13 +602,23 @@ void InEKFilter::Propagate_and_Correct()
             jac_norm_sq(axis) = FK_Jacobian.row(axis).squaredNorm();
         }
         // covariance.block(3,3, 3,3) = jac_norm_sq.asDiagonal() * robot.cov_enc_const;
+        covariance.block<3,3>(0,0) = Eigen::Matrix3d::Identity() * robot.cov_enc_const;
         covariance.block(3,3, 3,3) = Eigen::Matrix3d::Identity() * robot.cov_enc_const; // Use contact covariance for kinematic measurement noise
 
-        inekf::Kinematics frame(id, pose, covariance);
-        measured_kinematics.push_back(frame);
+        if (contact_nn_enabled && kinematics_mode == "vkm") {
+            const Eigen::Vector3d nn_variance = NN_foot_velocity_variance_world.segment<3>(3 * k);
+            if (nn_variance.allFinite() && (nn_variance.array() > 0.0).all()) {
+                covariance.block<3,3>(0,0) = nn_variance.asDiagonal();
+            }
+            inekf::Kinematics frame(id, pose, covariance, NN_foot_velocity_world.segment<3>(3 * k), true);
+            measured_kinematics.push_back(frame);
+        } else {
+            inekf::Kinematics frame(id, pose, covariance, robot.get_foot_velocity(k), IMU_Gyro[frame_count]);
+            measured_kinematics.push_back(frame);
+        }
     }
 
-    filter.CorrectKinematics(measured_kinematics, true);
+    filter.CorrectKinematics(kinematics_mode, measured_kinematics, true);
     
 
         // Store dv norms for this time step
@@ -760,8 +775,8 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
         // Update sliding window buffer with new features
         contact_nn->update_nn_feature_buffer(features);
         
-        // Predict contacts using neural network (returns contacts and foot velocities)
-        auto [predicted_contacts, predicted_foot_velocities] = contact_nn->nn_predict_contact();
+        // Predict contacts, world-frame foot velocities, and their diagonal variances.
+        auto [predicted_contacts, predicted_foot_velocities, predicted_foot_velocity_variances] = contact_nn->nn_predict_contact();
         
         // Implement hysteresis with probability thresholds (after sigmoid)
         for (int leg = 0; leg < robot.num_legs; ++leg) {
@@ -776,10 +791,11 @@ void InEKFilter::Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &mo
             }
         }
         
-        // Store NN-predicted foot velocities
-        // predicted_foot_velocities(0) = left leg dv_norm
-        // predicted_foot_velocities(1) = right leg dv_norm
-        dv_norm[frame_count] = predicted_foot_velocities;
+        NN_foot_velocity_world = predicted_foot_velocities;
+        NN_foot_velocity_variance_world = predicted_foot_velocity_variances;
+        for (int leg = 0; leg < robot.num_legs; ++leg) {
+            dv_norm[frame_count](leg) = predicted_foot_velocities.segment<3>(3 * leg).norm();
+        }
     }
     else {
 
@@ -903,8 +919,8 @@ void InEKFilter::Onestep(){
             // Update sliding window buffer with new features
             contact_nn->update_nn_feature_buffer(features);
             
-            // Predict contacts using ONNX Runtime model (velocity output is ignored)
-            auto [predicted_contacts, predicted_foot_velocities] = contact_nn->nn_predict_contact();
+            // Predict contacts, world-frame foot velocities, and their diagonal variances.
+            auto [predicted_contacts, predicted_foot_velocities, predicted_foot_velocity_variances] = contact_nn->nn_predict_contact();
             // Implement hysteresis with probability thresholds (after sigmoid)
             // If probability is above 0.5 then contact is true, otherwise false
             for (int leg = 0; leg < robot.num_legs; ++leg) {
@@ -922,12 +938,18 @@ void InEKFilter::Onestep(){
                 }
             }
 
-            dv_norm[frame_count] = predicted_foot_velocities; // Store NN-predicted foot velocities for potential future use/analysis
+            NN_foot_velocity_world = predicted_foot_velocities;
+            NN_foot_velocity_variance_world = predicted_foot_velocity_variances;
+            for (int leg = 0; leg < robot.num_legs; ++leg) {
+                dv_norm[frame_count](leg) = predicted_foot_velocities.segment<3>(3 * leg).norm();
+            }
+            CONTACT_t[frame_count] = CSVData.contact_state[j];
 
         } else {
             // Use previous frame's contact detection result
-            CONTACT_t[frame_count] = CONTACT_t[frame_count - 1];
+            // CONTACT_t[frame_count] = CONTACT_t[frame_count - 1];
             // Note: dv_norm is computed in Propagate_and_Correct() using kinematics
+            CONTACT_t[frame_count] = CSVData.contact_state[j];
         }
     }
     else

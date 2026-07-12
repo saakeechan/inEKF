@@ -4,6 +4,7 @@
 
 IMAGE_NAME="inekf"
 CONTAINER_NAME="inekf-container"
+BUILD_VOLUME="${IMAGE_NAME}-build"
 HOST_UID=$(id -u)
 HOST_GID=$(id -g)
 
@@ -39,9 +40,18 @@ function build_image() {
     fi
 }
 
+function ensure_build_volume() {
+    docker volume create ${BUILD_VOLUME} >/dev/null
+    docker run --rm \
+        -v ${BUILD_VOLUME}:/workspace/build \
+        ${IMAGE_NAME} \
+        chown -R ${HOST_UID}:${HOST_GID} /workspace/build
+}
+
 function run_container() {
     echo -e "${BLUE}Running Docker container: ${CONTAINER_NAME}${NC}"
     mkdir -p .ccache && chmod 777 .ccache
+    ensure_build_volume
     docker run -it --rm \
         --name ${CONTAINER_NAME} \
         --user ${HOST_UID}:${HOST_GID} \
@@ -53,6 +63,7 @@ function run_container() {
         -v /etc/passwd:/etc/passwd:ro \
         -v /etc/group:/etc/group:ro \
         -v $(pwd):/workspace \
+        -v ${BUILD_VOLUME}:/workspace/build \
         ${IMAGE_NAME} \
         /bin/bash
 }
@@ -69,6 +80,7 @@ function configure_cmake() {
     echo -e "${BLUE}Configuring CMake with Clang, ccache, and Ninja${NC}"
     if [ ! -f /.dockerenv ]; then
         mkdir -p .ccache && chmod 777 .ccache
+        ensure_build_volume
         docker run --rm \
             --user ${HOST_UID}:${HOST_GID} \
             -e HOME=/tmp \
@@ -79,6 +91,7 @@ function configure_cmake() {
             -v /etc/passwd:/etc/passwd:ro \
             -v /etc/group:/etc/group:ro \
             -v $(pwd):/workspace \
+            -v ${BUILD_VOLUME}:/workspace/build \
             ${IMAGE_NAME} \
             /bin/bash -lc "./docker.sh configure"
         return $?
@@ -116,6 +129,7 @@ function clean() {
     echo -e "${BLUE}Cleaning up Docker resources${NC}"
     docker rm -f ${CONTAINER_NAME} 2>/dev/null
     docker rmi ${IMAGE_NAME} 2>/dev/null
+    docker volume rm ${BUILD_VOLUME} 2>/dev/null
     echo -e "${GREEN}✓ Cleanup complete${NC}"
 }
 

@@ -1,7 +1,7 @@
 /* ----------------------------------------------------------------------------
  * Contact Neural Network Estimator
  * Handles neural network-based contact detection functionality
- * Note: NN outputs contact predictions only; foot velocities are computed via kinematics
+ * Note: NN outputs contact predictions and world-frame foot velocities
  * -------------------------------------------------------------------------- */
 
 #ifndef CONTACT_NN_HPP
@@ -11,6 +11,7 @@
 #include <deque>
 #include <memory>
 #include <string>
+#include <tuple>
 #include <eigen3/Eigen/Dense>
 #include <onnxruntime_cxx_api.h>
 #include "../utility/RobotModel.hpp"
@@ -50,11 +51,12 @@ public:
     // // Normalize input: (data - mean) / std per feature across time dimension
     // void normalize_nn_input(std::vector<float>& input_features);
     
-    // Run contact prediction inference (returns contacts; velocity output is not used)
-    std::pair<Eigen::VectorXd, Eigen::VectorXd> predict_contact(const std::vector<float>& input_features);
+    // Returns contact probabilities, mean_last, and cov_last, each flattened by leg then axis.
+    using Prediction = std::tuple<Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd>;
+    Prediction predict_contact(const std::vector<float>& input_features);
     
-    // Convenience method: create tensor, normalize, and predict (returns contacts; velocity output is not used)
-    std::pair<Eigen::VectorXd, Eigen::VectorXd> nn_predict_contact();
+    // Convenience method: create tensor, normalize, and predict.
+    Prediction nn_predict_contact();
     
     // Check if model is loaded and enabled
     bool is_enabled() const { return contact_nn_enabled; }

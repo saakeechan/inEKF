@@ -140,6 +140,8 @@ public:
     std::vector<Eigen::VectorXd>   MOTOR_POS_CMD; // Commanded motor positions for logging and potential use in contact detection
     std::vector<Eigen::VectorXd>   CMD_V;            // Commanded velocities (if available in CSV data)
     std::vector<Eigen::VectorXd>   torqueSumSquared;  // Sliding window buffer for torque sum squared
+    Eigen::VectorXd NN_foot_velocity_world;  // [x, y, z] world velocity for each leg
+    Eigen::VectorXd NN_foot_velocity_variance_world;  // [vx, vy, vz] diagonal variance for each leg
     //SAVE PARAMETER
     std::string estimator_info;
     std::string file_info;
@@ -203,6 +205,8 @@ public:
     int total_comparisons = 0;  // Total number of timesteps compared
 
 private:
+    std::string kinematics_mode = "pkm";
+
     // Helper function to compute indices after robot config is loaded
     void compute_indices() {
         idx_TRUE_Rotation = 0;
