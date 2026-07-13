@@ -2,7 +2,7 @@
 
 clear; close all; clc;
 
-filePath = "/home/saaketh/Research/inEKF/results/2026-07-12_20-51-09.csv"
+filePath = "/home/saaketh/Research/inEKF/results/2026-07-12_22-18-22.csv"
 savePlots = false;
 
 % --- Read the file ---

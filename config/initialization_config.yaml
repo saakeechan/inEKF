@@ -28,7 +28,7 @@ variable_contact_covariance:
   amplifier: 1.0  # Multiplied to contact covariance when VCC is enabled
 
 Contact_estimation_NN:
-  enabled: true  # Enable contact estimation using the neural network model
+  enabled: false  # Enable contact estimation using the neural network model
   file_path: "../src/contactDetection/model_final_epoch.onnx"  # Path to the ONNX contact estimation model
 
 
@@ -39,8 +39,8 @@ Contact_estimation_NN:
 
 covariance_exponents:
   gyro: -6
-  acc: -1
-  slip: -2
+  acc: -2
+  slip: 0
   contact: -4
   encoder: -8
   bias_gyro: -10

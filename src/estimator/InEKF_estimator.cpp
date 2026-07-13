@@ -535,11 +535,15 @@ void InEKFilter::new_measurement()
     IMU_Acc[frame_count] << CSVData.acc_body_x[j-1], CSVData.acc_body_y[j-1], CSVData.acc_body_z[j-1];
 
     if (robot.robot_name == "G1") {
-    // Convert gravity-compensated body IMU to world frame with gravity added back
-    // Eigen::Vector4d quat_gt;
-    // quat_gt << CSVData.quat_w[j], CSVData.quat_i[j], CSVData.quat_j[j], CSVData.quat_k[j];
-    // Eigen::Matrix3d R_gt = BasicFunctions_Estimator::Quaternion_to_Rotation_Matrix(quat_gt);
-    // IMU_Acc[frame_count] = R_gt * IMU_Acc[frame_count] - gravity;
+        // CSV acceleration is gravity-compensated and body-frame. Convert it
+        // to the body-frame specific force expected by InEKF::Propagate().
+        const int imu_row = j - 1;
+        Eigen::Vector4d quat_gt;
+        quat_gt << CSVData.quat_w[imu_row], CSVData.quat_i[imu_row],
+                   CSVData.quat_j[imu_row], CSVData.quat_k[imu_row];
+        const Eigen::Matrix3d R_gt =
+            BasicFunctions_Estimator::Quaternion_to_Rotation_Matrix(quat_gt);
+        IMU_Acc[frame_count] -= R_gt.transpose() * gravity;
     }
     // IMU_Gyro[frame_count] = filter.getState().getRotation() * IMU_Gyro[frame_count];
 
@@ -610,7 +614,9 @@ void InEKFilter::Propagate_and_Correct()
             if (nn_variance.allFinite() && (nn_variance.array() > 0.0).all()) {
                 covariance.block<3,3>(0,0) = nn_variance.asDiagonal();
             }
-            inekf::Kinematics frame(id, pose, covariance, NN_foot_velocity_world.segment<3>(3 * k), true);
+            inekf::Kinematics frame(id, pose, covariance, robot.get_foot_velocity(k), IMU_Gyro[frame_count]);
+            frame.world_foot_velocity = NN_foot_velocity_world.segment<3>(3 * k);
+            frame.use_world_foot_velocity = true;
             measured_kinematics.push_back(frame);
         } else {
             inekf::Kinematics frame(id, pose, covariance, robot.get_foot_velocity(k), IMU_Gyro[frame_count]);

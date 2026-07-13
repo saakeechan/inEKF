@@ -255,6 +255,14 @@ void InEKF::Correct(const Observation& obs) {
     Eigen::MatrixXd dX = Exp_SEK3(delta.segment(0,delta.rows()-state_.dimTheta()));
     Eigen::VectorXd dTheta = delta.segment(delta.rows()-state_.dimTheta(), state_.dimTheta());
 
+    // #------# VKM/correction debug: inspect the innovation and attitude/bias update.
+    cout << "#------# correction innovation: " << Z.block<3,1>(0, 0).transpose()
+         << " | delta R: " << delta.head<3>().transpose()
+         << " | delta bg: " << dTheta.head<3>().transpose()
+         << " | bg before: " << state_.getGyroscopeBias().transpose()
+         << " | bg after: " << (state_.getGyroscopeBias() + dTheta.head<3>()).transpose()
+         << endl;
+
     // Update state
     Eigen::MatrixXd X_new = dX*state_.getX(); // Right-Invariant Update
 
@@ -481,41 +489,17 @@ void InEKF::CorrectKinematics(const std::string& mode, const vectorKinematics& m
             int startIndex;
 
             if (mode == "vkm") {
-                if (it->use_world_foot_velocity) {
-                    // NN VKM: direct world-frame foot-velocity measurement.
-                    startIndex = Y.rows();
-                    Y.conservativeResize(startIndex+dimX, Eigen::NoChange);
-                    Y.segment(startIndex,dimX) = Eigen::VectorXd::Zero(dimX);
-                    Y(startIndex+3) = 1;
-
-                    startIndex = b.rows();
-                    b.conservativeResize(startIndex+dimX, Eigen::NoChange);
-                    b.segment(startIndex,dimX) = Eigen::VectorXd::Zero(dimX);
-                    b.segment(startIndex,3) = it->world_foot_velocity;
-
-                    startIndex = H.rows();
-                    H.conservativeResize(startIndex+3, dimP);
-                    H.block(startIndex,0,3,dimP) = Eigen::MatrixXd::Zero(3,dimP);
-                    H.block(startIndex,3,3,3) = -Eigen::Matrix3d::Identity();
-
-                    startIndex = N.rows();
-                    N.conservativeResize(startIndex+3, startIndex+3);
-                    N.block(startIndex,0,3,startIndex) = Eigen::MatrixXd::Zero(3,startIndex);
-                    N.block(0,startIndex,startIndex,3) = Eigen::MatrixXd::Zero(startIndex,3);
-                    N.block(startIndex,startIndex,3,3) = it->covariance.block<3,3>(0,0);
-
-                    startIndex = PI.rows();
-                    int startIndex2 = PI.cols();
-                    PI.conservativeResize(startIndex+3, startIndex2+dimX);
-                    PI.block(startIndex,0,3,startIndex2) = Eigen::MatrixXd::Zero(3,startIndex2);
-                    PI.block(0,startIndex2,startIndex,dimX) = Eigen::MatrixXd::Zero(startIndex,dimX);
-                    PI.block(startIndex,startIndex2,3,dimX) = Eigen::MatrixXd::Zero(3,dimX);
-                    PI.block(startIndex,startIndex2,3,3) = Eigen::Matrix3d::Identity();
-                    continue;
-                }
-
-                // r_v = R * (-(omega - b_g) x p_BF - v_F/B) - v.
+                // r_v = v_F^W - [v + R((omega - b_g) x p_BF + v_F/B)].
+                // Without an NN measurement, v_F^W is the usual zero-velocity contact assumption.
                 const Eigen::Vector3d y_v = -skew(it->angular_velocity - state_.getGyroscopeBias()) * it->pose.block<3,1>(0,3) - it->foot_velocity;
+
+                // #------# VKM debug: all quantities below are body-frame except the NN target.
+                cout << "#------# VKM leg " << it->id
+                     << " | gyro-bg: " << (it->angular_velocity - state_.getGyroscopeBias()).transpose()
+                     << " | p_BF: " << it->pose.block<3,1>(0,3).transpose()
+                     << " | v_F/B: " << it->foot_velocity.transpose()
+                     << " | v_F^W target: " << it->world_foot_velocity.transpose()
+                     << endl;
 
                 startIndex = Y.rows();
                 Y.conservativeResize(startIndex+dimX, Eigen::NoChange);
@@ -526,18 +510,29 @@ void InEKF::CorrectKinematics(const std::string& mode, const vectorKinematics& m
                 startIndex = b.rows();
                 b.conservativeResize(startIndex+dimX, Eigen::NoChange);
                 b.segment(startIndex,dimX) = Eigen::VectorXd::Zero(dimX);
+                if (it->use_world_foot_velocity) {
+                    b.segment(startIndex,3) = -it->world_foot_velocity;
+                }
                 b(startIndex+3) = -1;
 
                 startIndex = H.rows();
                 H.conservativeResize(startIndex+3, dimP);
                 H.block(startIndex,0,3,dimP) = Eigen::MatrixXd::Zero(3,dimP);
-                H.block(startIndex,3,3,3) = -Eigen::Matrix3d::Identity();
+                // Correct() uses delta = K * Z, so H stores -dZ/dx.
+                H.block(startIndex,3,3,3) = Eigen::Matrix3d::Identity();
+                // #------# VKM gyro-bias Jacobian: -dZ/db_g = R * skew(p_BF).
+                H.block(startIndex, dimP - state_.dimTheta(), 3, 3) =
+                    R * skew(it->pose.block<3,1>(0,3));
 
                 startIndex = N.rows();
                 N.conservativeResize(startIndex+3, startIndex+3);
                 N.block(startIndex,0,3,startIndex) = Eigen::MatrixXd::Zero(3,startIndex);
                 N.block(0,startIndex,startIndex,3) = Eigen::MatrixXd::Zero(startIndex,3);
-                N.block(startIndex,startIndex,3,3) = R * it->covariance.block<3,3>(0,0) * R.transpose();
+                if (it->use_world_foot_velocity) {
+                    N.block(startIndex,startIndex,3,3) = it->covariance.block<3,3>(0,0);
+                } else {
+                    N.block(startIndex,startIndex,3,3) = R * it->covariance.block<3,3>(0,0) * R.transpose();
+                }
 
                 startIndex = PI.rows();
                 int startIndex2 = PI.cols();
