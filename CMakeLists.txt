@@ -7,6 +7,11 @@ endif()
 
 project(INEKF_Estimator LANGUAGES CXX)
 
+# Select the deployment architecture.  Keep x64 as the default for existing
+# desktop builds; use -DARCH=arm64 for the hardware library.
+set(ARCH "x64" CACHE STRING "Target architecture (x64 or arm64)")
+set_property(CACHE ARCH PROPERTY STRINGS x64 arm64)
+
 
 macro(check_build_type_macro val)
     if(${val} MATCHES Release)
@@ -53,22 +58,39 @@ link_directories(${PINOCCHIO_LIBRARY_DIRS})
 
 find_package(yaml-cpp REQUIRED)
 
-# Find ONNX Runtime
-find_library(ONNXRUNTIME_LIB onnxruntime
-    HINTS /usr/local/lib /usr/lib /opt/onnxruntime/lib
-)
-find_path(ONNXRUNTIME_INCLUDE_DIR onnxruntime_cxx_api.h
-    HINTS /usr/local/include /usr/include /opt/onnxruntime/include
-)
-
-if(NOT ONNXRUNTIME_LIB OR NOT ONNXRUNTIME_INCLUDE_DIR)
-    message(FATAL_ERROR "ONNX Runtime not found. Please install ONNX Runtime.")
+if(ARCH STREQUAL "x64")
+    set(ONNXRUNTIME_DIR "${PROJECT_SOURCE_DIR}/../../../thirdparty/onnxruntime-linux-x64-1.25.1")
+    set(ONNXRUNTIME_LIB_FILE "${ONNXRUNTIME_DIR}/lib/libonnxruntime.so.1.25.1")
+    set(ONNXRUNTIME_RPATH "${ONNXRUNTIME_DIR}/lib")
+    set(INEKF_LIB_NAME "INEKF_Estimator_x64")
+elseif(ARCH STREQUAL "arm64")
+    set(ONNXRUNTIME_DIR "${PROJECT_SOURCE_DIR}/../../../thirdparty/onnxruntime-linux-aarch64-1.24.2")
+    set(ONNXRUNTIME_LIB_FILE "${ONNXRUNTIME_DIR}/lib/libonnxruntime.so.1.24.2")
+    set(ONNXRUNTIME_RPATH "${ONNXRUNTIME_DIR}/lib")
+    set(INEKF_LIB_NAME "INEKF_Estimator_arm64")
 else()
-    message(STATUS "Found ONNX Runtime: ${ONNXRUNTIME_LIB}")
-    message(STATUS "ONNX Runtime include: ${ONNXRUNTIME_INCLUDE_DIR}")
+    message(FATAL_ERROR "Unsupported ARCH='${ARCH}'. Use x64 or arm64.")
 endif()
 
-include_directories(${ONNXRUNTIME_INCLUDE_DIR})
+# robotpkg's x64 package exposes separate default and parser libraries.  The
+# ARM64 image builds upstream Pinocchio, whose pkg-config metadata supplies
+# the appropriate library list.
+if(ARCH STREQUAL "x64")
+    set(PINOCCHIO_LINK_LIBS pinocchio_default pinocchio_parsers)
+else()
+    set(PINOCCHIO_LINK_LIBS ${PINOCCHIO_LIBRARIES})
+endif()
+
+if(NOT EXISTS "${ONNXRUNTIME_LIB_FILE}" OR
+   NOT EXISTS "${ONNXRUNTIME_DIR}/include/onnxruntime_cxx_api.h")
+    message(FATAL_ERROR
+        "ONNX Runtime for ARCH=${ARCH} was not found at ${ONNXRUNTIME_DIR}.\n"
+        "Expected ${ONNXRUNTIME_LIB_FILE}")
+endif()
+
+message(STATUS "Building for ARCH=${ARCH}")
+message(STATUS "ONNX Runtime: ${ONNXRUNTIME_DIR}")
+include_directories("${ONNXRUNTIME_DIR}/include")
 
 link_directories(
         /usr/lib
@@ -101,17 +123,16 @@ target_compile_options(INEKF_Estimator PRIVATE -O3)
 
 # Set RPATH to find libraries at runtime
 set_target_properties(INEKF_Estimator PROPERTIES
-    BUILD_RPATH "${PINOCCHIO_LIBRARY_DIRS}"
-    INSTALL_RPATH "${PINOCCHIO_LIBRARY_DIRS}"
+    BUILD_RPATH "${PINOCCHIO_LIBRARY_DIRS};${ONNXRUNTIME_RPATH}"
+    INSTALL_RPATH "${PINOCCHIO_LIBRARY_DIRS};${ONNXRUNTIME_RPATH}"
+    OUTPUT_NAME "${INEKF_LIB_NAME}"
 )
 
 # Force linkage of pinocchio parsers with --no-as-needed
 target_link_options(INEKF_Estimator PRIVATE "LINKER:--no-as-needed,-rpath,/opt/openrobots/lib")
 
-# Link pinocchio libraries (excluding casadi which has version compatibility issues)
 target_link_libraries(INEKF_Estimator PUBLIC 
-    pinocchio_default
-    pinocchio_parsers
+    ${PINOCCHIO_LINK_LIBS}
     boost_filesystem
     boost_serialization
     boost_system
@@ -121,7 +142,7 @@ target_link_libraries(INEKF_Estimator PUBLIC
     urdfdom_world
     console_bridge
     yaml-cpp
-    ${ONNXRUNTIME_LIB}
+    "${ONNXRUNTIME_LIB_FILE}"
 )
 
 
@@ -150,8 +171,7 @@ set_target_properties(writeFKFootPosVel PROPERTIES
 
 target_link_libraries(writeFKFootPosVel
     INEKF_Estimator
-    pinocchio_default
-    pinocchio_parsers
+    ${PINOCCHIO_LINK_LIBS}
     yaml-cpp
 )
 
@@ -168,8 +188,7 @@ set_target_properties(DynKinSlip PROPERTIES
 
 target_link_libraries(DynKinSlip
     INEKF_Estimator
-    pinocchio_default
-    pinocchio_parsers
+    ${PINOCCHIO_LINK_LIBS}
     yaml-cpp
 )
 

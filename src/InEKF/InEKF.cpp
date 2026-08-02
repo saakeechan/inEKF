@@ -255,13 +255,13 @@ void InEKF::Correct(const Observation& obs) {
     Eigen::MatrixXd dX = Exp_SEK3(delta.segment(0,delta.rows()-state_.dimTheta()));
     Eigen::VectorXd dTheta = delta.segment(delta.rows()-state_.dimTheta(), state_.dimTheta());
 
-    // #------# VKM/correction debug: inspect the innovation and attitude/bias update.
-    cout << "#------# correction innovation: " << Z.block<3,1>(0, 0).transpose()
-         << " | delta R: " << delta.head<3>().transpose()
-         << " | delta bg: " << dTheta.head<3>().transpose()
-         << " | bg before: " << state_.getGyroscopeBias().transpose()
-         << " | bg after: " << (state_.getGyroscopeBias() + dTheta.head<3>()).transpose()
-         << endl;
+    // // #------# VKM/correction debug: inspect the innovation and attitude/bias update.
+    // cout << "#------# correction innovation: " << Z.block<3,1>(0, 0).transpose()
+    //      << " | delta R: " << delta.head<3>().transpose()
+    //      << " | delta bg: " << dTheta.head<3>().transpose()
+    //      << " | bg before: " << state_.getGyroscopeBias().transpose()
+    //      << " | bg after: " << (state_.getGyroscopeBias() + dTheta.head<3>()).transpose()
+    //      << endl;
 
     // Update state
     Eigen::MatrixXd X_new = dX*state_.getX(); // Right-Invariant Update
@@ -493,13 +493,13 @@ void InEKF::CorrectKinematics(const std::string& mode, const vectorKinematics& m
                 // Without an NN measurement, v_F^W is the usual zero-velocity contact assumption.
                 const Eigen::Vector3d y_v = -skew(it->angular_velocity - state_.getGyroscopeBias()) * it->pose.block<3,1>(0,3) - it->foot_velocity;
 
-                // #------# VKM debug: all quantities below are body-frame except the NN target.
-                cout << "#------# VKM leg " << it->id
-                     << " | gyro-bg: " << (it->angular_velocity - state_.getGyroscopeBias()).transpose()
-                     << " | p_BF: " << it->pose.block<3,1>(0,3).transpose()
-                     << " | v_F/B: " << it->foot_velocity.transpose()
-                     << " | v_F^W target: " << it->world_foot_velocity.transpose()
-                     << endl;
+                // // #------# VKM debug: all quantities below are body-frame except the NN target.
+                // cout << "#------# VKM leg " << it->id
+                //      << " | gyro-bg: " << (it->angular_velocity - state_.getGyroscopeBias()).transpose()
+                //      << " | p_BF: " << it->pose.block<3,1>(0,3).transpose()
+                //      << " | v_F/B: " << it->foot_velocity.transpose()
+                //      << " | v_F^W target: " << it->world_foot_velocity.transpose()
+                //      << endl;
 
                 startIndex = Y.rows();
                 Y.conservativeResize(startIndex+dimX, Eigen::NoChange);

@@ -3,10 +3,13 @@
 # Docker helper script for INEKF
 
 IMAGE_NAME="inekf"
+ARM64_IMAGE_NAME="inekf-arm64"
 CONTAINER_NAME="inekf-container"
 BUILD_VOLUME="${IMAGE_NAME}-build"
 HOST_UID=$(id -u)
 HOST_GID=$(id -g)
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+REPO_DIR=$(cd -- "${SCRIPT_DIR}/.." && pwd)
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -19,6 +22,8 @@ function print_usage() {
     echo ""
     echo "Commands:"
     echo "  build       - Build the Docker image"
+    echo "  build-arm64 - Build the ARM64/Jetson Docker image"
+    echo "  run-arm64   - Open an ARM64/Jetson Docker shell"
     echo "  run         - Run the container interactively"
     echo "  exec        - Execute a command in running container"
     echo "  configure   - Configure CMake with Clang, ccache, and Ninja"
@@ -40,6 +45,26 @@ function build_image() {
     fi
 }
 
+function build_arm64_image() {
+    echo -e "${BLUE}Building ARM64 Docker image: ${ARM64_IMAGE_NAME}${NC}"
+    docker buildx inspect --bootstrap
+    docker buildx build --platform linux/arm64 \
+        -f "${SCRIPT_DIR}/Dockerfile.arm64" \
+        -t "${ARM64_IMAGE_NAME}" \
+        --load \
+        "${REPO_DIR}"
+}
+
+function run_arm64_container() {
+    docker run -it --rm --platform linux/arm64 \
+        --user "${HOST_UID}:${HOST_GID}" \
+        -e HOME=/tmp \
+        -v "${REPO_DIR}:/workspace" \
+        -w /workspace \
+        "${ARM64_IMAGE_NAME}" \
+        /bin/bash
+}
+
 function ensure_build_volume() {
     docker volume create ${BUILD_VOLUME} >/dev/null
     docker run --rm \
@@ -51,7 +76,7 @@ function ensure_build_volume() {
 function run_container() {
     echo -e "${BLUE}Running Docker container: ${CONTAINER_NAME}${NC}"
     mkdir -p .ccache && chmod 777 .ccache
-    ensure_build_volume
+    mkdir -p build
     docker run -it --rm \
         --name ${CONTAINER_NAME} \
         --user ${HOST_UID}:${HOST_GID} \
@@ -63,7 +88,7 @@ function run_container() {
         -v /etc/passwd:/etc/passwd:ro \
         -v /etc/group:/etc/group:ro \
         -v $(pwd):/workspace \
-        -v ${BUILD_VOLUME}:/workspace/build \
+        -v $(pwd)/build:/workspace/build \
         ${IMAGE_NAME} \
         /bin/bash
 }
@@ -80,7 +105,7 @@ function configure_cmake() {
     echo -e "${BLUE}Configuring CMake with Clang, ccache, and Ninja${NC}"
     if [ ! -f /.dockerenv ]; then
         mkdir -p .ccache && chmod 777 .ccache
-        ensure_build_volume
+        mkdir -p build
         docker run --rm \
             --user ${HOST_UID}:${HOST_GID} \
             -e HOME=/tmp \
@@ -91,7 +116,7 @@ function configure_cmake() {
             -v /etc/passwd:/etc/passwd:ro \
             -v /etc/group:/etc/group:ro \
             -v $(pwd):/workspace \
-            -v ${BUILD_VOLUME}:/workspace/build \
+            -v $(pwd)/build:/workspace/build \
             ${IMAGE_NAME} \
             /bin/bash -lc "./docker.sh configure"
         return $?
@@ -142,6 +167,12 @@ function rebuild() {
 case "$1" in
     build)
         build_image
+        ;;
+    build-arm64)
+        build_arm64_image
+        ;;
+    run-arm64)
+        run_arm64_container
         ;;
     run)
         run_container
