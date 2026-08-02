@@ -10,6 +10,7 @@ HOST_UID=$(id -u)
 HOST_GID=$(id -g)
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 REPO_DIR=$(cd -- "${SCRIPT_DIR}/.." && pwd)
+ARM64_BUILD_DIR="${REPO_DIR}/build-arm64"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -56,10 +57,17 @@ function build_arm64_image() {
 }
 
 function run_arm64_container() {
+    mkdir -p "${ARM64_BUILD_DIR}"
+    mkdir -p "${REPO_DIR}/.ccache"
+    chmod 777 "${REPO_DIR}/.ccache"
     docker run -it --rm --platform linux/arm64 \
         --user "${HOST_UID}:${HOST_GID}" \
         -e HOME=/tmp \
+        -e CCACHE_DIR=/workspace/.ccache \
+        -v /etc/passwd:/etc/passwd:ro \
+        -v /etc/group:/etc/group:ro \
         -v "${REPO_DIR}:/workspace" \
+        -v "${ARM64_BUILD_DIR}:/workspace/build" \
         -w /workspace \
         "${ARM64_IMAGE_NAME}" \
         /bin/bash
@@ -118,7 +126,7 @@ function configure_cmake() {
             -v $(pwd):/workspace \
             -v $(pwd)/build:/workspace/build \
             ${IMAGE_NAME} \
-            /bin/bash -lc "./docker.sh configure"
+            /bin/bash -lc "./docker/docker.sh configure"
         return $?
     fi
 
@@ -126,6 +134,7 @@ function configure_cmake() {
     rm -f build/CMakeCache.txt build/build.ninja build/.ninja_deps build/.ninja_log
     rm -rf build/CMakeFiles
     cmake -S . -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_C_COMPILER=clang \
         -DCMAKE_CXX_COMPILER=clang++ \
         -DCMAKE_CXX_COMPILER_LAUNCHER=/usr/bin/ccache

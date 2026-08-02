@@ -3,7 +3,8 @@ g1_env/
 
 # Build directories
 build/
-
+build-arm64/
+build* 
 # Python cache
 __pycache__/
 *.pyc
@@ -19,6 +20,7 @@ output_images/
 
 # INEKF build directories
 build_arm64_docker/
+
 
 # Additional files/folders
 digit_mujoco-main/
@@ -37,4 +39,5 @@ splitData/
 
 .codex/
 
+Matlab/output_plots/ 
 

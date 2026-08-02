@@ -1,9 +1,14 @@
+# syntax=docker/dockerfile:1.7
 FROM ubuntu:22.04
+
+LABEL org.opencontainers.image.source="https://github.com/saakeechan/inEKF"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Native ARM64 compiler and all system dependencies used by this project.
-RUN apt-get update && apt-get install -y \
+RUN --mount=type=cache,id=inekf-arm64-apt-cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=inekf-arm64-apt-lists,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y \
     build-essential \
     clang \
     cmake \
@@ -23,8 +28,7 @@ RUN apt-get update && apt-get install -y \
     python3-numpy \
     python3-venv \
     ccache \
-    ninja-build \
-    && rm -rf /var/lib/apt/lists/*
+    ninja-build
 
 RUN python3 -m venv --system-site-packages /opt/venv
 ENV PATH="/opt/venv/bin:/usr/lib/ccache:${PATH}" \
@@ -33,12 +37,14 @@ ENV PATH="/opt/venv/bin:/usr/lib/ccache:${PATH}" \
     CXX=clang++ \
     CMAKE_GENERATOR=Ninja
 
-RUN /opt/venv/bin/pip install --no-cache-dir --upgrade pip numpy pandas matplotlib meshcat
+RUN --mount=type=cache,id=inekf-arm64-pip,target=/root/.cache/pip,sharing=locked \
+    /opt/venv/bin/pip install --upgrade pip numpy pandas matplotlib meshcat
 
 # robotpkg's binary repository is AMD64-only.  Build the required Pinocchio
 # library natively so that pkg-config exposes an ARM64 libpinocchio.
 ARG PINOCCHIO_VERSION=3.3.0
-RUN git clone --recursive --depth 1 --branch v${PINOCCHIO_VERSION} https://github.com/stack-of-tasks/pinocchio.git /tmp/pinocchio && \
+RUN --mount=type=cache,id=inekf-arm64-ccache,target=/ccache,sharing=locked \
+    git clone --recursive --depth 1 --branch v${PINOCCHIO_VERSION} https://github.com/stack-of-tasks/pinocchio.git /tmp/pinocchio && \
     cmake -S /tmp/pinocchio -B /tmp/pinocchio/build -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/opt/openrobots \
