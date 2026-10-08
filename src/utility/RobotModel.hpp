@@ -191,11 +191,11 @@ public:
     
     /**
      * @brief Map TextFile data to encoder vector using configured indices from YAML
-     * @param TextFile_data Vector of TextFile sensor data values
-     * @param output_vector Output encoder vector - must be pre-allocated
-     * @param encoder_type Type of encoder data: "encoder" for positions or "encoderdot" for velocities
+     * @param motor_data_arg Vector of sensor data values
+     * @param encoder_type_arg "encoder" for positions or "encoderdot" for velocities
+     * @return Mapped encoder vector with unmapped entries set to zero
      */
-    void map_indices_to_encoders(const std::vector<double>& motor_data, Eigen::VectorXd& output_vector, const std::string& encoder_type) const;
+    Eigen::VectorXd map_indices_to_encoders(const std::vector<double>& motor_data_arg, const std::string& encoder_type_arg) const;
 
     /**
      * @brief Extract active encoder columns from full Jacobian matrix

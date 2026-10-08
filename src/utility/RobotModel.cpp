@@ -455,17 +455,17 @@ void RobotModel::compute_joint_jacobians() const {
     pinocchio::computeJointJacobians(pin_model, const_cast<pinocchio::Data&>(pin_data));
 }
 
-void RobotModel::map_indices_to_encoders(const std::vector<double>& motor_data, Eigen::VectorXd& output_vector, const std::string& encoder_type) const {
+Eigen::VectorXd RobotModel::map_indices_to_encoders(const std::vector<double>& motor_data_arg, const std::string& encoder_type_arg) const {
 
     // Validate encoder_type parameter
-    if (encoder_type != "encoder" && encoder_type != "encoderdot") {
-        std::cerr << "Error: Invalid encoder_type '" << encoder_type << "'. Must be 'encoder' or 'encoderdot'" << std::endl;
+    if (encoder_type_arg != "encoder" && encoder_type_arg != "encoderdot") {
+        std::cerr << "Error: Invalid encoder_type '" << encoder_type_arg << "'. Must be 'encoder' or 'encoderdot'" << std::endl;
         std::exit(EXIT_FAILURE);
     }
     
     // Select appropriate indices based on encoder_type
-    const std::vector<int>& indices = (encoder_type == "encoder") ? Encoder_indices_map : Encoderdot_indices_map;
-    const std::string type_name = (encoder_type == "encoder") ? "encoder position" : "encoder velocity";
+    const std::vector<int>& indices = (encoder_type_arg == "encoder") ? Encoder_indices_map : Encoderdot_indices_map;
+    const std::string type_name = (encoder_type_arg == "encoder") ? "encoder position" : "encoder velocity";
     
     // Check if indices are configured
     if (indices.empty()) {
@@ -474,20 +474,21 @@ void RobotModel::map_indices_to_encoders(const std::vector<double>& motor_data, 
     }
     
     // Check if motor_data size exactly matches the number of indices
-    if (motor_data.size() != indices.size()) {
+    if (motor_data_arg.size() != indices.size()) {
         std::cerr << "FATAL ERROR: TextFile data size mismatch for " << type_name << "." << std::endl;
-        std::cerr << "  Expected exactly " << indices.size() << " values, got " << motor_data.size() << std::endl;
+        std::cerr << "  Expected exactly " << indices.size() << " values, got " << motor_data_arg.size() << std::endl;
         std::cerr << "  This is a configuration error - check your TextFileDataStruct and YAML indices." << std::endl;
         std::cerr << "  Debug: motor_data contents: ";
-        for (size_t i = 0; i < motor_data.size(); i++) {
-            std::cerr << motor_data[i] << " ";
+        for (size_t i = 0; i < motor_data_arg.size(); i++) {
+            std::cerr << motor_data_arg[i] << " ";
         }
         std::cerr << std::endl;
         std::exit(EXIT_FAILURE);
     }
     
     // Initialize output_vector to zero (all non-mapped indices will remain zero)
-    output_vector.setZero();
+    Eigen::VectorXd output_vector = Eigen::VectorXd::Zero(
+        encoder_type_arg == "encoder" ? encoder_size : encoderdot_size);
     
     // Map motor_data to output_vector using the index mapping
     // indices[i] tells us WHERE to put the data in output_vector
@@ -497,14 +498,15 @@ void RobotModel::map_indices_to_encoders(const std::vector<double>& motor_data, 
         
         // Validate output index bounds
         if (output_idx < 0 || output_idx >= output_vector.size()) {
-            std::cerr << "FATAL ERROR: Invalid " << encoder_type << " mapping index " << output_idx 
+            std::cerr << "FATAL ERROR: Invalid " << encoder_type_arg << " mapping index " << output_idx
                       << " at position " << i << " for output vector of size " << output_vector.size() << std::endl;
             std::exit(EXIT_FAILURE);
         }
         
         // Map: motor_data[i] -> output_vector[indices[i]]
-        output_vector(output_idx) = motor_data[i];
+        output_vector(output_idx) = motor_data_arg[i];
     }
+    return output_vector;
 }
 
 Eigen::MatrixXd RobotModel::extract_active_encoder_jacobian(const Eigen::MatrixXd& full_jacobian) const {

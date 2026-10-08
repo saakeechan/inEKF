@@ -5,7 +5,7 @@
 # Estimator parameters
 sliding_window_size: 2
 dt: 0.02
-kinematics_mode: pkm
+kinematics_mode: pkm # vkm is kinda broken, dont use
 
 # TextFile data file configuration
 textfile:
@@ -13,7 +13,7 @@ textfile:
   file_name: "../splitData/robotstate_0_env6_run2.csv"
   start_count: 0 # Number of initial data points to skip in TextFile
   end_count: 999 # End of data points to read from TextFile (inclusive)
-  save_results: true  # Whether to save estimation results to a file
+  save_results: false  # Whether to save estimation results to a file
   saved_results_folder: "../results"  # Name of the folder to save estimation results
 
 
@@ -30,7 +30,6 @@ variable_contact_covariance:
 Contact_estimation_NN:
   enabled: false  # Live inputs: true = NN, false = model-based; CSV uses recorded contacts
   file_path: "../src/contactDetection/model_final_epoch.onnx"  # Path to the ONNX contact estimation model
-
 
 
 # Estimator Covariances (exponents for 10^x) Overrides robot defaults here
@@ -61,4 +60,9 @@ initial_condition:
   bias_acc: [0.0, 0.0, 0.0]  # bax, bay, baz
 
 # ------------------------------------------------------------
-# Test comment
+
+# # # TO-DO
+# # 1. Implement variable dt for onestep instead of a fixed dt from yaml
+# 2. Fix the network based inference 
+# 3. Fix vkm based framework
+# 4. Look at robot model

@@ -5,8 +5,8 @@ import tempfile
 
 root = Path(__file__).resolve().parents[1]
 source = (root / 'src/estimatorManager/InEKF_manager.cpp').read_text()
-function = source.split('void InEKFilter::sliding_window()', 1)[1].split(
-    'void InEKFilter::Onestep(', 1)[0]
+function = source.split('void INEKFilter_manager::sliding_window()', 1)[1].split(
+    'void INEKFilter_manager::Onestep(', 1)[0]
 fields = [
     'Position_s', 'Rotation_s', 'Velocity_s', 'Bias_Gyro_s', 'Bias_Acc_s',
     'HARD_CONTACT_t', 'CONTACT_t', 'SLIP_t', 'IMU_Gyro', 'IMU_Acc',
@@ -19,18 +19,18 @@ code = '''#include <eigen3/Eigen/Dense>
 #include <limits>
 #include <cassert>
 #include <cmath>
-struct InEKFilter {
+struct INEKFilter_manager {
     int frame_count = 0;
     int sliding_window_size = 2;
-    struct { int num_legs = 2; } robot;
+    struct { struct { int num_legs = 2; } model; } robot;
     void sliding_window();
 '''
 for field in fields:
     kind = ('std::vector<bool>' if field in contacts else
             'Eigen::Matrix3d' if field == 'Rotation_s' else 'Eigen::VectorXd')
     code += f'    std::vector<{kind}> {field};\n'
-code += '};\nvoid InEKFilter::sliding_window()' + function
-code += '\nint main() { for (int n : {2, 3, 5}) { InEKFilter f; f.sliding_window_size = n;\n'
+code += '};\nvoid INEKFilter_manager::sliding_window()' + function
+code += '\nint main() { for (int n : {2, 3, 5}) { INEKFilter_manager f; f.sliding_window_size = n;\n'
 for field in fields:
     code += f'f.{field}.resize(n);\n'
     if field in contacts:
@@ -50,7 +50,7 @@ for field in fields:
     else:
         code += f'for (int i=0; i<n-1; ++i) assert(f.{field}[i](0) == i+2);\n'
         code += f'assert(f.{field}.back().size() == 6);\n'
-        code += (f'assert(std::isinf(f.{field}.back()(0)));\n' if field == 'd_v'
+        code += (f'assert(std::isinf(f.{field}.back()(0)));\n' if field in {'d_v', 'dv_norm'}
                  else f'assert(f.{field}.back().isZero());\n')
 code += '''f.d_v.back().setConstant(99);
 f.sliding_window();

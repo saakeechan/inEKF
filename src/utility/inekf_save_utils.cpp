@@ -7,42 +7,44 @@
 #include <filesystem>
 #include <chrono>
 #include <sstream>
+#include <algorithm>
+#include <limits>
+#include <stdexcept>
 
 using std::cout;
 using std::endl;
 
 namespace InEKF_SaveUtils {
 
-void initialize_logging(InEKFilter& filter) {
+void initialize_logging(INEKFilter_manager& filter) {
+    filter.saved_count = 0;
     filter.dv_history.clear();
-    filter.contact_match_count.assign(filter.robot.num_legs, 0);
-    filter.contact_mismatch_count.assign(filter.robot.num_legs, 0);
+    filter.contact_match_count.assign(filter.robot.model.num_legs, 0);
+    filter.contact_mismatch_count.assign(filter.robot.model.num_legs, 0);
     filter.total_comparisons = 0;
-    filter.GroundTruthContact.assign(filter.robot.num_legs, false);
+    filter.GroundTruthContact.assign(filter.robot.model.num_legs, false);
 }
 
-void save_onestep_impl(InEKFilter& filter, int save_index) {
+void save_onestep_impl(INEKFilter_manager& filter, int save_index) {
     
-    if(save_index >= filter.SAVEMAXCNT) {
-        save_index = filter.SAVEMAXCNT - 1;
-        cout << "over Max_SAVE_cnt!!" << endl;
-        return;
+    if (save_index < 0 || save_index >= filter.SAVEMAXCNT) {
+        throw std::out_of_range("Result buffer index exceeds capacity");
     }
     
     // Save estimated dv values (always, regardless of csv_mode)
-    for(int i=0; i<filter.robot.num_legs; i++) {
+    for(int i=0; i<filter.robot.model.num_legs; i++) {
         for(int k=0; k<3; k++) {
             filter.SAVE_MATRIX[filter.idx_ESTIMATED_dv + 3 * i + k][save_index] = 
                 filter.d_v[filter.frame_count](3*i + k);
         }
     }
-    for (int i=0; i<filter.robot.num_legs; i++) {
+    for (int i=0; i<filter.robot.model.num_legs; i++) {
         filter.SAVE_MATRIX[filter.idx_ESTIMATED_dv_norm + i][save_index] = filter.dv_norm[filter.frame_count](i);
     }
     
     if(filter.csv_mode) {
         //Sending True States----------------------------------------------------------------------------
-        int j = filter.time_count + filter.start_index + 1;
+        int j = filter.start_index + save_index;
 
         // Build rotation matrix from CSV quaternion data
         Eigen::Vector4d quat_true;
@@ -59,45 +61,18 @@ void save_onestep_impl(InEKFilter& filter, int save_index) {
         }
 
         // Calculate ground truth foot velocities using finite differences from CSV foot positions
-        Eigen::Vector<double,3> dv_true;
-
-        for(int i=0; i<filter.robot.num_legs; i++) {
-            // Get foot positions from CSV (i=0 is left foot, i=1 is right foot, etc.)
-            Eigen::Vector3d foot_pos_current, foot_pos_next;
-            
-            if (i == 0) {  // Left foot
-                foot_pos_current << filter.CSVData.lfoot_pos_x[j], 
-                                     filter.CSVData.lfoot_pos_y[j], 
-                                     filter.CSVData.lfoot_pos_z[j];
-                
-                if (j < filter.CSVData.lfoot_pos_x.size() - 1) {
-                    // Forward difference: (pos[j+1] - pos[j]) / dt
-                    foot_pos_next << filter.CSVData.lfoot_pos_x[j+1], 
-                                     filter.CSVData.lfoot_pos_y[j+1], 
-                                     filter.CSVData.lfoot_pos_z[j+1];
-                    dv_true = (foot_pos_next - foot_pos_current) / filter.dt;
-                } else {
-                    // For last timestep, use the velocity from previous timestep
-                    for(int k=0; k<3; k++) {
-                        dv_true(k) = filter.SAVE_MATRIX[filter.idx_TRUE_dv + 3 * i + k][save_index - 1];
-                    }
-                }
-            } else if (i == 1) {  // Right foot
-                foot_pos_current << filter.CSVData.rfoot_pos_x[j], 
-                                     filter.CSVData.rfoot_pos_y[j], 
-                                     filter.CSVData.rfoot_pos_z[j];
-                
-                if (j < filter.CSVData.rfoot_pos_x.size() - 1) {
-                    // Forward difference: (pos[j+1] - pos[j]) / dt
-                    foot_pos_next << filter.CSVData.rfoot_pos_x[j+1], 
-                                     filter.CSVData.rfoot_pos_y[j+1], 
-                                     filter.CSVData.rfoot_pos_z[j+1];
-                    dv_true = (foot_pos_next - foot_pos_current) / filter.dt;
-                } else {
-                    // For last timestep, use the velocity from previous timestep
-                    for(int k=0; k<3; k++) {
-                        dv_true(k) = filter.SAVE_MATRIX[filter.idx_TRUE_dv + 3 * i + k][save_index - 1];
-                    }
+        for(int i=0; i<filter.robot.model.num_legs; i++) {
+            Eigen::Vector3d dv_true = Eigen::Vector3d::Constant(std::numeric_limits<double>::infinity());
+            if (i < 2) {
+                const auto& x = i == 0 ? filter.CSVData.lfoot_pos_x : filter.CSVData.rfoot_pos_x;
+                const auto& y = i == 0 ? filter.CSVData.lfoot_pos_y : filter.CSVData.rfoot_pos_y;
+                const auto& z = i == 0 ? filter.CSVData.lfoot_pos_z : filter.CSVData.rfoot_pos_z;
+                if (x.size() > 1) {
+                    const int from = j + 1 < static_cast<int>(x.size()) ? j : j - 1;
+                    const int to = from + 1;
+                    dv_true << (x.at(to) - x.at(from)) / filter.dt,
+                               (y.at(to) - y.at(from)) / filter.dt,
+                               (z.at(to) - z.at(from)) / filter.dt;
                 }
             }
 
@@ -131,46 +106,45 @@ void save_onestep_impl(InEKFilter& filter, int save_index) {
         // Save contact states
         std::vector<bool> temp_contact = filter.CSVData.contact_state[j];
         
-        for(int i=0; i<filter.robot.num_legs; i++) {
+        for(int i=0; i<filter.robot.model.num_legs; i++) {
             filter.SAVE_MATRIX[filter.idx_TRUE_Contact+i][save_index] = temp_contact[i];
-            filter.SAVE_MATRIX[filter.idx_TRUE_Slip+i][save_index] = filter.SLIP_t[filter.frame_count][i];
-            filter.SAVE_MATRIX[filter.idx_TRUE_Hard_Contact+i][save_index] = filter.HARD_CONTACT_t[filter.frame_count][i];
         }
     }
 
     // Save estimated states (always done, regardless of csv_mode)
-    for(int i=0; i<filter.robot.num_legs; i++) {
+    for(int i=0; i<filter.robot.model.num_legs; i++) {
         filter.SAVE_MATRIX[filter.idx_ESTIMATED_Contact+i][save_index] = filter.CONTACT_t[filter.frame_count][i];
         filter.SAVE_MATRIX[filter.idx_ESTIMATED_Slip+i][save_index] = filter.SLIP_t[filter.frame_count][i];
         filter.SAVE_MATRIX[filter.idx_ESTIMATED_Hard_Contact+i][save_index] = filter.HARD_CONTACT_t[filter.frame_count][i];
     }
 
-    Eigen::Vector3d temp_eul = BasicFunctions_Estimator::Rotation_to_EulerZYX(filter.robot_state.Rotation);
+    Eigen::Vector3d temp_eul = BasicFunctions_Estimator::Rotation_to_EulerZYX(filter.robot.state.Rotation);
     for(int i=0; i<3; i++) {
-        filter.SAVE_MATRIX[filter.idx_ESTIMATED_Position+i][save_index] = filter.robot_state.Position(i);
-        filter.SAVE_MATRIX[filter.idx_ESTIMATED_Velocity+i][save_index] = filter.robot_state.Velocity(i);
-        filter.SAVE_MATRIX[filter.idx_ESTIMATED_Omega+i][save_index] = filter.robot_state.Angular_Velocity(i);
-        filter.SAVE_MATRIX[filter.idx_ESTIMATED_Bias_Gyro+i][save_index] = filter.robot_state.Bias_Gyro(i);
-        filter.SAVE_MATRIX[filter.idx_ESTIMATED_Bias_Acc+i][save_index] = filter.robot_state.Bias_Acc(i);
+        filter.SAVE_MATRIX[filter.idx_ESTIMATED_Position+i][save_index] = filter.robot.state.Position(i);
+        filter.SAVE_MATRIX[filter.idx_ESTIMATED_Velocity+i][save_index] = filter.robot.state.Velocity(i);
+        filter.SAVE_MATRIX[filter.idx_ESTIMATED_Omega+i][save_index] = filter.robot.state.Angular_Velocity(i);
+        filter.SAVE_MATRIX[filter.idx_ESTIMATED_Bias_Gyro+i][save_index] = filter.robot.state.Bias_Gyro(i);
+        filter.SAVE_MATRIX[filter.idx_ESTIMATED_Bias_Acc+i][save_index] = filter.robot.state.Bias_Acc(i);
         filter.SAVE_MATRIX[filter.idx_ESTIMATED_rpy+i][save_index] = temp_eul(i);
     }
 
     for(int i=0; i<3; i++) {
         for(int j=0; j<3; j++) {
             filter.SAVE_MATRIX[filter.idx_ESTIMATED_Rotation+i*3+j][save_index] = 
-                filter.robot_state.Rotation(i,j);
+                filter.robot.state.Rotation(i,j);
         }
     }
+    filter.saved_count = std::max(filter.saved_count, save_index + 1);
 }
 
-void print_contact_accuracy_impl(const InEKFilter& filter) {
+void print_contact_accuracy_impl(const INEKFilter_manager& filter) {
     if (filter.total_comparisons <= 0) {
         return;
     }
 
     cout << "\n=== Contact Detection Accuracy ==="<< endl;
     cout << "Total comparisons: " << filter.total_comparisons << endl;
-    for (int k = 0; k < filter.robot.num_legs; k++) {
+    for (int k = 0; k < filter.robot.model.num_legs; k++) {
         int total_leg = filter.contact_match_count[k] + filter.contact_mismatch_count[k];
         double accuracy = (total_leg > 0) ? (100.0 * filter.contact_match_count[k] / total_leg) : 0.0;
         cout << "Leg " << (k+1) << ": Matches=" << filter.contact_match_count[k] 
@@ -179,7 +153,7 @@ void print_contact_accuracy_impl(const InEKFilter& filter) {
     }
 }
 
-void write_saved_data_impl(InEKFilter& filter) {
+void write_saved_data_impl(INEKFilter_manager& filter) {
     
     // Create output directory if it doesn't exist
     try {
@@ -223,10 +197,11 @@ void write_saved_data_impl(InEKFilter& filter) {
         metafile << "Initial Condition Info: " << filter.initial_info << "\n";
         metafile << "File Info: " << filter.file_info << "\n";
         metafile << "Time Count: " << filter.time_count << "\n";
+        metafile << "Saved Rows: " << filter.saved_count << "\n";
         metafile << "Timestamp: " << timestamp_str << "\n";
         metafile << "dt: " << filter.dt << "\n";
-        metafile << "Robot Name: " << filter.robot.robot_name << "\n";
-        metafile << "Number of Legs: " << filter.robot.num_legs << "\n";
+        metafile << "Robot Name: " << filter.robot.model.robot_name << "\n";
+        metafile << "Number of Legs: " << filter.robot.model.num_legs << "\n";
         metafile << "Slip Rejection Mode: " << (filter.slip_rejection_mode ? "true" : "false") << "\n";
         metafile << "Slip Threshold: " << filter.slip_threshold << "\n";
         metafile << "Variable Contact Cov Mode: " << (filter.variable_contact_cov_mode ? "true" : "false") << "\n";
@@ -262,13 +237,15 @@ void write_saved_data_impl(InEKFilter& filter) {
     headers.push_back("EST_Omega_x"); headers.push_back("EST_Omega_y"); headers.push_back("EST_Omega_z");
     headers.push_back("EST_Bg_x"); headers.push_back("EST_Bg_y"); headers.push_back("EST_Bg_z");
     headers.push_back("EST_Ba_x"); headers.push_back("EST_Ba_y"); headers.push_back("EST_Ba_z");
-    for(int k=0; k<filter.robot.num_legs; k++) headers.push_back("EST_Contact_leg" + std::to_string(k+1));
-    for(int k=0; k<filter.robot.num_legs; k++) {
+    for(int k=0; k<filter.robot.model.num_legs; k++) headers.push_back("EST_Contact_leg" + std::to_string(k+1));
+    for(int k=0; k<filter.robot.model.num_legs; k++) headers.push_back("EST_Slip_leg" + std::to_string(k+1));
+    for(int k=0; k<filter.robot.model.num_legs; k++) headers.push_back("EST_Hard_Contact_leg" + std::to_string(k+1));
+    for(int k=0; k<filter.robot.model.num_legs; k++) {
         headers.push_back("EST_dv_leg" + std::to_string(k+1) + "_x");
         headers.push_back("EST_dv_leg" + std::to_string(k+1) + "_y");
         headers.push_back("EST_dv_leg" + std::to_string(k+1) + "_z");
     }
-    for(int k=0; k<filter.robot.num_legs; k++) headers.push_back("EST_dv_norm_leg" + std::to_string(k+1));
+    for(int k=0; k<filter.robot.model.num_legs; k++) headers.push_back("EST_dv_norm_leg" + std::to_string(k+1));
     
     // Ground truth values (only if csv mode)
     if (filter.csv_mode) {
@@ -277,13 +254,13 @@ void write_saved_data_impl(InEKFilter& filter) {
         headers.push_back("GT_roll"); headers.push_back("GT_pitch"); headers.push_back("GT_yaw");
         headers.push_back("GT_Vx"); headers.push_back("GT_Vy"); headers.push_back("GT_Vz");
         headers.push_back("GT_Omega_x"); headers.push_back("GT_Omega_y"); headers.push_back("GT_Omega_z");
-        for(int k=0; k<filter.robot.num_legs; k++) headers.push_back("GT_Contact_leg" + std::to_string(k+1));
-        for(int k=0; k<filter.robot.num_legs; k++) {
+        for(int k=0; k<filter.robot.model.num_legs; k++) headers.push_back("GT_Contact_leg" + std::to_string(k+1));
+        for(int k=0; k<filter.robot.model.num_legs; k++) {
             headers.push_back("GT_dv_leg" + std::to_string(k+1) + "_x");
             headers.push_back("GT_dv_leg" + std::to_string(k+1) + "_y");
             headers.push_back("GT_dv_leg" + std::to_string(k+1) + "_z");
         }
-        for(int k=0; k<filter.robot.num_legs; k++) headers.push_back("GT_dv_norm_leg" + std::to_string(k+1));
+        for(int k=0; k<filter.robot.model.num_legs; k++) headers.push_back("GT_dv_norm_leg" + std::to_string(k+1));
     }
     
     // Write header row
@@ -294,7 +271,7 @@ void write_saved_data_impl(InEKFilter& filter) {
     outfile << "\n";
 
     // Write data rows
-    for(int i = 0; i < filter.time_count; i++) {
+    for(int i = 0; i < filter.saved_count; i++) {
         // Time
         outfile << (i * filter.dt);
         
@@ -334,18 +311,24 @@ void write_saved_data_impl(InEKFilter& filter) {
         outfile << "," << filter.SAVE_MATRIX[filter.idx_ESTIMATED_Bias_Acc+2][i];
         
         // ESTIMATED - Contact
-        for(int k=0; k<filter.robot.num_legs; k++) 
+        for(int k=0; k<filter.robot.model.num_legs; k++)
             outfile << "," << filter.SAVE_MATRIX[filter.idx_ESTIMATED_Contact+k][i];
         
+        // ESTIMATED - slip and hard-contact diagnostics
+        for(int k=0; k<filter.robot.model.num_legs; k++)
+            outfile << "," << filter.SAVE_MATRIX[filter.idx_ESTIMATED_Slip+k][i];
+        for(int k=0; k<filter.robot.model.num_legs; k++)
+            outfile << "," << filter.SAVE_MATRIX[filter.idx_ESTIMATED_Hard_Contact+k][i];
+
         // ESTIMATED - dv per leg
-        for(int k=0; k<filter.robot.num_legs; k++) {
+        for(int k=0; k<filter.robot.model.num_legs; k++) {
             outfile << "," << filter.SAVE_MATRIX[filter.idx_ESTIMATED_dv + 3*k][i];
             outfile << "," << filter.SAVE_MATRIX[filter.idx_ESTIMATED_dv + 3*k + 1][i];
             outfile << "," << filter.SAVE_MATRIX[filter.idx_ESTIMATED_dv + 3*k + 2][i];
         }
         
         // ESTIMATED - dv_norm per leg (from SAVE_MATRIX)
-        for(int k=0; k<filter.robot.num_legs; k++) {
+        for(int k=0; k<filter.robot.model.num_legs; k++) {
             outfile << "," << filter.SAVE_MATRIX[filter.idx_ESTIMATED_dv_norm + k][i];
         }
         
@@ -379,18 +362,18 @@ void write_saved_data_impl(InEKFilter& filter) {
             outfile << "," << filter.SAVE_MATRIX[filter.idx_TRUE_Omega+2][i];
             
             // GT - Contact
-            for(int k=0; k<filter.robot.num_legs; k++) 
+            for(int k=0; k<filter.robot.model.num_legs; k++)
                 outfile << "," << filter.SAVE_MATRIX[filter.idx_TRUE_Contact+k][i];
             
             // GT - dv per leg (from SAVE_MATRIX)
-            for(int k=0; k<filter.robot.num_legs; k++) {
+            for(int k=0; k<filter.robot.model.num_legs; k++) {
                 outfile << "," << filter.SAVE_MATRIX[filter.idx_TRUE_dv + 3*k][i];
                 outfile << "," << filter.SAVE_MATRIX[filter.idx_TRUE_dv + 3*k + 1][i];
                 outfile << "," << filter.SAVE_MATRIX[filter.idx_TRUE_dv + 3*k + 2][i];
             }
             
             // GT - dv_norm per leg (from SAVE_MATRIX)
-            for(int k=0; k<filter.robot.num_legs; k++) {
+            for(int k=0; k<filter.robot.model.num_legs; k++) {
                 outfile << "," << filter.SAVE_MATRIX[filter.idx_TRUE_dv_norm + k][i];
             }
         }

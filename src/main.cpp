@@ -25,14 +25,14 @@ int main() {
     // If this is your first time running a new robot, uncomment the line below
     //  to extract parameters and use that to fill in the yaml files
     
-    // InEKFilter::getParameters("../src/utility/G1/g1_29dof.xml", "g1_wFootFrames_XML");
+    // INEKFilter_manager::getParameters("../src/utility/G1/g1_29dof.xml", "g1_wFootFrames_XML");
     // return 0;
 
 
-    // InEKFilter::getParameters("../digit_mujoco-main/src/digit_mujoco/models/flat/digit-v3-flat.xml", "Digit");
+    // INEKFilter_manager::getParameters("../digit_mujoco-main/src/digit_mujoco/models/flat/digit-v3-flat.xml", "Digit");
     // return 0;
 
-    InEKFilter estimator_IEKF("../config/initialization_config.yaml", "../config/G1_config.yaml");
+    INEKFilter_manager estimator_IEKF("../config/initialization_config.yaml", "../config/G1_config.yaml");
 
     // // Create random Eigen vectors for IMU, motor data (2×num_joints matrix), and torque values
     // Eigen::VectorXd imu_values(6);
@@ -64,7 +64,7 @@ int main() {
 
     std::vector<double> step_times;
 
-        for (int time = 1; time < (estimator_IEKF.time_length - estimator_IEKF.start_index); time++) {
+        for (int time = 1; time <= (estimator_IEKF.time_length - estimator_IEKF.start_index); time++) {
             auto start = std::chrono::high_resolution_clock::now();
 
             estimator_IEKF.RunCSVStep();
@@ -76,7 +76,7 @@ int main() {
                 }
             }
             // std::cout << " position: "
-            //           << estimator_IEKF.robot_state.Position.transpose()
+            //           << estimator_IEKF.robot.state.Position.transpose()
             //           << std::endl;
 
             auto end = std::chrono::high_resolution_clock::now();
@@ -85,15 +85,15 @@ int main() {
 
         }
         // std::cout << "Final robot state:" << std::endl;
-        // std::cout << "  Position: " << estimator_IEKF.robot_state.Position.transpose() << std::endl;
-        // std::cout << "  Velocity: " << estimator_IEKF.robot_state.Velocity.transpose() << std::endl;
-        // std::cout << "  Orientation: " << estimator_IEKF.robot_state.Rotation << std::endl;
+        // std::cout << "  Position: " << estimator_IEKF.robot.state.Position.transpose() << std::endl;
+        // std::cout << "  Velocity: " << estimator_IEKF.robot.state.Velocity.transpose() << std::endl;
+        // std::cout << "  Orientation: " << estimator_IEKF.robot.state.Rotation << std::endl;
         // std::cout << "  Bias Gyro: " << std::scientific << std::setprecision(6) 
-        //           << estimator_IEKF.robot_state.Bias_Gyro.transpose() << std::endl;
+        //           << estimator_IEKF.robot.state.Bias_Gyro.transpose() << std::endl;
         // std::cout << "  Bias Acc: " << std::scientific << std::setprecision(6) 
-        //           << estimator_IEKF.robot_state.Bias_Acc.transpose() << std::endl;
+        //           << estimator_IEKF.robot.state.Bias_Acc.transpose() << std::endl;
         // if (estimator_IEKF.csv_mode && !estimator_IEKF.CSVData.pos_x.empty() && !estimator_IEKF.CSVData.timestamp.empty()) {
-        //     const int last_gt_index = estimator_IEKF.time_length - 1;
+        //     const int last_gt_index = estimator_IEKF.time_length;
         //     Eigen::Vector3d gt_position;
         //     gt_position << estimator_IEKF.CSVData.pos_x[last_gt_index],
         //                    estimator_IEKF.CSVData.pos_y[last_gt_index],
@@ -114,7 +114,7 @@ int main() {
                 max_time = step_times[i];
             }
         }
-        double avg_time = total_time / step_times.size();
+        double avg_time = step_times.empty() ? 0.0 : total_time / step_times.size();
         
         std::cout << "Timing Statistics:" << std::endl;
         std::cout << "  Average time per step: " << std::fixed 

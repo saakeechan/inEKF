@@ -5,31 +5,31 @@
 #include <string>
 
 // Forward declaration
-class InEKFilter;
+class INEKFilter_manager;
 
 namespace InEKF_SaveUtils {
 
     // Reset logging history and contact-accuracy counters.
-    void initialize_logging(InEKFilter& filter);
+    void initialize_logging(INEKFilter_manager& filter);
 
     /**
      * @brief Save one timestep of estimator data to SAVE_MATRIX
-     * @param filter Reference to the InEKFilter instance
-     * @param save_index Index in SAVE_MATRIX to write to
+     * @param filter Reference to the INEKFilter_manager instance
+     * @param save_index Index in SAVE_MATRIX; 0 is initialization, CSV source row is start_index + save_index
      */
-    void save_onestep_impl(InEKFilter& filter, int save_index);
+    void save_onestep_impl(INEKFilter_manager& filter, int save_index);
 
     /**
      * @brief Write all saved data to CSV file with timestamp-based filename
-     * @param filter Reference to the InEKFilter instance
+     * @param filter Reference to the INEKFilter_manager instance
      */
-    void write_saved_data_impl(InEKFilter& filter);
+    void write_saved_data_impl(INEKFilter_manager& filter);
 
     /**
      * @brief Print contact detection accuracy statistics to stdout
-     * @param filter Reference to the InEKFilter instance
+     * @param filter Reference to the INEKFilter_manager instance
      */
-    void print_contact_accuracy_impl(const InEKFilter& filter);
+    void print_contact_accuracy_impl(const INEKFilter_manager& filter);
 
 } // namespace InEKF_SaveUtils
 
