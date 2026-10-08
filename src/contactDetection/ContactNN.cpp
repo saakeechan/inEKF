@@ -70,7 +70,7 @@ void ContactNN::load_contact_model(const std::string& model_path) {
 ContactNN::Prediction ContactNN::predict_contact(const std::vector<float>& input_features) {
     if (!contact_nn_enabled) {
         std::cerr << "Warning: Contact model not loaded. Using default contact detection." << std::endl;
-        return {Eigen::VectorXd::Zero(robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs)};
+        return {std::vector<bool>(robot.num_legs, false), Eigen::VectorXd::Zero(3 * robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs)};
     }
     
     try {
@@ -95,24 +95,24 @@ ContactNN::Prediction ContactNN::predict_contact(const std::vector<float>& input
         
         if (output_tensors.size() != 5) {
             std::cerr << "Expected mean_seq, mean_last, cov_seq, cov_last, and contact_logits from the NN" << std::endl;
-            return {Eigen::VectorXd::Zero(robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs)};
+            return {std::vector<bool>(robot.num_legs, false), Eigen::VectorXd::Zero(3 * robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs)};
         }
 
         // contact_logits is [1, num_legs].
         const auto contact_shape = output_tensors[4].GetTensorTypeAndShapeInfo().GetShape();
         if (contact_shape.size() != 2 || contact_shape[0] != 1 || contact_shape[1] != robot.num_legs) {
             std::cerr << "Expected NN contact_logits shape [1, " << robot.num_legs << "]" << std::endl;
-            return {Eigen::VectorXd::Zero(robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs)};
+            return {std::vector<bool>(robot.num_legs, false), Eigen::VectorXd::Zero(3 * robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs)};
         }
         float* contact_logits_data = output_tensors[4].GetTensorMutableData<float>();
         
         // contact_output shape is [batch_size, num_legs].
         // Apply sigmoid to convert logits to probabilities [0, 1]
-        Eigen::VectorXd contact_predictions = Eigen::VectorXd::Zero(robot.num_legs);
+        std::vector<bool> contact_predictions(robot.num_legs, false);
         for (int leg = 0; leg < robot.num_legs; ++leg) {
             float logit = contact_logits_data[leg];  // Get logit for this leg
             float prob = 1.0f / (1.0f + std::exp(-logit));  // Sigmoid function
-            contact_predictions(leg) = prob;  // Store probability
+            contact_predictions[leg] = prob > 0.5f;  // Direct threshold; no hysteresis
             // std::cout << "Leg " << leg << " - Logit: " << logit << ", Prob: " << prob << std::endl;
         }
         
@@ -146,7 +146,7 @@ ContactNN::Prediction ContactNN::predict_contact(const std::vector<float>& input
         
     } catch (const Ort::Exception& e) {
         std::cerr << "Error during ONNX contact prediction: " << e.what() << std::endl;
-        return {Eigen::VectorXd::Zero(robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs)};
+        return {std::vector<bool>(robot.num_legs, false), Eigen::VectorXd::Zero(3 * robot.num_legs), Eigen::VectorXd::Zero(3 * robot.num_legs)};
     }
 }
 

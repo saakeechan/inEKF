@@ -1,6 +1,6 @@
 
-#ifndef SRC_InEKF_estimator_HPP
-#define SRC_InEKF_estimator_HPP
+#ifndef SRC_InEKF_manager_HPP
+#define SRC_InEKF_manager_HPP
 
 // Libraries
 #include <eigen3/Eigen/Dense>
@@ -19,6 +19,7 @@
 // Include ContactNN for neural network-based contact detection
 #include "../contactDetection/ContactNN.hpp"
 #include <deque>
+#include <tuple>
 
 using namespace Eigen;
 using namespace std;
@@ -54,7 +55,7 @@ public:
     InEKFilter(const std::string& initialization_config_path, const std::string& robot_config_path) {
         load_robot_config(robot_config_path);  // Load robot config FIRST
         InitializeFromYAML(initialization_config_path);  // Then initialize (loads contact_model_path and sets contact_nn_enabled)
-        if (contact_nn_enabled) {
+        if (!csv_mode && contact_nn_enabled) {
             load_contact_model(contact_model_path);  // Load ONNX contact estimation model only if enabled
         }
     }
@@ -66,29 +67,42 @@ public:
     }
     
     // Load ONNX contact estimation model (delegates to ContactNN)
-    void load_contact_model(const std::string& model_path = "../src/estimator/bipedal_contact_best_val_leg_acc.onnx");
+    void load_contact_model(const std::string& model_path = "../src/estimatorManager/bipedal_contact_best_val_leg_acc.onnx");
     
     void LoadCSVData(const std::string& csv_filename);
 
-    void Initialize(double _dt, Eigen::Vector<double,12> cov_val_setting, Eigen::Vector<double, 16> initial_condition, int sliding_window_size = 2); // default sliding window size = 2 (filter)
+    void Initialize(double _dt, Eigen::Vector<double,12> cov_val_setting, Eigen::Vector<double, 16> initial_condition, int sliding_window_size_arg = 2); // default sliding window size = 2 (filter)
     
     void InitializeFromYAML(const std::string& config_path); // Initialize from YAML configuration file
 
     void new_measurement(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const std::vector<bool> &Contact_i);
-    void new_measurement(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i);  // Contact detection from torques
-    void new_measurement();  // No-argument version for CSV mode
+    void new_measurement(const Eigen::VectorXd &imu_i);  // IMU-only mode
 
     std::vector<bool> contact_detection_logic(const std::vector<double> &motor_torques_i);  // Helper for contact detection from torques
-    void Propagate_and_Correct();
+    void Propagate_and_Correct(bool use_nn_velocity = false);
     std::vector<double> Variable_Contact_Cov(int time);
 
     // void send_states(ROBOT_STATES &state_);
+    void store_state_history(inekf::RobotState& state);
     void sliding_window();
 
-    void Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const std::vector<bool> &Contact_i);
-    void Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const Eigen::VectorXd &motor_torques_i, const Eigen::VectorXd &motor_pos_cmd_i, const Eigen::VectorXd &Cmd_Velocity_i);  // Contact detection from torques
-    void Onestep();  // No-argument version for CSV mode
-    // void Onestep(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i, const Eigen::VectorXd &motor_torques_i);  // Contact detection from torques
+    // Supply fresh IMU; propagation uses the previous sample in the window.
+    void Onestep(const Eigen::VectorXd &imu_i);
+    void Onestep(const Eigen::VectorXd &imu_i, const std::vector<bool> &Contact_i, const Eigen::MatrixXd &motor_data_i);
+    // TODO: the following two overloads require the separate velocity NN correction.
+    void Onestep(const Eigen::VectorXd &imu_i, const Eigen::VectorXd &nn_velocity);
+    void Onestep(const Eigen::VectorXd &imu_i, const std::vector<bool> &Contact_i, const Eigen::MatrixXd &motor_data_i, const Eigen::VectorXd &nn_velocity);
+
+    // Independent live contact detectors; call the YAML-selected detector before Onestep.
+    std::vector<bool> run_contact_inference(const Eigen::VectorXd &imu_i, const Eigen::MatrixXd &motor_data_i,
+                                          const Eigen::VectorXd &motor_torques_i, const Eigen::VectorXd &motor_pos_cmd_i,
+                                          const Eigen::VectorXd &cmd_velocity_i);
+    // Pass one latest frame of torques and joint velocities, not their sliding windows.
+    std::vector<bool> run_contact_detection(const Eigen::VectorXd &motor_torques_i,
+                                          const Eigen::VectorXd &joint_velocities_i);
+    Eigen::VectorXd ReadCSVIMU(int row) const;
+    std::tuple<Eigen::VectorXd, std::vector<bool>, Eigen::MatrixXd> ReadCSVInputs(int row) const;
+    void RunCSVStep();
 
     // Static utility function - can be called without creating an estimator object
     static void getParameters(const std::string& urdf_path, const std::string& robot_name);
@@ -103,7 +117,8 @@ public:
     std::string contact_model_path;  // Path to the contact model loaded from YAML
     bool contact_nn_enabled = false;  // Flag to enable/disable NN contact detection
 
-    int frame_count=0;
+    int sliding_window_size = 2; // Configured by YAML and applied by Initialize.
+    int frame_count=0; // Fresh slot is N-1; latest completed frame is N-2.
     int time_count=0;
 
     ROBOT_STATES robot_state;  // Current estimated state populated by send_states()
@@ -116,8 +131,9 @@ public:
     inekf::InEKF filter;
 
     Eigen::Vector<double,6> imu_measurement;
+    bool imu_history_initialized = false;
     
-    // Estimated State Values Window Buffer (dynamically allocated based on SLIDING_WINDOW_SIZE)
+    // Estimated State Values Window Buffer (dynamically allocated based on sliding_window_size)
     std::vector<Vector3d>                   Position_s;
     std::vector<Matrix3d>                   Rotation_s;
     std::vector<Vector3d>                   Velocity_s;
@@ -127,7 +143,7 @@ public:
     std::vector<Vector3d>                   Bias_Acc_s;
     std::vector<Vector3d>                   Bias_Gyro_s;
 
-    // True Values and measurement Buffer (dynamically allocated based on SLIDING_WINDOW_SIZE)
+    // True Values and measurement Buffer (dynamically allocated based on sliding_window_size)
     std::vector<std::vector<bool>>     CONTACT_t;
     std::vector<std::vector<bool>>     HARD_CONTACT_t;
     std::vector<std::vector<bool>>     SLIP_t;
@@ -137,9 +153,6 @@ public:
     std::vector<Eigen::VectorXd>   ENCODER;      // Dynamic size, set after robot config loaded
     std::vector<Eigen::VectorXd>   ENCODERDOT;   // Dynamic size, set after robot config loaded
     std::vector<Eigen::VectorXd>   MOTOR_TORQUES;     // Raw motor torques for NN features
-    std::vector<Eigen::VectorXd>   MOTOR_POS_CMD; // Commanded motor positions for logging and potential use in contact detection
-    std::vector<Eigen::VectorXd>   CMD_V;            // Commanded velocities (if available in CSV data)
-    std::vector<Eigen::VectorXd>   torqueSumSquared;  // Sliding window buffer for torque sum squared
     Eigen::VectorXd NN_foot_velocity_world;  // [x, y, z] world velocity for each leg
     Eigen::VectorXd NN_foot_velocity_variance_world;  // [vx, vy, vz] diagonal variance for each leg
     //SAVE PARAMETER
@@ -188,6 +201,20 @@ public:
 
     bool slip_rejection_mode = false;
     double slip_threshold=0.0;
+
+    // Effective estimator covariances: robot defaults overridden by initialization YAML.
+    double cov_gyro_const = 0.0;
+    double cov_acc_const = 0.0;
+    double cov_slip_const = 0.0;
+    double cov_contact_const = 0.0;
+    double cov_enc_const = 0.0;
+    double cov_bias_gyro_const = 0.0;
+    double cov_bias_acc_const = 0.0;
+    double cov_prior_orientation_const = 0.0;
+    double cov_prior_velocity_const = 0.0;
+    double cov_prior_position_const = 0.0;
+    double cov_prior_bias_gyro_const = 0.0;
+    double cov_prior_bias_acc_const = 0.0;
 
     bool variable_contact_cov_mode = false;
     double cov_amplifier = 2;
@@ -238,4 +265,4 @@ private:
     }
 
 };
-#endif //SRC_InEKF_estimator_HPP
+#endif //SRC_InEKF_manager_HPP

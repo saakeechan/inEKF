@@ -102,7 +102,7 @@ include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${EIGEN3_DIR}
         src
-        src/estimator
+        src/estimatorManager
         src/utility
         src/InEKF
         src/contactDetection
@@ -115,6 +115,8 @@ file(GLOB_RECURSE INEKF_Estimator_src
 
 # Remove files with main() functions from the source list
 list (FILTER INEKF_Estimator_src EXCLUDE REGEX ".*/main\\.cpp$")
+list (FILTER INEKF_Estimator_src EXCLUDE REGEX ".*/csvParserMujoco\\.cpp$")
+list (FILTER INEKF_Estimator_src EXCLUDE REGEX ".*/writeFKFootPosVelMujoco\\.cpp$")
 
 
 add_library(INEKF_Estimator SHARED ${INEKF_Estimator_src})
@@ -170,6 +172,22 @@ set_target_properties(writeFKFootPosVel PROPERTIES
 )
 
 target_link_libraries(writeFKFootPosVel
+    INEKF_Estimator
+    ${PINOCCHIO_LINK_LIBS}
+    yaml-cpp
+)
+
+add_executable(writeFKFootPosVelMujoco
+    src/utility/writeFKFootPosVelMujoco.cpp
+    src/utility/csvParserMujoco.cpp
+)
+
+set_target_properties(writeFKFootPosVelMujoco PROPERTIES
+    BUILD_RPATH "${PINOCCHIO_LIBRARY_DIRS}"
+    INSTALL_RPATH "${PINOCCHIO_LIBRARY_DIRS}"
+)
+
+target_link_libraries(writeFKFootPosVelMujoco
     INEKF_Estimator
     ${PINOCCHIO_LINK_LIBS}
     yaml-cpp

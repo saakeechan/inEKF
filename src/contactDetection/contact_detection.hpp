@@ -35,6 +35,14 @@ namespace ContactDetection {
     // ---------------------------------------------------------
 
 
+    // Detect from one latest motor frame and the previous filter velocity residual.
+    std::vector<bool> get_contacts(
+        const Eigen::VectorXd& motor_torques,
+        const Eigen::VectorXd& joint_velocities,
+        const Eigen::VectorXd& previous_d_v,
+        const std::vector<std::vector<int>>& leg_indices
+    );
+
     /**
      * @brief Detect ground contact combining motor torques and foot velocities
      * 

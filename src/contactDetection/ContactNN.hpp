@@ -51,8 +51,8 @@ public:
     // // Normalize input: (data - mean) / std per feature across time dimension
     // void normalize_nn_input(std::vector<float>& input_features);
     
-    // Returns contact probabilities, mean_last, and cov_last, each flattened by leg then axis.
-    using Prediction = std::tuple<Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd>;
+    // Returns thresholded contact states, mean_last, and cov_last (leg then axis).
+    using Prediction = std::tuple<std::vector<bool>, Eigen::VectorXd, Eigen::VectorXd>;
     Prediction predict_contact(const std::vector<float>& input_features);
     
     // Convenience method: create tensor, normalize, and predict.

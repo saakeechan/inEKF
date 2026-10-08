@@ -9,6 +9,9 @@ class InEKFilter;
 
 namespace InEKF_SaveUtils {
 
+    // Reset logging history and contact-accuracy counters.
+    void initialize_logging(InEKFilter& filter);
+
     /**
      * @brief Save one timestep of estimator data to SAVE_MATRIX
      * @param filter Reference to the InEKFilter instance

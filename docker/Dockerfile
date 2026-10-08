@@ -86,4 +86,7 @@ COPY src/ src/
 COPY config/ config/
 COPY Extra_Files/ Extra_Files/
 
+# Use all available cores for plain cmake --build in interactive shells.
+RUN echo 'export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)' >> /etc/bash.bashrc
+
 CMD ["/bin/bash"]

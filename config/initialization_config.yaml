@@ -5,7 +5,7 @@
 # Estimator parameters
 sliding_window_size: 2
 dt: 0.02
-kinematics_mode: vkm
+kinematics_mode: pkm
 
 # TextFile data file configuration
 textfile:
@@ -28,7 +28,7 @@ variable_contact_covariance:
   amplifier: 1.0  # Multiplied to contact covariance when VCC is enabled
 
 Contact_estimation_NN:
-  enabled: false  # Enable contact estimation using the neural network model
+  enabled: false  # Live inputs: true = NN, false = model-based; CSV uses recorded contacts
   file_path: "../src/contactDetection/model_final_epoch.onnx"  # Path to the ONNX contact estimation model
 
 
@@ -52,7 +52,7 @@ covariance_exponents:
   prior_bias_acc: -10
 
 
-# Initial condition (16-dimensional state vector)
+# Initial condition (16-dimensional state vector) (Acts like Noise when csv enabled)
 initial_condition:
   position: [0.0, 0.0, 0.0]  # Px, Py, Pz
   orientation: [1.0, 0.0, 0.0, 0.0]  # Quaternion (Qw, Qx, Qy, Qz)
@@ -61,3 +61,4 @@ initial_condition:
   bias_acc: [0.0, 0.0, 0.0]  # bax, bay, baz
 
 # ------------------------------------------------------------
+# Test comment

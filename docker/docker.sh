@@ -64,6 +64,8 @@ function run_arm64_container() {
         --user "${HOST_UID}:${HOST_GID}" \
         -e HOME=/tmp \
         -e CCACHE_DIR=/workspace/.ccache \
+        -e CMAKE_GENERATOR=Ninja \
+        -e CMAKE_BUILD_PARALLEL_LEVEL="$(nproc)" \
         -v /etc/passwd:/etc/passwd:ro \
         -v /etc/group:/etc/group:ro \
         -v "${REPO_DIR}:/workspace" \
@@ -90,9 +92,10 @@ function run_container() {
         --user ${HOST_UID}:${HOST_GID} \
         -e HOME=/tmp \
         -e CCACHE_DIR=/workspace/.ccache \
+        -e CMAKE_GENERATOR=Ninja \
+        -e CMAKE_BUILD_PARALLEL_LEVEL="$(nproc)" \
         -e CC=clang \
         -e CXX=clang++ \
-        -e CMAKE_GENERATOR=Ninja \
         -v /etc/passwd:/etc/passwd:ro \
         -v /etc/group:/etc/group:ro \
         -v $(pwd):/workspace \
@@ -118,6 +121,7 @@ function configure_cmake() {
             --user ${HOST_UID}:${HOST_GID} \
             -e HOME=/tmp \
             -e CCACHE_DIR=/workspace/.ccache \
+            -e CMAKE_BUILD_PARALLEL_LEVEL="$(nproc)" \
             -e CC=clang \
             -e CXX=clang++ \
             -e CMAKE_GENERATOR=Ninja \

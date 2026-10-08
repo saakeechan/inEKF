@@ -1,5 +1,5 @@
 #include "inekf_save_utils.hpp"
-#include "../estimator/InEKF_estimator.hpp"
+#include "../estimatorManager/InEKF_manager.hpp"
 #include "BasicFunctions_Estimator.hpp"
 #include <iostream>
 #include <fstream>
@@ -12,6 +12,14 @@ using std::cout;
 using std::endl;
 
 namespace InEKF_SaveUtils {
+
+void initialize_logging(InEKFilter& filter) {
+    filter.dv_history.clear();
+    filter.contact_match_count.assign(filter.robot.num_legs, 0);
+    filter.contact_mismatch_count.assign(filter.robot.num_legs, 0);
+    filter.total_comparisons = 0;
+    filter.GroundTruthContact.assign(filter.robot.num_legs, false);
+}
 
 void save_onestep_impl(InEKFilter& filter, int save_index) {
     

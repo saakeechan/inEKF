@@ -8,7 +8,7 @@
 
 #include <eigen3/Eigen/Dense>
 #include <vector>
-#include "estimator/InEKF_estimator.hpp"
+#include "estimatorManager/InEKF_manager.hpp"
 #include "utility/inekf_save_utils.hpp"
 #include <iomanip>
 #include "utility/RobotModel.hpp"
@@ -67,7 +67,7 @@ int main() {
         for (int time = 1; time < (estimator_IEKF.time_length - estimator_IEKF.start_index); time++) {
             auto start = std::chrono::high_resolution_clock::now();
 
-            estimator_IEKF.Onestep();  // Contact detection from torques
+            estimator_IEKF.RunCSVStep();
             // std::cout << "Loop " << time;
             if (estimator_IEKF.csv_mode) {
                 const int csv_index = estimator_IEKF.start_index + estimator_IEKF.time_count;
@@ -133,4 +133,5 @@ int main() {
         }
 
     return 0;
+    
 }
