@@ -20,9 +20,26 @@
 #include "../contactDetection/ContactNN.hpp"
 #include <deque>
 #include <tuple>
+#include <stdexcept>
 
 using namespace Eigen;
 using namespace std;
+
+struct ContactState {
+    std::vector<bool> contact;
+    std::vector<bool> hard_contact;
+    std::vector<bool> slip;
+    Eigen::VectorXd d_v;
+    Eigen::VectorXd dv_norm;
+
+    void reset(int num_legs, double velocity_value) {
+        contact.assign(num_legs, false);
+        hard_contact.assign(num_legs, false);
+        slip.assign(num_legs, false);
+        d_v.setConstant(3 * num_legs, velocity_value);
+        dv_norm.setConstant(num_legs, velocity_value);
+    }
+};
 
 class RobotManager {
 public:
@@ -32,9 +49,9 @@ public:
 
         Eigen::Matrix3d Rotation;
         Eigen::Vector3d Velocity;
-        Eigen::Vector3d Angular_Velocity;
+        Eigen::Vector3d Angular_Velocity; // Selected frame angular velocity in world axes.
         Eigen::Vector3d Position;
-        Eigen::MatrixXd Covariance;  // Full filter error-state covariance.
+        Eigen::MatrixXd Covariance;  // Raw IMU filter error-state covariance; not transformed to stateFrame_id.
 
         // Eigen::VectorXd d;        // Dynamic size, set at runtime based on num_legs
         Eigen::VectorXd d_v;      // Dynamic size, set at runtime based on num_legs
@@ -68,7 +85,9 @@ public:
     
     //functions
     void load_robot_config(const std::string& config_path_arg) {
-        robot.model.load_config(config_path_arg);
+        if (!robot.model.load_config(config_path_arg)) {
+            throw std::runtime_error("Failed to load robot configuration: " + config_path_arg);
+        }
         compute_indices(); // Compute indices after robot config is loaded
     }
     
@@ -95,7 +114,7 @@ public:
     // Supply fresh IMU; propagation uses the previous sample in the window.
     void Onestep(const Eigen::VectorXd &fresh_imu_arg);
     void Onestep(const Eigen::VectorXd &fresh_imu_arg, const std::vector<bool> &contacts_arg, const Eigen::MatrixXd &motor_data_arg);
-    // TODO: the following two overloads take a separate NN robot-base velocity measurement.
+    // NN input: [IMU-origin velocity in IMU axes; three positive diagonal variances].
     void Onestep(const Eigen::VectorXd &fresh_imu_arg, const Eigen::VectorXd &nn_velocity_arg);
     void Onestep(const Eigen::VectorXd &fresh_imu_arg, const std::vector<bool> &contacts_arg, const Eigen::MatrixXd &motor_data_arg, const Eigen::VectorXd &nn_velocity_arg);
 
@@ -143,16 +162,12 @@ public:
     std::vector<Vector3d>                   Position_s;
     std::vector<Matrix3d>                   Rotation_s;
     std::vector<Vector3d>                   Velocity_s;
-    std::vector<Eigen::VectorXd>            d_v;
-    std::vector<Eigen::VectorXd>            dv_norm;     // Scalar velocity norms per leg
 
     std::vector<Vector3d>                   Bias_Acc_s;
     std::vector<Vector3d>                   Bias_Gyro_s;
 
     // True Values and measurement Buffer (dynamically allocated based on sliding_window_size)
-    std::vector<std::vector<bool>>     CONTACT_t;
-    std::vector<std::vector<bool>>     HARD_CONTACT_t;
-    std::vector<std::vector<bool>>     SLIP_t;
+    std::vector<ContactState> CONTACT_t;
 
     std::vector<Eigen::Vector3d>    IMU_Gyro;
     std::vector<Eigen::Vector3d>    IMU_Acc;
@@ -226,9 +241,6 @@ public:
 
     bool save_results = true;
     std::string saved_results_folder = "../results";
-
-    // dv history for CSV logging: [time_step][leg] = dv_norm
-    std::vector<std::vector<double>> dv_history;
 
     // Contact detection accuracy tracking
     std::vector<bool> GroundTruthContact;  // Ground truth contact state

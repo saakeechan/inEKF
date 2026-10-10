@@ -7,6 +7,7 @@
 
 #include <cmath>
 #include <cassert>
+#include <stdexcept>
 #include <eigen3/Eigen/Dense>
 #include <eigen3/Eigen/Geometry>
 
@@ -760,18 +761,28 @@ public:
     template <typename Derived>
     static Eigen::Matrix<typename Derived::Scalar, 3, 3> Quaternion_to_Rotation_Matrix(const Eigen::MatrixBase<Derived> &q) {
         // q(wxyz) -> R
+        Eigen::Matrix<typename Derived::Scalar, 4, 1> normalized_q = q;
+        if (!normalized_q.allFinite()) {
+            throw std::invalid_argument("Quaternion must have finite components");
+        }
+        const auto scale = normalized_q.cwiseAbs().maxCoeff();
+        if (scale == 0) {
+            throw std::invalid_argument("Quaternion must have nonzero norm");
+        }
+        normalized_q /= scale;
+        normalized_q /= normalized_q.stableNorm();
         Eigen::Matrix<typename Derived::Scalar, 3, 3> R;
-        R(0) = q(0) * q(0) + q(1) * q(1) - q(2) * q(2) - q(3) * q(3);
-        R(1) = 2 * q(0) * q(3) + 2 * q(1) * q(2);
-        R(2) = 2 * q(1) * q(3) - 2 * q(0) * q(2);
+        R(0) = normalized_q(0) * normalized_q(0) + normalized_q(1) * normalized_q(1) - normalized_q(2) * normalized_q(2) - normalized_q(3) * normalized_q(3);
+        R(1) = 2 * normalized_q(0) * normalized_q(3) + 2 * normalized_q(1) * normalized_q(2);
+        R(2) = 2 * normalized_q(1) * normalized_q(3) - 2 * normalized_q(0) * normalized_q(2);
 
-        R(3) = 2 * q(1) * q(2) - 2 * q(0) * q(3);
-        R(4) = q(0) * q(0) - q(1) * q(1) + q(2) * q(2) - q(3) * q(3);
-        R(5) = 2 * q(0) * q(1) + 2 * q(2) * q(3);
+        R(3) = 2 * normalized_q(1) * normalized_q(2) - 2 * normalized_q(0) * normalized_q(3);
+        R(4) = normalized_q(0) * normalized_q(0) - normalized_q(1) * normalized_q(1) + normalized_q(2) * normalized_q(2) - normalized_q(3) * normalized_q(3);
+        R(5) = 2 * normalized_q(0) * normalized_q(1) + 2 * normalized_q(2) * normalized_q(3);
 
-        R(6) = 2 * q(0) * q(2) + 2 * q(1) * q(3);
-        R(7) = 2 * q(2) * q(3) - 2 * q(0) * q(1);
-        R(8) = q(0) * q(0) - q(1) * q(1) - q(2) * q(2) + q(3) * q(3);
+        R(6) = 2 * normalized_q(0) * normalized_q(2) + 2 * normalized_q(1) * normalized_q(3);
+        R(7) = 2 * normalized_q(2) * normalized_q(3) - 2 * normalized_q(0) * normalized_q(1);
+        R(8) = normalized_q(0) * normalized_q(0) - normalized_q(1) * normalized_q(1) - normalized_q(2) * normalized_q(2) + normalized_q(3) * normalized_q(3);
 
         return R;
     }

@@ -33,19 +33,29 @@ int main() {
 
         // Exercise both live overloads with distinct samples and verify startup/reset.
         estimator.csv_mode = false;
+        auto live_initial = initial;
+        live_initial.segment<3>(7) << 0.1, -0.2, 0.3;
+        live_initial.segment<3>(10) << 0.01, -0.02, 0.03;
+        live_initial.segment<3>(13) << 0.04, -0.05, 0.06;
         for (bool with_contacts : {false, true}) {
             // Stale flags must be cleared when the same manager is reinitialized.
             for (int slot = 0; slot < n; ++slot) {
-                estimator.CONTACT_t[slot].assign(estimator.robot.model.num_legs, true);
-                estimator.HARD_CONTACT_t[slot].assign(estimator.robot.model.num_legs, true);
-                estimator.SLIP_t[slot].assign(estimator.robot.model.num_legs, true);
+                estimator.CONTACT_t[slot].contact.assign(estimator.robot.model.num_legs, true);
+                estimator.CONTACT_t[slot].hard_contact.assign(estimator.robot.model.num_legs, true);
+                estimator.CONTACT_t[slot].slip.assign(estimator.robot.model.num_legs, true);
             }
-            estimator.Initialize(0.02, covariance, initial, n);
+            estimator.Initialize(0.02, covariance, live_initial, n);
+            assert(estimator.filter.getState().getVelocity().isApprox(live_initial.segment<3>(7)));
+            assert(estimator.filter.getState().getGyroscopeBias().isApprox(live_initial.segment<3>(10)));
+            assert(estimator.filter.getState().getAccelerometerBias().isApprox(live_initial.segment<3>(13)));
+            assert(estimator.robot.state.Velocity.isApprox(live_initial.segment<3>(7)));
+            assert(estimator.robot.state.Bias_Gyro.isApprox(live_initial.segment<3>(10)));
+            assert(estimator.robot.state.Bias_Acc.isApprox(live_initial.segment<3>(13)));
             for (int slot = 0; slot < n; ++slot) {
                 const std::vector<bool> cleared(estimator.robot.model.num_legs, false);
-                assert(estimator.CONTACT_t[slot] == cleared);
-                assert(estimator.HARD_CONTACT_t[slot] == cleared);
-                assert(estimator.SLIP_t[slot] == cleared);
+                assert(estimator.CONTACT_t[slot].contact == cleared);
+                assert(estimator.CONTACT_t[slot].hard_contact == cleared);
+                assert(estimator.CONTACT_t[slot].slip == cleared);
             }
             Eigen::MatrixXd motors = Eigen::MatrixXd::Zero(2, 29);
             const std::vector<bool> contacts(estimator.robot.model.num_legs, false);

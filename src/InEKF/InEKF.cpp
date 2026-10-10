@@ -207,20 +207,19 @@ void InEKF::Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector
 
     // Discretization
     Eigen::MatrixXd I = Eigen::MatrixXd::Identity(dimP,dimP);
-    // Eigen::MatrixXd Phi = I + A*dt; // Fast approximation of exp(A*dt). TODO: explore using the full exp() instead
     Eigen::MatrixXd Phi = (A*dt).exp(); // Matrix exponential for state transition matrix
     Eigen::MatrixXd Adj = I;
     Adj.block(0,0,dimP-dimTheta,dimP-dimTheta) = Adjoint_SEK3(X); // Approx 200 microseconds
     Eigen::MatrixXd PhiAdj = Phi * Adj;
+    // Model Qk as continuous-time white-noise spectral density: E[w(t)w(tau)^T] = Qk * delta(t-tau).
+    // This endpoint approximation of the covariance integral is first-order in dt;
+    // the dt scaling assumes noise intensity, rather than covariance of a held discrete sample.
     Eigen::MatrixXd Qk_hat = PhiAdj * Qk * PhiAdj.transpose() * dt;
-    // Eigen::MatrixXd Qk_hat = Adj*dt * Qk * dt*Adj.transpose(); // Further simplified from PhiAdj*Qk*PhiAdj.transpose() to reduce computation time
     // Propagate Covariance
     Eigen::MatrixXd P_pred = (Phi * P * Phi.transpose() + Qk_hat);
-    // std::cout << "Q_hat: \n" << Qk_hat << std::endl;
 
     // Set new covariance
     state_.setP(P_pred);
-    // printDebugState("After Propagation", state_, true);
 
     return;
 }
@@ -277,6 +276,21 @@ void InEKF::Correct(const Observation& obs) {
     state_.setP(P_new); 
     // printDebugState("After Correction", state_, true);
 }   
+
+// Velocity of the IMU origin in IMU axes; variance is diagonal in those axes.
+void InEKF::CorrectBodyVelocity(const Eigen::Vector3d& velocity, const Eigen::Vector3d& variance) {
+    Eigen::VectorXd Y = Eigen::VectorXd::Zero(state_.dimX());
+    Eigen::VectorXd b = Eigen::VectorXd::Zero(state_.dimX());
+    Y.head<3>() = velocity;
+    Y(3) = b(3) = -1;
+    Eigen::MatrixXd H = Eigen::MatrixXd::Zero(3, state_.dimP());
+    H.block<3,3>(0,3).setIdentity();
+    Eigen::MatrixXd PI = Eigen::MatrixXd::Zero(3, state_.dimX());
+    PI.leftCols<3>().setIdentity();
+    const Eigen::Matrix3d R = state_.getRotation();
+    Eigen::MatrixXd N = R * variance.asDiagonal() * R.transpose();
+    Correct(Observation(Y, b, H, N, PI));
+}
 
 // Create Observation from vector of landmark measurements
 void InEKF::CorrectLandmarks(const vectorLandmarks& measured_landmarks) {
@@ -405,6 +419,7 @@ void InEKF::CorrectLandmarks(const vectorLandmarks& measured_landmarks) {
 
     // Augment state with newly detected landmarks
     if (new_landmarks.size() > 0) {
+        R = state_.getRotation();
         Eigen::MatrixXd X_aug = state_.getX(); 
         Eigen::MatrixXd P_aug = state_.getP();
         Eigen::Vector3d p = state_.getPosition();
@@ -488,6 +503,7 @@ void InEKF::CorrectKinematics(const std::string& mode, const vectorKinematics& m
             int dimP = state_.dimP();
             int startIndex;
 
+            // VERY BUGGY DON'T USE
             if (mode == "vkm") {
                 // r_v = v_F^W - [v + R((omega - b_g) x p_BF + v_F/B)].
                 // Without an NN measurement, v_F^W is the usual zero-velocity contact assumption.
@@ -640,6 +656,7 @@ void InEKF::CorrectKinematics(const std::string& mode, const vectorKinematics& m
 
     // Augment state with newly detected contacts
     if (new_contacts.size() > 0) {
+        R = state_.getRotation();
         Eigen::MatrixXd X_aug = state_.getX(); 
         Eigen::MatrixXd P_aug = state_.getP();
         Eigen::Vector3d p = state_.getPosition();
