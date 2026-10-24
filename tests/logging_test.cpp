@@ -98,11 +98,11 @@ int main(int argc, char** argv) {
     Eigen::VectorXd imu = Eigen::VectorXd::Zero(6); imu(5) = 9.806659;
     Eigen::MatrixXd motors = Eigen::MatrixXd::Zero(2, 29);
     std::vector<bool> contacts(f.robot.model.num_legs, false);
-    f.Onestep(imu, contacts, motors);
+    f.Onestep(imu, StepMeasurements{KinematicsMeasurement{contacts, motors}});
     assert(f.robot.state.d_v.isApprox(f.NN_foot_velocity_world));
     assert(f.robot.state.dv_norm.isApprox(Eigen::VectorXd::Constant(f.robot.model.num_legs, std::sqrt(12.0))));
     assert(f.dv_norm_nn.size() == 0);
-    f.Onestep(imu, contacts, motors);
+    f.Onestep(imu, StepMeasurements{KinematicsMeasurement{contacts, motors}});
     assert(!f.robot.state.d_v.isApprox(f.NN_foot_velocity_world));
 
     auto state = f.filter.getState();
@@ -110,10 +110,10 @@ int main(int argc, char** argv) {
     f.filter.setState(state);
     std::ostringstream diagnostics;
     auto* previous_stderr = std::cerr.rdbuf(diagnostics.rdbuf());
-    f.Onestep(imu, contacts, motors);
+    f.Onestep(imu, StepMeasurements{KinematicsMeasurement{contacts, motors}});
     std::cerr.rdbuf(previous_stderr);
     assert(diagnostics.str().find("Estimator diverged") != std::string::npos);
     assert(f.dt == 0.02 && f.frame_count == f.sliding_window_size - 1);
     assert(f.IMU_Gyro.back().isZero());
-    f.Onestep(imu, contacts, motors); // Processing continues after reporting divergence.
+    f.Onestep(imu, StepMeasurements{KinematicsMeasurement{contacts, motors}}); // Processing continues after reporting divergence.
 }

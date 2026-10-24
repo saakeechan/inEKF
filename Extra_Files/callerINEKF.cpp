@@ -74,7 +74,11 @@ private:
         }
         
         // Call the estimator's Onestep function
-        estimator_IEKF.Onestep(Sensor_, Contact_);
+        Eigen::MatrixXd motor_data(2, 12);
+        motor_data.row(0) = Sensor_.block(6, 0, 12, 1).transpose();
+        motor_data.row(1) = Sensor_.block(18, 0, 12, 1).transpose();
+        estimator_IEKF.Onestep(Sensor_.topRows(6),
+            StepMeasurements{KinematicsMeasurement{Contact_, motor_data}});
         
         // Publish the estimated state
         publish_state();

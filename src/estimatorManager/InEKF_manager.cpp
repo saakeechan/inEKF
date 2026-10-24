@@ -45,11 +45,11 @@ std::vector<double> INEKFilter_manager::Variable_Contact_Cov(int frame_index_arg
     std::vector<double> covariances(robot.model.num_legs, cov_contact_const);
 
     for (int leg = 0; leg < robot.model.num_legs; ++leg) {
-        if (!CONTACT_t[frame_index_arg].contact[leg]) {
+        if (!CONTACT_s[frame_index_arg].contact[leg]) {
             continue;
         }
 
-        const double residual = CONTACT_t[frame_index_arg].dv_norm(leg);
+        const double residual = CONTACT_s[frame_index_arg].dv_norm(leg);
         if (std::isnan(residual)) continue;
 
         if (variable_contact_cov_mode) {
@@ -82,6 +82,7 @@ void INEKFilter_manager::Initialize(double dt_arg, Eigen::Matrix<double,12,1> co
     frame_count = sliding_window_size - 2; // Initial state occupies the previous-frame slot
     time_count = 0; // Initialize time counter
     imu_history_initialized = false;
+    divergence_reported = false;
     
     // Set sliding window size and allocate buffers
     std::cout << "Sliding window size set to: " << sliding_window_size << std::endl;
@@ -99,7 +100,7 @@ void INEKFilter_manager::Initialize(double dt_arg, Eigen::Matrix<double,12,1> co
     Velocity_s.resize(sliding_window_size);
     Bias_Acc_s.resize(sliding_window_size);
     Bias_Gyro_s.resize(sliding_window_size);
-    CONTACT_t.resize(sliding_window_size);
+    CONTACT_s.resize(sliding_window_size);
     IMU_Gyro.resize(sliding_window_size);
     IMU_Acc.resize(sliding_window_size);
     ENCODER.resize(sliding_window_size);
@@ -129,7 +130,7 @@ void INEKFilter_manager::Initialize(double dt_arg, Eigen::Matrix<double,12,1> co
         ENCODERDOT[i] = Eigen::VectorXd::Zero(robot.model.encoderdot_size);
         MOTOR_TORQUES[i] = Eigen::VectorXd::Zero(robot.model.encoder_size);  // Same size as encoder
         
-        CONTACT_t[i].reset(robot.model.num_legs, std::numeric_limits<double>::infinity());
+        CONTACT_s[i].reset(robot.model.num_legs, std::numeric_limits<double>::infinity());
     }
         
     // Store effective noise settings in the estimator; leave robot defaults unchanged.
@@ -255,7 +256,7 @@ void INEKFilter_manager::Initialize(double dt_arg, Eigen::Matrix<double,12,1> co
 
         ENCODER[init_frame] = robot.model.map_indices_to_encoders(CSVData.encoders[init_csv_index], "encoder");
         ENCODERDOT[init_frame] = robot.model.map_indices_to_encoders(CSVData.encoderdots[init_csv_index], "encoderdot");
-        CONTACT_t[init_frame].contact = CSVData.contact_state[init_csv_index];
+        CONTACT_s[init_frame].contact = CSVData.contact_state[init_csv_index];
 
         robot.model.Forward_Kinematics(ENCODER[init_frame], ENCODERDOT[init_frame]);
         robot.model.compute_joint_jacobians();
@@ -264,7 +265,7 @@ void INEKFilter_manager::Initialize(double dt_arg, Eigen::Matrix<double,12,1> co
         inekf::vectorKinematics measured_kinematics;
 
         for (int k = 0; k < robot.model.num_legs; k++) {
-            contactConstraints.emplace_back(k, CONTACT_t[init_frame].contact[k]);
+            contactConstraints.emplace_back(k, CONTACT_s[init_frame].contact[k]);
 
             Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
             pose.block<3,1>(0,3) = robot.model.get_foot_position(k);
@@ -460,7 +461,7 @@ void INEKFilter_manager::new_measurement(const Eigen::VectorXd &imu_arg, const E
     ENCODER[frame_count] = robot.model.map_indices_to_encoders(encoder_data, "encoder");
     ENCODERDOT[frame_count] = robot.model.map_indices_to_encoders(encoderdot_data, "encoderdot");
     
-    CONTACT_t[frame_count].contact = contacts_arg;
+    CONTACT_s[frame_count].contact = contacts_arg;
     
     // Pinnocchio FK and Jacobians - compute forward kinematics and joint Jacobians as soon as you get new measurement
     robot.model.Forward_Kinematics(ENCODER[frame_count], ENCODERDOT[frame_count]);
@@ -483,19 +484,11 @@ void INEKFilter_manager::new_measurement(const Eigen::VectorXd &imu_arg)
     }
 }
 
-void INEKFilter_manager::Propagate_and_Correct()
-
-{
-
-
-    imu_measurement << IMU_Gyro[frame_count - 1], IMU_Acc[frame_count - 1];
-    filter.Propagate(imu_measurement, dt, Variable_Contact_Cov(frame_count - 1));
-
-
+void INEKFilter_manager::correct_kinematics() {
     // // Build contact constraint list from slip-filtered hard contacts
     std::vector<pair<int,bool>> contactConstraints;
     for (int i=0; i<robot.model.num_legs; i++) {
-        contactConstraints.emplace_back(i, CONTACT_t[frame_count].contact[i]);
+        contactConstraints.emplace_back(i, CONTACT_s[frame_count].contact[i]);
     }
 
     filter.setContacts(contactConstraints);
@@ -536,33 +529,33 @@ void INEKFilter_manager::Propagate_and_Correct()
     }
 
     filter.CorrectKinematics(kinematics_mode, measured_kinematics, true);
-    auto state = filter.getState();
-    store_state_history(state);
-    
+}
 
+void INEKFilter_manager::update_contact_diagnostics() {
+    auto state = filter.getState();
         // Compute d_v from kinematics (full 3D velocity)
         for (int k=0; k<robot.model.num_legs; k++){
-            CONTACT_t[frame_count].d_v.block(3*k,0,3,1) = state.getVelocity()
+            CONTACT_s[frame_count].d_v.block(3*k,0,3,1) = state.getVelocity()
                     + state.getRotation()*robot.model.get_foot_velocity(k)
                     + state.getRotation()*BasicFunctions_Estimator::Hat_so3(IMU_Gyro[frame_count] - state.getGyroscopeBias())*robot.model.get_foot_position(k);
             
-            CONTACT_t[frame_count].dv_norm(k) = CONTACT_t[frame_count].d_v.block(3*k,0,3,1).norm();
+            CONTACT_s[frame_count].dv_norm(k) = CONTACT_s[frame_count].d_v.block(3*k,0,3,1).norm();
         }
         // Apply this step's NN foot velocities and norms after the kinematic defaults.
         if (contact_nn_enabled && dv_norm_nn.size() != 0) {
-            CONTACT_t[frame_count].d_v = NN_foot_velocity_world;
-            CONTACT_t[frame_count].dv_norm = dv_norm_nn;
+            CONTACT_s[frame_count].d_v = NN_foot_velocity_world;
+            CONTACT_s[frame_count].dv_norm = dv_norm_nn;
         }
         dv_norm_nn.resize(0);
         
         for (int k=0; k<robot.model.num_legs; k++){
-            CONTACT_t[frame_count].slip[k] = false;
+            CONTACT_s[frame_count].slip[k] = false;
             
-            if (slip_rejection_mode == true && CONTACT_t[frame_count].contact[k] == true &&
-                CONTACT_t[frame_count].dv_norm(k) > slip_threshold){
-                CONTACT_t[frame_count].slip[k] = true;
+            if (slip_rejection_mode == true && CONTACT_s[frame_count].contact[k] == true &&
+                CONTACT_s[frame_count].dv_norm(k) > slip_threshold){
+                CONTACT_s[frame_count].slip[k] = true;
             }
-            CONTACT_t[frame_count].hard_contact[k]  = CONTACT_t[frame_count].contact[k] - CONTACT_t[frame_count].slip[k];
+            CONTACT_s[frame_count].hard_contact[k]  = CONTACT_s[frame_count].contact[k] - CONTACT_s[frame_count].slip[k];
     }
     
     
@@ -583,11 +576,11 @@ void INEKFilter_manager::send_states(RobotManager::ManagerState &state_arg) {
     // Populate remaining robot.state fields (sensor-specific and contact data)
     state_arg.Bias_Gyro = filter_state.getGyroscopeBias();
     state_arg.Bias_Acc = filter_state.getAccelerometerBias();
-    state_arg.Contact = CONTACT_t[frame_count].contact;
-    state_arg.Hard_Contact = CONTACT_t[frame_count].hard_contact;
-    state_arg.Slip = CONTACT_t[frame_count].slip;
-    state_arg.d_v = CONTACT_t[frame_count].d_v;
-    state_arg.dv_norm = CONTACT_t[frame_count].dv_norm;
+    state_arg.Contact = CONTACT_s[frame_count].contact;
+    state_arg.Hard_Contact = CONTACT_s[frame_count].hard_contact;
+    state_arg.Slip = CONTACT_s[frame_count].slip;
+    state_arg.d_v = CONTACT_s[frame_count].d_v;
+    state_arg.dv_norm = CONTACT_s[frame_count].dv_norm;
 
 
 }
@@ -611,7 +604,7 @@ void INEKFilter_manager::sliding_window() {
         Velocity_s[i] = Velocity_s[i + 1];
         Bias_Gyro_s[i] = Bias_Gyro_s[i + 1];
         Bias_Acc_s[i] = Bias_Acc_s[i + 1];
-        CONTACT_t[i] = CONTACT_t[i + 1];
+        CONTACT_s[i] = CONTACT_s[i + 1];
         IMU_Gyro[i] = IMU_Gyro[i + 1];
         IMU_Acc[i] = IMU_Acc[i + 1];
         ENCODER[i] = ENCODER[i + 1];
@@ -625,7 +618,7 @@ void INEKFilter_manager::sliding_window() {
     Velocity_s[frame_count].setZero();
     Bias_Gyro_s[frame_count].setZero();
     Bias_Acc_s[frame_count].setZero();
-    CONTACT_t[frame_count].reset(robot.model.num_legs, std::numeric_limits<double>::infinity());
+    CONTACT_s[frame_count].reset(robot.model.num_legs, std::numeric_limits<double>::infinity());
     IMU_Gyro[frame_count].setZero();
     IMU_Acc[frame_count].setZero();
     ENCODER[frame_count].setZero();
@@ -633,61 +626,48 @@ void INEKFilter_manager::sliding_window() {
     MOTOR_TORQUES[frame_count].setZero();
 }
 
-void INEKFilter_manager::Onestep(const Eigen::VectorXd& fresh_imu_arg) { // Look later and streamline
-    new_measurement(fresh_imu_arg);
-    imu_measurement << IMU_Gyro[frame_count - 1], IMU_Acc[frame_count - 1];
-    filter.Propagate(imu_measurement, dt, Variable_Contact_Cov(frame_count - 1));
-    auto state = filter.getState();
-    store_state_history(state);
-    CONTACT_t[frame_count].reset(robot.model.num_legs, std::numeric_limits<double>::quiet_NaN());
-    CONTACT_t[frame_count].contact = CONTACT_t[frame_count - 1].contact;
-    dv_norm_nn.resize(0);
-    send_states(robot.state);
-    sliding_window();
-}
-
-void INEKFilter_manager::Onestep(const Eigen::VectorXd& fresh_imu_arg, const Eigen::VectorXd& nn_velocity_arg) {
-    if (nn_velocity_arg.size() != 6 || !nn_velocity_arg.allFinite() ||
-        (nn_velocity_arg.tail<3>().array() <= 0.0).any()) {
-        throw std::invalid_argument("Expected body velocity and three finite positive variances");
+void INEKFilter_manager::Onestep(const Eigen::VectorXd& fresh_imu_arg, const StepMeasurements& measurements_arg) {
+    if (measurements_arg.body_velocity) {
+        const auto& body = *measurements_arg.body_velocity;
+        if (!body.velocity.allFinite() || !body.variance.allFinite() ||
+            (body.variance.array() <= 0.0).any()) {
+            throw std::invalid_argument("Expected finite body velocity and positive variances");
+        }
     }
-    new_measurement(fresh_imu_arg);
-    imu_measurement << IMU_Gyro[frame_count - 1], IMU_Acc[frame_count - 1];
-    filter.Propagate(imu_measurement, dt, Variable_Contact_Cov(frame_count - 1));
-    filter.CorrectBodyVelocity(nn_velocity_arg.head<3>(), nn_velocity_arg.tail<3>());
-    auto state = filter.getState();
-    store_state_history(state);
-    CONTACT_t[frame_count].reset(robot.model.num_legs, std::numeric_limits<double>::quiet_NaN());
-    CONTACT_t[frame_count].contact = CONTACT_t[frame_count - 1].contact;
-    dv_norm_nn.resize(0);
-    send_states(robot.state);
-    sliding_window();
-}
-
-void INEKFilter_manager::Onestep(const Eigen::VectorXd& fresh_imu_arg, const std::vector<bool>&,
-                        const Eigen::MatrixXd&, const Eigen::VectorXd&) {
-    throw std::logic_error("TODO: implement contact kinematics plus separate velocity NN correction");
-}
-
-void INEKFilter_manager::Onestep(const Eigen::VectorXd &fresh_imu_arg, const std::vector<bool> &contacts_arg, const Eigen::MatrixXd &motor_data_arg) {
-    if (fresh_imu_arg.size() != 6 || !fresh_imu_arg.allFinite() ||
-        motor_data_arg.rows() != 2 ||
-        !motor_data_arg.allFinite() || contacts_arg.size() != static_cast<std::size_t>(robot.model.num_legs)) {
-        throw std::invalid_argument("Expected IMU, one contact per leg, and finite motor data [q; qd]");
+    if (measurements_arg.kinematics) {
+        const auto& kinematics = *measurements_arg.kinematics;
+        if (kinematics.motor_data.rows() != 2 || !kinematics.motor_data.allFinite() ||
+            kinematics.motor_data.cols() != static_cast<Eigen::Index>(robot.model.Encoder_indices_map.size()) ||
+            kinematics.motor_data.cols() != static_cast<Eigen::Index>(robot.model.Encoderdot_indices_map.size()) ||
+            kinematics.contacts.size() != static_cast<std::size_t>(robot.model.num_legs)) {
+            throw std::invalid_argument("Expected one contact per leg and finite motor data [q; qd]");
+        }
+        new_measurement(fresh_imu_arg, kinematics.motor_data, kinematics.contacts);
+    } else {
+        new_measurement(fresh_imu_arg);
+        CONTACT_s[frame_count].reset(robot.model.num_legs, std::numeric_limits<double>::quiet_NaN());
+        CONTACT_s[frame_count].contact = CONTACT_s[frame_count - 1].contact;
     }
 
-    // Current IMU remains in history for correction, residuals, and output.
-    new_measurement(fresh_imu_arg, motor_data_arg, contacts_arg);
-    Propagate_and_Correct();
-    send_states(robot.state);
+    imu_measurement << IMU_Gyro[frame_count - 1], IMU_Acc[frame_count - 1];
+    filter.Propagate(imu_measurement, dt, Variable_Contact_Cov(frame_count - 1));
+    if (measurements_arg.kinematics) correct_kinematics();
+    if (measurements_arg.body_velocity) {
+        const auto& body = *measurements_arg.body_velocity;
+        filter.CorrectBodyVelocity(body.velocity, body.variance);
+    }
 
-    if (!filter.getState().getVelocity().allFinite() || filter.getState().getVelocity().norm() > 10) {
+    auto state = filter.getState();
+    store_state_history(state);
+    if (measurements_arg.kinematics) update_contact_diagnostics();
+    else dv_norm_nn.resize(0); // I dont like this loose dv_norm_nn here, but look later. This is related to inference of foot velocity NN.
+    send_states(robot.state);
+    if (!divergence_reported &&
+        (!state.getVelocity().allFinite() || state.getVelocity().norm() > 10)) {
         std::cerr << "Estimator diverged" << std::endl;
+        divergence_reported = true;
     }
-
-    // Preserve the completed frame in history and clear the fresh slot.
     sliding_window();
-
 }
 
 void INEKFilter_manager::load_contact_model(const std::string& model_path_arg) {
@@ -740,7 +720,7 @@ std::tuple<std::vector<bool>, Eigen::VectorXd> INEKFilter_manager::run_contact_i
     // Predict contacts, world-frame foot velocities, and their diagonal variances.
     auto [predicted_contacts, predicted_foot_velocities, predicted_foot_velocity_variances] = contact_nn->nn_predict_contact();
 
-    CONTACT_t[frame_count].contact = predicted_contacts;
+    CONTACT_s[frame_count].contact = predicted_contacts;
 
     NN_foot_velocity_world = predicted_foot_velocities;
     NN_foot_velocity_variance_world = predicted_foot_velocity_variances;
@@ -748,7 +728,7 @@ std::tuple<std::vector<bool>, Eigen::VectorXd> INEKFilter_manager::run_contact_i
     for (int leg = 0; leg < robot.model.num_legs; ++leg) {
         dv_norm_nn(leg) = predicted_foot_velocities.segment<3>(3 * leg).norm();
     }
-    return {CONTACT_t[frame_count].contact, dv_norm_nn};
+    return {CONTACT_s[frame_count].contact, dv_norm_nn};
 }
 
 std::vector<bool> INEKFilter_manager::run_contact_detection(const Eigen::VectorXd &motor_torques_arg,
@@ -756,9 +736,9 @@ std::vector<bool> INEKFilter_manager::run_contact_detection(const Eigen::VectorX
     if (csv_mode) throw std::logic_error("Model-based contact detection requires CSV mode to be disabled");
     dv_norm_nn.resize(0);
     // Detection precedes Onestep, so use the previous completed filter residual.
-    CONTACT_t[frame_count].contact = ContactDetection::get_contacts(
-        motor_torques_arg, joint_velocities_arg, CONTACT_t[frame_count > 0 ? frame_count - 1 : 0].d_v, robot.model.Leg_indices_map);
-    return CONTACT_t[frame_count].contact;
+    CONTACT_s[frame_count].contact = ContactDetection::get_contacts(
+        motor_torques_arg, joint_velocities_arg, CONTACT_s[frame_count > 0 ? frame_count - 1 : 0].d_v, robot.model.Leg_indices_map);
+    return CONTACT_s[frame_count].contact;
 }
 
 Eigen::VectorXd INEKFilter_manager::ReadCSVIMU(int row_arg) const {
@@ -797,19 +777,14 @@ void INEKFilter_manager::RunCSVStep() {
         throw std::out_of_range("No CSV rows remain within inclusive end_count");
     }
     auto [imu, contacts, motor_data] = ReadCSVInputs(j);
-    Onestep(imu, contacts, motor_data);
+    Onestep(imu, StepMeasurements{KinematicsMeasurement{contacts, motor_data}});
     // The completed sample is now in the penultimate slot; the logger reads frame_count.
     frame_count = sliding_window_size - 2;
     GroundTruthContact = CSVData.contact_state[j]; // For evaluation purposes, store ground truth contact from CSV
     
-    // // Print contact and d_v info for debugging
-    // std::cout << "Contacts: [" << CONTACT_t[frame_count].contact[0] << ", " << CONTACT_t[frame_count].contact[1] << "]";
-    // std::cout << " GT: [" << GroundTruthContact[0] << ", " << GroundTruthContact[1] << "]" << std::endl;
-    // std::cout << "d_v norms: [" << CONTACT_t[frame_count].d_v.block(0,0,3,1).norm() << ", " << CONTACT_t[frame_count].d_v.block(3,0,3,1).norm() << "]" << std::endl;
-
     // Compare detected contact with ground truth and update counters
     for (int k = 0; k < robot.model.num_legs; k++) {
-        if (CONTACT_t[frame_count].contact[k] == GroundTruthContact[k]) {
+        if (CONTACT_s[frame_count].contact[k] == GroundTruthContact[k]) {
             contact_match_count[k]++;
         } else {
             contact_mismatch_count[k]++;
@@ -820,6 +795,7 @@ void INEKFilter_manager::RunCSVStep() {
     InEKF_SaveUtils::save_onestep_impl(*this, time_count + 1);
     frame_count = sliding_window_size - 1;
     ++time_count;
+    // Dont like how this temporarily changes frame count for logger. Look into it later
 }
 
 void INEKFilter_manager::getParameters(const std::string& urdf_path_arg, const std::string& robot_name_arg) {

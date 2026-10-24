@@ -99,6 +99,7 @@ class InEKF {
 
         void Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector<double> contact_cov_array);
         void Correct(const Observation& obs);
+        void CorrectWithoutAttitudeAndGyroBias(const Observation& obs);
         void CorrectBodyVelocity(const Eigen::Vector3d& velocity, const Eigen::Vector3d& variance);
         void CorrectLandmarks(const vectorLandmarks& measured_landmarks);
         void CorrectKinematics(const std::string& mode, const vectorKinematics& measured_kinematics, bool flag);

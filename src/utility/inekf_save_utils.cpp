@@ -34,11 +34,11 @@ void save_onestep_impl(INEKFilter_manager& filter, int save_index) {
     for(int i=0; i<filter.robot.model.num_legs; i++) {
         for(int k=0; k<3; k++) {
             filter.SAVE_MATRIX[filter.idx_ESTIMATED_dv + 3 * i + k][save_index] = 
-                filter.CONTACT_t[filter.frame_count].d_v(3*i + k);
+                filter.CONTACT_s[filter.frame_count].d_v(3*i + k);
         }
     }
     for (int i=0; i<filter.robot.model.num_legs; i++) {
-        filter.SAVE_MATRIX[filter.idx_ESTIMATED_dv_norm + i][save_index] = filter.CONTACT_t[filter.frame_count].dv_norm(i);
+        filter.SAVE_MATRIX[filter.idx_ESTIMATED_dv_norm + i][save_index] = filter.CONTACT_s[filter.frame_count].dv_norm(i);
     }
     
     if(filter.csv_mode) {
@@ -112,9 +112,9 @@ void save_onestep_impl(INEKFilter_manager& filter, int save_index) {
 
     // Save estimated states (always done, regardless of csv_mode)
     for(int i=0; i<filter.robot.model.num_legs; i++) {
-        filter.SAVE_MATRIX[filter.idx_ESTIMATED_Contact+i][save_index] = filter.CONTACT_t[filter.frame_count].contact[i];
-        filter.SAVE_MATRIX[filter.idx_ESTIMATED_Slip+i][save_index] = filter.CONTACT_t[filter.frame_count].slip[i];
-        filter.SAVE_MATRIX[filter.idx_ESTIMATED_Hard_Contact+i][save_index] = filter.CONTACT_t[filter.frame_count].hard_contact[i];
+        filter.SAVE_MATRIX[filter.idx_ESTIMATED_Contact+i][save_index] = filter.CONTACT_s[filter.frame_count].contact[i];
+        filter.SAVE_MATRIX[filter.idx_ESTIMATED_Slip+i][save_index] = filter.CONTACT_s[filter.frame_count].slip[i];
+        filter.SAVE_MATRIX[filter.idx_ESTIMATED_Hard_Contact+i][save_index] = filter.CONTACT_s[filter.frame_count].hard_contact[i];
     }
 
     Eigen::Vector3d temp_eul = BasicFunctions_Estimator::Rotation_to_EulerZYX(filter.robot.state.Rotation);

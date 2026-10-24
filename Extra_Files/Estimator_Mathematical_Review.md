@@ -207,7 +207,7 @@ The review did not find a sign error in:
 - The `vkm` gyro-bias Jacobian block.
 - The Joseph covariance update in `Correct()`.
 
-The previous-IMU propagation/current-measurement correction timing was treated as the existing intended contract. Slip and hard-contact flags were treated as diagnostics; correction intentionally uses nominal `CONTACT_t`.
+The previous-IMU propagation/current-measurement correction timing was treated as the existing intended contract. Slip and hard-contact flags were treated as diagnostics; correction intentionally uses nominal `CONTACT_s`.
 
 ## Priorities and validation limits
 

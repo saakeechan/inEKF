@@ -20,6 +20,7 @@
 #include "../contactDetection/ContactNN.hpp"
 #include <deque>
 #include <tuple>
+#include <optional>
 #include <stdexcept>
 
 using namespace Eigen;
@@ -39,6 +40,21 @@ struct ContactState {
         d_v.setConstant(3 * num_legs, velocity_value);
         dv_norm.setConstant(num_legs, velocity_value);
     }
+};
+
+struct KinematicsMeasurement {
+    std::vector<bool> contacts;
+    Eigen::MatrixXd motor_data;
+};
+
+struct BodyVelocityMeasurement {
+    Eigen::Vector3d velocity = Eigen::Vector3d::Zero(); // IMU origin in IMU axes.
+    Eigen::Vector3d variance = Eigen::Vector3d::Zero(); // Positive diagonal variances.
+};
+
+struct StepMeasurements {
+    std::optional<KinematicsMeasurement> kinematics;
+    std::optional<BodyVelocityMeasurement> body_velocity;
 };
 
 class RobotManager {
@@ -104,7 +120,8 @@ public:
     void new_measurement(const Eigen::VectorXd &imu_arg);  // IMU-only mode
 
     std::vector<bool> contact_detection_logic(const std::vector<double> &motor_torques_arg);  // Helper for contact detection from torques
-    void Propagate_and_Correct();
+    void correct_kinematics();
+    void update_contact_diagnostics();
     std::vector<double> Variable_Contact_Cov(int frame_index_arg);
 
     void send_states(RobotManager::ManagerState &state_arg);
@@ -112,11 +129,7 @@ public:
     void sliding_window();
 
     // Supply fresh IMU; propagation uses the previous sample in the window.
-    void Onestep(const Eigen::VectorXd &fresh_imu_arg);
-    void Onestep(const Eigen::VectorXd &fresh_imu_arg, const std::vector<bool> &contacts_arg, const Eigen::MatrixXd &motor_data_arg);
-    // NN input: [IMU-origin velocity in IMU axes; three positive diagonal variances].
-    void Onestep(const Eigen::VectorXd &fresh_imu_arg, const Eigen::VectorXd &nn_velocity_arg);
-    void Onestep(const Eigen::VectorXd &fresh_imu_arg, const std::vector<bool> &contacts_arg, const Eigen::MatrixXd &motor_data_arg, const Eigen::VectorXd &nn_velocity_arg);
+    void Onestep(const Eigen::VectorXd &fresh_imu_arg, const StepMeasurements &measurements_arg = {});
 
     // Independent live contact detectors; call the YAML-selected detector before Onestep.
     // Returns contacts and per-leg norms of NN-predicted world foot velocities.
@@ -167,7 +180,7 @@ public:
     std::vector<Vector3d>                   Bias_Gyro_s;
 
     // True Values and measurement Buffer (dynamically allocated based on sliding_window_size)
-    std::vector<ContactState> CONTACT_t;
+    std::vector<ContactState> CONTACT_s;
 
     std::vector<Eigen::Vector3d>    IMU_Gyro;
     std::vector<Eigen::Vector3d>    IMU_Acc;
@@ -249,6 +262,7 @@ public:
     int total_comparisons = 0;  // Total number of timesteps compared
 
 private:
+    bool divergence_reported = false;
     std::string kinematics_mode = "pkm";
 
     // Helper function to compute indices after robot config is loaded

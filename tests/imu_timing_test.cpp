@@ -31,7 +31,7 @@ int main() {
             previous = fresh;
         }
 
-        // Exercise both live overloads with distinct samples and verify startup/reset.
+        // Exercise both live measurement modes with distinct samples and verify startup/reset.
         estimator.csv_mode = false;
         auto live_initial = initial;
         live_initial.segment<3>(7) << 0.1, -0.2, 0.3;
@@ -40,9 +40,9 @@ int main() {
         for (bool with_contacts : {false, true}) {
             // Stale flags must be cleared when the same manager is reinitialized.
             for (int slot = 0; slot < n; ++slot) {
-                estimator.CONTACT_t[slot].contact.assign(estimator.robot.model.num_legs, true);
-                estimator.CONTACT_t[slot].hard_contact.assign(estimator.robot.model.num_legs, true);
-                estimator.CONTACT_t[slot].slip.assign(estimator.robot.model.num_legs, true);
+                estimator.CONTACT_s[slot].contact.assign(estimator.robot.model.num_legs, true);
+                estimator.CONTACT_s[slot].hard_contact.assign(estimator.robot.model.num_legs, true);
+                estimator.CONTACT_s[slot].slip.assign(estimator.robot.model.num_legs, true);
             }
             estimator.Initialize(0.02, covariance, live_initial, n);
             assert(estimator.filter.getState().getVelocity().isApprox(live_initial.segment<3>(7)));
@@ -53,9 +53,9 @@ int main() {
             assert(estimator.robot.state.Bias_Acc.isApprox(live_initial.segment<3>(13)));
             for (int slot = 0; slot < n; ++slot) {
                 const std::vector<bool> cleared(estimator.robot.model.num_legs, false);
-                assert(estimator.CONTACT_t[slot].contact == cleared);
-                assert(estimator.CONTACT_t[slot].hard_contact == cleared);
-                assert(estimator.CONTACT_t[slot].slip == cleared);
+                assert(estimator.CONTACT_s[slot].contact == cleared);
+                assert(estimator.CONTACT_s[slot].hard_contact == cleared);
+                assert(estimator.CONTACT_s[slot].slip == cleared);
             }
             Eigen::MatrixXd motors = Eigen::MatrixXd::Zero(2, 29);
             const std::vector<bool> contacts(estimator.robot.model.num_legs, false);
@@ -66,7 +66,7 @@ int main() {
                 if (step == 1) previous = fresh; // First live sample seeds history.
                 auto expected = estimator.filter;
                 expected.Propagate(previous, estimator.dt, estimator.Variable_Contact_Cov(n - 2));
-                if (with_contacts) estimator.Onestep(fresh, contacts, motors);
+                if (with_contacts) estimator.Onestep(fresh, StepMeasurements{KinematicsMeasurement{contacts, motors}});
                 else estimator.Onestep(fresh);
                 assert(estimator.robot.state.Rotation.isApprox(expected.getState().getRotation()));
                 assert(estimator.robot.state.Position.isApprox(expected.getState().getPosition()));
@@ -81,5 +81,5 @@ int main() {
             }
         }
     }
-    std::cout << "Previous IMU propagation passed for CSV and both live overloads, N=2, 3, 5.\n";
+    std::cout << "Previous IMU propagation passed for CSV and both live measurement modes, N=2, 3, 5.\n";
 }

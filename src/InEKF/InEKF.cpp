@@ -277,6 +277,31 @@ void InEKF::Correct(const Observation& obs) {
     // printDebugState("After Correction", state_, true);
 }   
 
+// Freeze attitude and gyro bias for this observation; retain the other gain rows.
+void InEKF::CorrectWithoutAttitudeAndGyroBias(const Observation& obs) {
+    Eigen::MatrixXd P = state_.getP();
+    Eigen::MatrixXd PHT = P * obs.H.transpose();
+    Eigen::MatrixXd S = obs.H * PHT + obs.N;
+    Eigen::MatrixXd K = S.ldlt().solve(PHT.transpose()).transpose();
+    K.topRows(3).setZero();
+    K.middleRows(state_.dimP() - state_.dimTheta(), 3).setZero();
+
+    Eigen::MatrixXd BigX;
+    state_.copyDiagX(obs.Y.rows()/state_.dimX(), BigX);
+    Eigen::MatrixXd Z = BigX*obs.Y - obs.b;
+    Eigen::VectorXd delta = K*obs.PI*Z;
+    Eigen::MatrixXd dX = Exp_SEK3(delta.segment(0,delta.rows()-state_.dimTheta()));
+    Eigen::VectorXd dTheta = delta.segment(delta.rows()-state_.dimTheta(), state_.dimTheta());
+    Eigen::MatrixXd X_new = dX*state_.getX();
+    Eigen::VectorXd Theta_new = state_.getTheta() + dTheta;
+    state_.setX(X_new);
+    state_.setTheta(Theta_new);
+
+    Eigen::MatrixXd IKH = Eigen::MatrixXd::Identity(state_.dimP(),state_.dimP()) - K*obs.H;
+    Eigen::MatrixXd P_new = IKH * P * IKH.transpose() + K*obs.N*K.transpose();
+    state_.setP(P_new);
+}
+
 // Velocity of the IMU origin in IMU axes; variance is diagonal in those axes.
 void InEKF::CorrectBodyVelocity(const Eigen::Vector3d& velocity, const Eigen::Vector3d& variance) {
     Eigen::VectorXd Y = Eigen::VectorXd::Zero(state_.dimX());
@@ -290,6 +315,7 @@ void InEKF::CorrectBodyVelocity(const Eigen::Vector3d& velocity, const Eigen::Ve
     const Eigen::Matrix3d R = state_.getRotation();
     Eigen::MatrixXd N = R * variance.asDiagonal() * R.transpose();
     Correct(Observation(Y, b, H, N, PI));
+    // CorrectWithoutAttitudeAndGyroBias(Observation(Y, b, H, N, PI));
 }
 
 // Create Observation from vector of landmark measurements
