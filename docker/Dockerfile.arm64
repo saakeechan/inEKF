@@ -1,0 +1,83 @@
+# syntax=docker/dockerfile:1.7
+FROM ubuntu:22.04
+
+LABEL org.opencontainers.image.source="https://github.com/saakeechan/inEKF"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Native ARM64 compiler and all system dependencies used by this project.
+RUN --mount=type=cache,id=inekf-arm64-apt-cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=inekf-arm64-apt-lists,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y \
+    build-essential \
+    clang \
+    cmake \
+    git \
+    wget \
+    pkg-config \
+    libboost-all-dev \
+    libeigen3-dev \
+    libyaml-cpp-dev \
+    liburdfdom-dev \
+    libconsole-bridge-dev \
+    libassimp-dev \
+    libtinyxml2-dev \
+    python3 \
+    python3-dev \
+    python3-pip \
+    python3-numpy \
+    python3-venv \
+    ccache \
+    ninja-build
+
+RUN python3 -m venv --system-site-packages /opt/venv
+ENV PATH="/opt/venv/bin:/usr/lib/ccache:${PATH}" \
+    CCACHE_DIR=/ccache \
+    CC=clang \
+    CXX=clang++ \
+    CMAKE_GENERATOR=Ninja
+
+RUN --mount=type=cache,id=inekf-arm64-pip,target=/root/.cache/pip,sharing=locked \
+    /opt/venv/bin/pip install --upgrade pip numpy pandas matplotlib meshcat
+
+# robotpkg's binary repository is AMD64-only.  Build the required Pinocchio
+# library natively so that pkg-config exposes an ARM64 libpinocchio.
+ARG PINOCCHIO_VERSION=3.3.0
+RUN --mount=type=cache,id=inekf-arm64-ccache,target=/ccache,sharing=locked \
+    git clone --recursive --depth 1 --branch v${PINOCCHIO_VERSION} https://github.com/stack-of-tasks/pinocchio.git /tmp/pinocchio && \
+    cmake -S /tmp/pinocchio -B /tmp/pinocchio/build -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/opt/openrobots \
+        -DBUILD_PYTHON_INTERFACE=OFF \
+        -DBUILD_TESTING=OFF \
+        -DBUILD_EXAMPLES=OFF \
+        -DBUILD_WITH_URDF_SUPPORT=ON \
+        -DBUILD_WITH_COLLISION_SUPPORT=OFF \
+        -DBUILD_WITH_CASADI_SUPPORT=OFF && \
+    cmake --build /tmp/pinocchio/build && \
+    cmake --install /tmp/pinocchio/build && \
+    rm -rf /tmp/pinocchio
+
+ENV PATH="/opt/openrobots/bin:${PATH}" \
+    PKG_CONFIG_PATH="/opt/openrobots/lib/pkgconfig" \
+    LD_LIBRARY_PATH="/opt/openrobots/lib" \
+    CMAKE_PREFIX_PATH="/opt/openrobots"
+
+ARG ONNXRUNTIME_VERSION=1.24.2
+WORKDIR /tmp
+RUN wget -q https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-linux-aarch64-${ONNXRUNTIME_VERSION}.tgz && \
+    tar -xzf onnxruntime-linux-aarch64-${ONNXRUNTIME_VERSION}.tgz && \
+    mkdir -p /thirdparty && \
+    mv onnxruntime-linux-aarch64-${ONNXRUNTIME_VERSION} /thirdparty/ && \
+    rm onnxruntime-linux-aarch64-${ONNXRUNTIME_VERSION}.tgz
+
+WORKDIR /workspace
+COPY CMakeLists.txt .
+COPY src/ src/
+COPY config/ config/
+COPY Extra_Files/ Extra_Files/
+
+# Use all available cores for plain cmake --build in interactive shells.
+RUN echo 'export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)' >> /etc/bash.bashrc
+
+CMD ["/bin/bash"]

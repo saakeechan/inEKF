@@ -11,6 +11,7 @@
  *  @date   September 25, 2018
  **/
 
+ 
 #include "LieGroup.h"
 
 namespace inekf {
@@ -29,42 +30,60 @@ Eigen::Matrix3d skew(const Eigen::Vector3d& v) {
 }
 
 Eigen::Matrix3d Exp_SO3(const Eigen::Vector3d& w) {
-    // Computes the vectorized exponential map for SO(3)
-    Eigen::Matrix3d A = skew(w);
+    Eigen::Matrix3d W = skew(w);
     double theta = w.norm();
+    Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
+
     if (theta < TOLERANCE) {
-        return Eigen::Matrix3d::Identity();
-    } 
-    Eigen::Matrix3d R =  Eigen::Matrix3d::Identity() + (sin(theta)/theta)*A + ((1-cos(theta))/(theta*theta))*A*A;
-    return R;
+        return I + W + 0.5 * W * W;
+    }
+
+    return I
+        + (std::sin(theta) / theta) * W
+        + ((1.0 - std::cos(theta)) / (theta * theta)) * W * W;
 }
 
 Eigen::MatrixXd Exp_SEK3(const Eigen::VectorXd& v) {
-    // Computes the vectorized exponential map for SE_K(3)
-    int K = (v.size()-3)/3;
-    Eigen::MatrixXd X = Eigen::MatrixXd::Identity(3+K,3+K);
+    int K = (v.size() - 3) / 3;
+
+    Eigen::MatrixXd X = Eigen::MatrixXd::Identity(3 + K, 3 + K);
+
+    Eigen::Vector3d w = v.head<3>();
+    double theta = w.norm();
+
+    Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
+    Eigen::Matrix3d A = skew(w);
+    Eigen::Matrix3d A2 = A * A;
+
     Eigen::Matrix3d R;
     Eigen::Matrix3d Jl;
-    Eigen::Vector3d w = v.head(3);
-    double theta = w.norm();
-    Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
+
     if (theta < TOLERANCE) {
-        R = I;
-        Jl = I;
+        R  = I + A + 0.5 * A2;
+        Jl = I + 0.5 * A + (1.0 / 6.0) * A2;
     } else {
-        Eigen::Matrix3d A = skew(w);
-        double theta2 = theta*theta;
-        double stheta = sin(theta);
-        double ctheta = cos(theta);
-        double oneMinusCosTheta2 = (1-ctheta)/(theta2);
-        Eigen::Matrix3d A2 = A*A;
-        R =  I + (stheta/theta)*A + oneMinusCosTheta2*A2;
-        Jl = I + oneMinusCosTheta2*A + ((theta-stheta)/(theta2*theta))*A2;
+        double theta2 = theta * theta;
+        double stheta = std::sin(theta);
+        double ctheta = std::cos(theta);
+
+        double oneMinusCosTheta2 = (1.0 - ctheta) / theta2;
+
+        R  = I
+           + (stheta / theta) * A
+           + oneMinusCosTheta2 * A2;
+
+        Jl = I
+           + oneMinusCosTheta2 * A
+           + ((theta - stheta) / (theta2 * theta)) * A2;
     }
+
     X.block<3,3>(0,0) = R;
-    for (int i=0; i<K; ++i) {
-        X.block<3,1>(0,3+i) = Jl * v.segment<3>(3+3*i);
+
+    for (int i = 0; i < K; ++i) {
+        X.block<3,1>(0, 3 + i) =
+            Jl * v.segment<3>(3 + 3 * i);
     }
+
     return X;
 }
 

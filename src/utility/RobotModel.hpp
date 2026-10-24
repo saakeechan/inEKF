@@ -63,6 +63,7 @@ public:
     std::string model_format;        // "urdf" or "mjcf"
     std::vector<int> contact_point_frame_ids;  // Frame IDs for contact points
     int imu_frame_id;                // Frame ID for IMU in Pinocchio model
+    int state_frame_id = -1;          // Requested output state frame in Pinocchio model
     
     int encoder_size;                // Configuration space dimension (nq) - auto-set from model
     int encoderdot_size;             // Velocity space dimension (nv) - auto-set from model
@@ -122,25 +123,10 @@ public:
     Eigen::Matrix<double,3,3>   Covariance_Prior_Bias_Gyro;
     Eigen::Matrix<double,3,3>   Covariance_Prior_Bias_Acc;
 
-    // Square root information matrices
-    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Gyro;
-    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Acc;
-    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Contact;
-    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Slip;
-    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Encoder;
-    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Bias_Gyro;
-    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Bias_Acc;
-    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Prior_Orientation;
-    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Prior_Velocity;
-    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Prior_Position;
-    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Prior_Bias_Gyro;
-    Eigen::Matrix<double,3,3> SQRT_INFO_Covariance_Prior_Bias_Acc;
-
     /**
-     * @brief Reset covariance matrices based on provided values
-     * @param cov_val_setting 12x1 vector of covariance values
+     * @brief Set robot covariance constants from YAML with built-in defaults and construct matrices
      */
-    void SetCovariances(Eigen::Matrix<double,12,1> cov_val_setting);
+    void SetCovariances();
     
     // // Contact detection parameters
     // bool variable_contact_cov_mode;
@@ -161,21 +147,21 @@ public:
     
     /**
      * @brief Get foot position after calling Forward_Kinematics
-     * @param i_leg Leg index (1-indexed)
+     * @param i_leg Leg index (0-indexed)
      * @return 3D position vector of the foot
      */
     Eigen::Vector3d get_foot_position(int i_leg) const;
     
     /**
      * @brief Get foot Jacobian after calling Forward_Kinematics
-     * @param i_leg Leg index (1-indexed)
+     * @param i_leg Leg index (0-indexed)
      * @return Jacobian matrix for the foot frame
      */
     Eigen::MatrixXd get_foot_jacobian(int i_leg) const;
 
     /**
      * @brief Get foot velocity after calling Forward_Kinematics
-     * @param i_leg Leg index (1-indexed)
+     * @param i_leg Leg index (0-indexed)
      * @return 3D velocity vector of the foot
      */
     Eigen::Vector3d get_foot_velocity(int i_leg) const;
@@ -191,11 +177,11 @@ public:
     
     /**
      * @brief Map TextFile data to encoder vector using configured indices from YAML
-     * @param TextFile_data Vector of TextFile sensor data values
-     * @param output_vector Output encoder vector - must be pre-allocated
-     * @param encoder_type Type of encoder data: "encoder" for positions or "encoderdot" for velocities
+     * @param motor_data_arg Vector of sensor data values
+     * @param encoder_type_arg "encoder" for positions or "encoderdot" for velocities
+     * @return Mapped encoder vector with unmapped entries set to zero
      */
-    void map_indices_to_encoders(const std::vector<double>& motor_data, Eigen::VectorXd& output_vector, const std::string& encoder_type) const;
+    Eigen::VectorXd map_indices_to_encoders(const std::vector<double>& motor_data_arg, const std::string& encoder_type_arg) const;
 
     /**
      * @brief Extract active encoder columns from full Jacobian matrix
@@ -213,40 +199,25 @@ public:
      */
     Eigen::MatrixXd extract_active_encoder_jacobian(const Eigen::MatrixXd& full_jacobian) const;
 
-    /**
-     * @brief Transform all state quantities from World-IMU frame to World-Base frame
-     * @param R_IMU_world Rotation matrix representing IMU orientation in world frame (from filter)
-     * @param p_IMU_world Position of IMU in world frame (from filter)
-     * @param v_IMU_world Linear velocity of IMU in world frame (from filter)
-     * @param w_IMU_world Angular velocity of IMU in world frame (bias-corrected gyro)
-     * @param R_base_World Output: Base orientation in world frame
-     * @param p_base_World Output: Base position in world frame
-     * @param v_base_World Output: Base linear velocity in world frame
-     * @param w_base_World Output: Base angular velocity in world frame
-     */
-    void transform_state_to_base(
+    // Transform IMU pose and velocities to a selected model frame.
+    // Inputs and outputs use world axes; R maps frame axes into world axes.
+    // Requires current forward kinematics and frame placements.
+    void transform_state_to_frame(
+        int state_frame_id_arg,
         const Eigen::Matrix3d& R_IMU_world,
         const Eigen::Vector3d& p_IMU_world,
         const Eigen::Vector3d& v_IMU_world,
         const Eigen::Vector3d& w_IMU_world,
-        Eigen::Matrix3d& R_base_World,
-        Eigen::Vector3d& p_base_World,
-        Eigen::Vector3d& v_base_World,
-        Eigen::Vector3d& w_base_World
+        Eigen::Matrix3d& R_state_world,
+        Eigen::Vector3d& p_state_world,
+        Eigen::Vector3d& v_state_world,
+        Eigen::Vector3d& w_state_world
     ) const;
 
 private:
     YAML::Node config;  // Stores the loaded YAML configuration
     
-    /**
-     * @brief Load covariance parameters from YAML config
-     */
-    void load_covariance_params();
-    
-    /**
-     * @brief Initialize covariance matrices with default values
-     */
-    void initialize_covariances();
+
 };
 
 #endif // SRC_ROBOT_MODEL_HPP

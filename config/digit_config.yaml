@@ -34,6 +34,9 @@ structure:
 # ============================================================================
 imuFrame_id: 1
 
+# Pinocchio frame ID of the base whose pose and velocity are requested (world-expressed).
+stateFrame_id: 1
+
 # ============================================================================
 # COVARIANCE PARAMETERS for the Robot
 # ============================================================================

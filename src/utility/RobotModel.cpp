@@ -4,6 +4,8 @@
 //
 
 #include "RobotModel.hpp"
+#include <pinocchio/spatial/skew.hpp>
+#include <pinocchio/algorithm/joint-configuration.hpp>
 #include <iostream>
 #include <fstream>
 #include <stdexcept>
@@ -11,20 +13,6 @@
 RobotModel::RobotModel() {
     // Initialize default values
     imu_frame_id = -1;  // Will be set from config
-    
-    // Initialize covariance constants with defaults
-    cov_gyro_const = 1e-4;
-    cov_acc_const = 1e-2;
-    cov_slip_const = 1e-3;
-    cov_contact_const = 1e-3;
-    cov_enc_const = 1e-4;
-    cov_bias_gyro_const = 1e-6;
-    cov_bias_acc_const = 1e-6;
-    cov_prior_orientation_const = 1e-3;
-    cov_prior_velocity_const = 1e-3;
-    cov_prior_position_const = 1e-3;
-    cov_prior_bias_gyro_const = 1e-6;
-    cov_prior_bias_acc_const = 1e-6;
 }
 
 RobotModel::~RobotModel() {
@@ -114,16 +102,20 @@ bool RobotModel::load_config(const std::string& config_file) {
             std::cout << "Warning: imuFrame_id not specified in config" << std::endl;
         }
         
+        state_frame_id = config["stateFrame_id"].as<int>(imu_frame_id);
+
         // ====================================================================
         // LOAD COVARIANCE PARAMETERS
         // ====================================================================
-        load_covariance_params();
-        initialize_covariances();
+        SetCovariances();
         
         // ====================================================================
         // LOAD ROBOT MODEL
         // ====================================================================
         load_robot_model(robot_model_path, contact_point_frame_ids);
+        if (state_frame_id < 0 || state_frame_id >= static_cast<int>(pin_model.nframes)) {
+            throw std::out_of_range("stateFrame_id must select an existing Pinocchio frame");
+        }
         
         std::cout << "Robot configuration loaded successfully!" << std::endl;
         return true;
@@ -137,62 +129,6 @@ bool RobotModel::load_config(const std::string& config_file) {
     }
 }
 
-void RobotModel::load_covariance_params() {
-    if (!config["covariance"]) {
-        std::cout << "No covariance parameters in config, using defaults" << std::endl;
-        return;
-    }
-    
-    auto cov = config["covariance"]; // Test with partial covariance specification
-    
-    cov_gyro_const = cov["gyro"].as<double>(cov_gyro_const);
-    cov_acc_const = cov["accelerometer"].as<double>(cov_acc_const);
-    cov_enc_const = cov["encoder"].as<double>(cov_enc_const);
-    cov_contact_const = cov["contact"].as<double>(cov_contact_const);
-    cov_slip_const = cov["slip"].as<double>(cov_slip_const);
-    cov_bias_gyro_const = cov["bias_gyro"].as<double>(cov_bias_gyro_const);
-    cov_bias_acc_const = cov["bias_accelerometer"].as<double>(cov_bias_acc_const);
-    
-    cov_prior_orientation_const = cov["prior_orientation"].as<double>(cov_prior_orientation_const);
-    cov_prior_velocity_const = cov["prior_velocity"].as<double>(cov_prior_velocity_const);
-    cov_prior_position_const = cov["prior_position"].as<double>(cov_prior_position_const);
-    cov_prior_bias_gyro_const = cov["prior_bias_gyro"].as<double>(cov_prior_bias_gyro_const);
-    cov_prior_bias_acc_const = cov["prior_bias_accelerometer"].as<double>(cov_prior_bias_acc_const);
-    
-    std::cout << "Loaded covariance parameters from config" << std::endl;
-}
-
-void RobotModel::initialize_covariances() {
-    // Initialize covariance matrices as diagonal matrices
-    Covariance_Gyro = cov_gyro_const * Eigen::Matrix<double, 3, 3>::Identity();
-    Covariance_Acc = cov_acc_const * Eigen::Matrix<double, 3, 3>::Identity();
-    Covariance_Slip = cov_slip_const * Eigen::Matrix<double, 3, 3>::Identity();
-    Covariance_Contact = cov_contact_const * Eigen::Matrix<double, 3, 3>::Identity();
-    Covariance_Encoder = cov_enc_const * Eigen::Matrix<double, 3, 3>::Identity();
-
-    Covariance_Bias_Gyro = cov_bias_gyro_const * Eigen::Matrix<double, 3, 3>::Identity();
-    Covariance_Bias_Acc = cov_bias_acc_const * Eigen::Matrix<double, 3, 3>::Identity();
-
-    Covariance_Prior_Orientation = cov_prior_orientation_const * Eigen::Matrix<double, 3, 3>::Identity();
-    Covariance_Prior_Velocity = cov_prior_velocity_const * Eigen::Matrix<double, 3, 3>::Identity();
-    Covariance_Prior_Position = cov_prior_position_const * Eigen::Matrix<double, 3, 3>::Identity();
-
-    Covariance_Prior_Bias_Gyro = cov_prior_bias_gyro_const * Eigen::Matrix<double, 3, 3>::Identity();
-    Covariance_Prior_Bias_Acc = cov_prior_bias_acc_const * Eigen::Matrix<double, 3, 3>::Identity();
-
-    SQRT_INFO_Covariance_Gyro = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_gyro_const);
-    SQRT_INFO_Covariance_Acc = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_acc_const);
-    SQRT_INFO_Covariance_Slip = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_slip_const);
-    SQRT_INFO_Covariance_Contact = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_contact_const);
-    SQRT_INFO_Covariance_Encoder = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_enc_const);
-    SQRT_INFO_Covariance_Bias_Gyro = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_bias_gyro_const);
-    SQRT_INFO_Covariance_Bias_Acc = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_bias_acc_const);
-    SQRT_INFO_Covariance_Prior_Orientation = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_prior_orientation_const);
-    SQRT_INFO_Covariance_Prior_Velocity = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_prior_velocity_const);
-    SQRT_INFO_Covariance_Prior_Position = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_prior_position_const);
-    SQRT_INFO_Covariance_Prior_Bias_Gyro = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_prior_bias_gyro_const);
-    SQRT_INFO_Covariance_Prior_Bias_Acc = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_prior_bias_acc_const);
-}
 
 
 void RobotModel::load_robot_model(const std::string& xml_path, const std::vector<int>& contact_frame_ids) {
@@ -207,6 +143,10 @@ void RobotModel::load_robot_model(const std::string& xml_path, const std::vector
         }
         
         pin_data = pinocchio::Data(pin_model);
+        // Provide valid frame placements at live startup, before the first encoder sample.
+        pinocchio::forwardKinematics(pin_model, pin_data, pinocchio::neutral(pin_model),
+            Eigen::VectorXd::Zero(pin_model.nv));
+        pinocchio::updateFramePlacements(pin_model, pin_data);
         
         std::cout << "Successfully loaded robot model from: " << xml_path << std::endl;
         std::cout << "Number of joints: " << pin_model.njoints << std::endl;
@@ -240,20 +180,20 @@ void RobotModel::load_robot_model(const std::string& xml_path, const std::vector
     }
 }
 
-void RobotModel::SetCovariances(Eigen::Matrix<double,12,1> cov_val_setting) {
-
-    cov_gyro_const = cov_val_setting(0);
-    cov_acc_const = cov_val_setting(1);
-    cov_slip_const = cov_val_setting(2);
-    cov_contact_const = cov_val_setting(3);
-    cov_enc_const = cov_val_setting(4);
-    cov_bias_gyro_const = cov_val_setting(5);
-    cov_bias_acc_const = cov_val_setting(6);
-    cov_prior_orientation_const = cov_val_setting(7);
-    cov_prior_velocity_const = cov_val_setting(8);
-    cov_prior_position_const = cov_val_setting(9);
-    cov_prior_bias_gyro_const = cov_val_setting(10);
-    cov_prior_bias_acc_const = cov_val_setting(11);
+void RobotModel::SetCovariances() {
+    const auto cov = config["covariance"];
+    cov_gyro_const = cov["gyro"].as<double>(1e-4);
+    cov_acc_const = cov["accelerometer"].as<double>(1e-2);
+    cov_slip_const = cov["slip"].as<double>(1e-3);
+    cov_contact_const = cov["contact"].as<double>(1e-3);
+    cov_enc_const = cov["encoder"].as<double>(1e-4);
+    cov_bias_gyro_const = cov["bias_gyro"].as<double>(1e-6);
+    cov_bias_acc_const = cov["bias_accelerometer"].as<double>(1e-6);
+    cov_prior_orientation_const = cov["prior_orientation"].as<double>(1e-3);
+    cov_prior_velocity_const = cov["prior_velocity"].as<double>(1e-3);
+    cov_prior_position_const = cov["prior_position"].as<double>(1e-3);
+    cov_prior_bias_gyro_const = cov["prior_bias_gyro"].as<double>(1e-6);
+    cov_prior_bias_acc_const = cov["prior_bias_accelerometer"].as<double>(1e-6);
 
     Covariance_Gyro = cov_gyro_const * Eigen::Matrix<double, 3, 3>::Identity();
     Covariance_Acc = cov_acc_const * Eigen::Matrix<double, 3, 3>::Identity();
@@ -271,18 +211,6 @@ void RobotModel::SetCovariances(Eigen::Matrix<double,12,1> cov_val_setting) {
     Covariance_Prior_Bias_Gyro = cov_prior_bias_gyro_const * Eigen::Matrix<double, 3, 3>::Identity();
     Covariance_Prior_Bias_Acc = cov_prior_bias_acc_const * Eigen::Matrix<double, 3, 3>::Identity();
 
-    SQRT_INFO_Covariance_Gyro = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_gyro_const);
-    SQRT_INFO_Covariance_Acc = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_acc_const);
-    SQRT_INFO_Covariance_Slip = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_slip_const);
-    SQRT_INFO_Covariance_Contact = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_contact_const);
-    SQRT_INFO_Covariance_Encoder = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_enc_const);
-    SQRT_INFO_Covariance_Bias_Gyro = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_bias_gyro_const);
-    SQRT_INFO_Covariance_Bias_Acc = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_bias_acc_const);
-    SQRT_INFO_Covariance_Prior_Orientation = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_prior_orientation_const);
-    SQRT_INFO_Covariance_Prior_Velocity = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_prior_velocity_const);
-    SQRT_INFO_Covariance_Prior_Position = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_prior_position_const);
-    SQRT_INFO_Covariance_Prior_Bias_Gyro = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_prior_bias_gyro_const);
-    SQRT_INFO_Covariance_Prior_Bias_Acc = Eigen::Matrix<double, 3, 3>::Identity() / sqrt(cov_prior_bias_acc_const);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -308,16 +236,16 @@ Eigen::Vector3d RobotModel::get_foot_position(int i_leg) const {
         std::exit(EXIT_FAILURE);
     }
     
-    if (i_leg < 1 || i_leg > static_cast<int>(foot_frame_ids.size())) {
-        std::cerr << "Error: Invalid leg index " << i_leg << ". Must be between 1 and " 
-                  << foot_frame_ids.size() << std::endl;
+    if (i_leg < 0 || i_leg >= static_cast<int>(foot_frame_ids.size())) {
+        std::cerr << "Error: Invalid leg index " << i_leg << ". Must be between 0 and "
+                  << foot_frame_ids.size() - 1 << std::endl;
         std::exit(EXIT_FAILURE);
     }
     
     // Get foot position relative to IMU frame
     // Formula: foot_in_imu = inv(SE3_imu) * SE3_foot
     const pinocchio::SE3& imu_placement = pin_data.oMf[imu_frame_id];
-    const pinocchio::SE3& foot_placement = pin_data.oMf[foot_frame_ids[i_leg - 1]];
+    const pinocchio::SE3& foot_placement = pin_data.oMf[foot_frame_ids[i_leg]];
     
     // Use actInv for efficient computation: imu.actInv(foot) = inv(imu) * foot
     pinocchio::SE3 foot_relative_to_imu = imu_placement.actInv(foot_placement);
@@ -331,9 +259,9 @@ Eigen::MatrixXd RobotModel::get_foot_jacobian(int i_leg) const {
         std::exit(EXIT_FAILURE);
     }
     
-    if (i_leg < 1 || i_leg > static_cast<int>(foot_frame_ids.size())) {
-        std::cerr << "Error: Invalid leg index " << i_leg << ". Must be between 1 and " 
-                  << foot_frame_ids.size() << std::endl;
+    if (i_leg < 0 || i_leg >= static_cast<int>(foot_frame_ids.size())) {
+        std::cerr << "Error: Invalid leg index " << i_leg << ". Must be between 0 and "
+                  << foot_frame_ids.size() - 1 << std::endl;
         std::exit(EXIT_FAILURE);
     }
     
@@ -342,8 +270,8 @@ Eigen::MatrixXd RobotModel::get_foot_jacobian(int i_leg) const {
     pinocchio::getFrameJacobian(
         pin_model,
         const_cast<pinocchio::Data&>(pin_data),
-        foot_frame_ids[i_leg - 1],
-        pinocchio::LOCAL_WORLD_ALIGNED,
+        foot_frame_ids[i_leg],
+        pinocchio::LOCAL_WORLD_ALIGNED, // Get Jacobian in World frame to compute relative Jacobian with IMU
         J_foot_full
     );
     
@@ -357,10 +285,13 @@ Eigen::MatrixXd RobotModel::get_foot_jacobian(int i_leg) const {
         J_imu_full
     );
     
-    // Extract linear velocity parts (first 3 rows) and compute relative Jacobian
-    Eigen::MatrixXd J_foot_linear = J_foot_full.topRows(3);
-    Eigen::MatrixXd J_imu_linear = J_imu_full.topRows(3);
-    Eigen::MatrixXd J_relative = J_foot_linear - J_imu_linear;
+    const Eigen::Matrix3d R_oi = pin_data.oMf[imu_frame_id].rotation();
+    const Eigen::Vector3d p_IF = get_foot_position(i_leg);
+
+    // Differentiate the relative position, including rotation of the IMU axes.
+    const Eigen::MatrixXd J_relative =
+        R_oi.transpose() * (J_foot_full.topRows(3) - J_imu_full.topRows(3))
+        + pinocchio::skew(p_IF) * R_oi.transpose() * J_imu_full.bottomRows(3);
     
     // Filter to only active encoder columns
     return extract_active_encoder_jacobian(J_relative);
@@ -372,9 +303,9 @@ Eigen::Vector3d RobotModel::get_foot_velocity(int i_leg) const {
         std::exit(EXIT_FAILURE);
     }
     
-    if (i_leg < 1 || i_leg > static_cast<int>(foot_frame_ids.size())) {
-        std::cerr << "Error: Invalid leg index " << i_leg << ". Must be between 1 and " 
-                  << foot_frame_ids.size() << std::endl;
+    if (i_leg < 0 || i_leg >= static_cast<int>(foot_frame_ids.size())) {
+        std::cerr << "Error: Invalid leg index " << i_leg << ". Must be between 0 and "
+                  << foot_frame_ids.size() - 1 << std::endl;
         std::exit(EXIT_FAILURE);
     }
     
@@ -382,7 +313,7 @@ Eigen::Vector3d RobotModel::get_foot_velocity(int i_leg) const {
     pinocchio::Motion foot_velocity_Base = pinocchio::getFrameVelocity(
         pin_model,
         const_cast<pinocchio::Data&>(pin_data),
-        foot_frame_ids[i_leg - 1],
+        foot_frame_ids[i_leg],
         pinocchio::LOCAL_WORLD_ALIGNED
     );
     
@@ -403,8 +334,12 @@ Eigen::Vector3d RobotModel::get_foot_velocity(int i_leg) const {
     const Eigen::Matrix3d R_oi = 
         pin_data.oMf[imu_frame_id].rotation();
     
-    // Transform relative velocity to IMU frame: v_imu = R_oi^T * v_base
-    return R_oi.transpose() * v_rel_base;
+    const Eigen::Vector3d omega_imu =
+        R_oi.transpose() * imu_velocity_Base.angular();
+
+    // Differentiate the relative position in the rotating IMU axes.
+    return R_oi.transpose() * v_rel_base
+           - omega_imu.cross(get_foot_position(i_leg));
 }
 
 void RobotModel::compute_joint_jacobians() const {
@@ -414,17 +349,17 @@ void RobotModel::compute_joint_jacobians() const {
     pinocchio::computeJointJacobians(pin_model, const_cast<pinocchio::Data&>(pin_data));
 }
 
-void RobotModel::map_indices_to_encoders(const std::vector<double>& motor_data, Eigen::VectorXd& output_vector, const std::string& encoder_type) const {
+Eigen::VectorXd RobotModel::map_indices_to_encoders(const std::vector<double>& motor_data_arg, const std::string& encoder_type_arg) const {
 
     // Validate encoder_type parameter
-    if (encoder_type != "encoder" && encoder_type != "encoderdot") {
-        std::cerr << "Error: Invalid encoder_type '" << encoder_type << "'. Must be 'encoder' or 'encoderdot'" << std::endl;
+    if (encoder_type_arg != "encoder" && encoder_type_arg != "encoderdot") {
+        std::cerr << "Error: Invalid encoder_type '" << encoder_type_arg << "'. Must be 'encoder' or 'encoderdot'" << std::endl;
         std::exit(EXIT_FAILURE);
     }
     
     // Select appropriate indices based on encoder_type
-    const std::vector<int>& indices = (encoder_type == "encoder") ? Encoder_indices_map : Encoderdot_indices_map;
-    const std::string type_name = (encoder_type == "encoder") ? "encoder position" : "encoder velocity";
+    const std::vector<int>& indices = (encoder_type_arg == "encoder") ? Encoder_indices_map : Encoderdot_indices_map;
+    const std::string type_name = (encoder_type_arg == "encoder") ? "encoder position" : "encoder velocity";
     
     // Check if indices are configured
     if (indices.empty()) {
@@ -433,20 +368,21 @@ void RobotModel::map_indices_to_encoders(const std::vector<double>& motor_data, 
     }
     
     // Check if motor_data size exactly matches the number of indices
-    if (motor_data.size() != indices.size()) {
+    if (motor_data_arg.size() != indices.size()) {
         std::cerr << "FATAL ERROR: TextFile data size mismatch for " << type_name << "." << std::endl;
-        std::cerr << "  Expected exactly " << indices.size() << " values, got " << motor_data.size() << std::endl;
+        std::cerr << "  Expected exactly " << indices.size() << " values, got " << motor_data_arg.size() << std::endl;
         std::cerr << "  This is a configuration error - check your TextFileDataStruct and YAML indices." << std::endl;
         std::cerr << "  Debug: motor_data contents: ";
-        for (size_t i = 0; i < motor_data.size(); i++) {
-            std::cerr << motor_data[i] << " ";
+        for (size_t i = 0; i < motor_data_arg.size(); i++) {
+            std::cerr << motor_data_arg[i] << " ";
         }
         std::cerr << std::endl;
         std::exit(EXIT_FAILURE);
     }
     
     // Initialize output_vector to zero (all non-mapped indices will remain zero)
-    output_vector.setZero();
+    Eigen::VectorXd output_vector = Eigen::VectorXd::Zero(
+        encoder_type_arg == "encoder" ? encoder_size : encoderdot_size);
     
     // Map motor_data to output_vector using the index mapping
     // indices[i] tells us WHERE to put the data in output_vector
@@ -456,14 +392,15 @@ void RobotModel::map_indices_to_encoders(const std::vector<double>& motor_data, 
         
         // Validate output index bounds
         if (output_idx < 0 || output_idx >= output_vector.size()) {
-            std::cerr << "FATAL ERROR: Invalid " << encoder_type << " mapping index " << output_idx 
+            std::cerr << "FATAL ERROR: Invalid " << encoder_type_arg << " mapping index " << output_idx
                       << " at position " << i << " for output vector of size " << output_vector.size() << std::endl;
             std::exit(EXIT_FAILURE);
         }
         
         // Map: motor_data[i] -> output_vector[indices[i]]
-        output_vector(output_idx) = motor_data[i];
+        output_vector(output_idx) = motor_data_arg[i];
     }
+    return output_vector;
 }
 
 Eigen::MatrixXd RobotModel::extract_active_encoder_jacobian(const Eigen::MatrixXd& full_jacobian) const {
@@ -498,44 +435,47 @@ Eigen::MatrixXd RobotModel::extract_active_encoder_jacobian(const Eigen::MatrixX
     return active_jacobian;
 }
 
-void RobotModel::transform_state_to_base(
+void RobotModel::transform_state_to_frame(
+    int state_frame_id_arg,
     const Eigen::Matrix3d& R_IMU_world,
     const Eigen::Vector3d& p_IMU_world,
     const Eigen::Vector3d& v_IMU_world,
     const Eigen::Vector3d& w_IMU_world,
-    Eigen::Matrix3d& R_base_World,
-    Eigen::Vector3d& p_base_World,
-    Eigen::Vector3d& v_base_World,
-    Eigen::Vector3d& w_base_World
+    Eigen::Matrix3d& R_state_world,
+    Eigen::Vector3d& p_state_world,
+    Eigen::Vector3d& v_state_world,
+    Eigen::Vector3d& w_state_world
 ) const {
-    // In Pinocchio, the base frame is the world/universe frame (frame 0)
-    // So base_placement = Identity, and we only need IMU placement
-    
-    const pinocchio::SE3& imu_placement = pin_data.oMf[imu_frame_id];
+    if (state_frame_id_arg < 0 || state_frame_id_arg >= static_cast<int>(pin_model.nframes)) {
+        throw std::out_of_range("State frame must select an existing Pinocchio frame");
+    }
+    if (state_frame_id_arg == imu_frame_id) {
+        R_state_world = R_IMU_world;
+        p_state_world = p_IMU_world;
+        v_state_world = v_IMU_world;
+        w_state_world = w_IMU_world;
+        return;
+    }
+    const auto& imu_pose = pin_data.oMf[imu_frame_id];
+    const auto& state_pose = pin_data.oMf[state_frame_id_arg];
+    const pinocchio::SE3 pose_IS = imu_pose.actInv(state_pose);
+    const Eigen::Vector3d p_IS = pose_IS.translation();
 
-    // Since base is at world origin, the transformation from base to IMU is just the IMU placement
-    const Eigen::Matrix3d R_base_to_IMU = imu_placement.rotation();
-    const Eigen::Vector3d p_base_to_IMU = imu_placement.translation();
-    
-    // Get IMU frame velocity in world-aligned coordinates
-    pinocchio::Motion imu_velocity_world = pinocchio::getFrameVelocity(
-        pin_model,
-        const_cast<pinocchio::Data&>(pin_data),
-        imu_frame_id,
-        pinocchio::LOCAL_WORLD_ALIGNED
-    );
-    
-    const Eigen::Vector3d v_imu_Base = imu_velocity_world.linear();   // Joint-induced linear velocity in Base frame
-    const Eigen::Vector3d w_imu_Base = imu_velocity_world.angular();  // Joint-induced angular velocity in Base frame
-    
-    
-    // Transform rotation: R_world_to_base = R_world_to_IMU * R_IMU_to_base
-    R_base_World = R_IMU_world * R_base_to_IMU.transpose();
+    const auto imu_velocity = pinocchio::getFrameVelocity(
+        pin_model, pin_data, imu_frame_id, pinocchio::LOCAL_WORLD_ALIGNED);
+    const auto state_velocity = pinocchio::getFrameVelocity(
+        pin_model, pin_data, state_frame_id_arg, pinocchio::LOCAL_WORLD_ALIGNED);
+    const Eigen::Matrix3d R_IO = imu_pose.rotation().transpose();
+    const Eigen::Vector3d omega_model_I = R_IO * imu_velocity.angular();
+    const Eigen::Vector3d p_dot_IS =
+        R_IO * (state_velocity.linear() - imu_velocity.linear())
+        - omega_model_I.cross(p_IS);
 
-    p_base_World = p_IMU_world - R_base_World * p_base_to_IMU;
-
-    w_base_World = w_IMU_world - R_base_World * w_imu_Base; // 
-    v_base_World = v_IMU_world - R_base_World * v_imu_Base; // Get linear velocity in world frame of base
-    
-
+    R_state_world = R_IMU_world * pose_IS.rotation();
+    p_state_world = p_IMU_world + R_IMU_world * p_IS;
+    // Move velocity between origins, including physical rotation of the lever arm.
+    v_state_world = v_IMU_world + w_IMU_world.cross(R_IMU_world * p_IS)
+                    + R_IMU_world * p_dot_IS;
+    w_state_world = w_IMU_world
+        + R_IMU_world * R_IO * (state_velocity.angular() - imu_velocity.angular());
 }

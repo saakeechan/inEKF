@@ -3,7 +3,8 @@ g1_env/
 
 # Build directories
 build/
-
+build-arm64/
+build* 
 # Python cache
 __pycache__/
 *.pyc
@@ -17,6 +18,29 @@ CMakeCache.txt
 # Output images (generated)
 output_images/
 
+# INEKF build directories
+build_arm64_docker/
 
-# INEKF build directory 
-build_arm64_docker
+
+# Additional files/folders
+digit_mujoco-main/
+unitree_ros/
+
+results/
+
+# IDE and build cache
+.vscode/
+
+.ccache/
+
+Data/
+contactData/
+splitData/
+
+.codex/
+
+Matlab/output_plots/ 
+
+MujocoData*/
+
+

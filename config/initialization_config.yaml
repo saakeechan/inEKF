@@ -5,18 +5,22 @@
 # Estimator parameters
 sliding_window_size: 2
 dt: 0.02
+kinematics_mode: pkm # vkm is kinda broken, dont use
 
 # TextFile data file configuration
 textfile:
   enabled: true # Set to true to use TextFile data, false to use sensor data
-  file_name: "/home/saakee/Research/Saaketh_INEKF/G1LoggingData.csv"
-  time_length: 990 # Total number of data points to process from the TextFile
-  starting_point: 0 # Number of initial data points to skip in TextFile
+  file_name: "../splitData/robotstate_0_env6_run2.csv"
+  start_count: 0 # Number of initial data points to skip in TextFile
+  end_count: 999 # End of data points to read from TextFile (inclusive)
+  save_results: false  # Whether to save estimation results to a file
+  saved_results_folder: "../results"  # Name of the folder to save estimation results
+
 
 # Slip rejection configuration
 slip_rejection:
-  enabled: true  # Slip rejection mode
-  threshold: 5  # Slip threshold in m/s
+  enabled: false  # Slip rejection mode
+  threshold: 0.3  # Slip threshold in m/s
 
 # Variable contact covariance configuration
 variable_contact_covariance:
@@ -24,8 +28,8 @@ variable_contact_covariance:
   amplifier: 1.0  # Multiplied to contact covariance when VCC is enabled
 
 Contact_estimation_NN:
-  enabled: true  # Enable contact estimation using the PyTorch model
-  file_path: "/home/saakee/Research/Saaketh_INEKF/src/contactDetection/bipedal_contact_best_val_leg_acc.onnx"  # Path to the PyTorch contact estimation model
+  enabled: false  # Live inputs: true = NN, false = model-based; CSV uses recorded contacts
+  file_path: "../src/contactDetection/model_final_epoch.onnx"  # Path to the ONNX contact estimation model
 
 
 # Estimator Covariances (exponents for 10^x) Overrides robot defaults here
@@ -33,10 +37,10 @@ Contact_estimation_NN:
 #        prior_ori, prior_vel, prior_pos, prior_bias_gyro, prior_bias_acc
 
 covariance_exponents:
-  gyro: -5
-  acc: -1
-  slip: -2
-  contact: -5
+  gyro: -6
+  acc: -2
+  slip: 0
+  contact: -4
   encoder: -8
   bias_gyro: -10
   bias_acc: -10
@@ -47,7 +51,7 @@ covariance_exponents:
   prior_bias_acc: -10
 
 
-# Initial condition (16-dimensional state vector)
+# Initial condition (16-dimensional state vector) (Acts like Noise when csv enabled)
 initial_condition:
   position: [0.0, 0.0, 0.0]  # Px, Py, Pz
   orientation: [1.0, 0.0, 0.0, 0.0]  # Quaternion (Qw, Qx, Qy, Qz)
@@ -56,3 +60,9 @@ initial_condition:
   bias_acc: [0.0, 0.0, 0.0]  # bax, bay, baz
 
 # ------------------------------------------------------------
+
+# # # TO-DO
+# # 1. Implement variable dt for onestep instead of a fixed dt from yaml
+# 2. Fix the network based inference 
+# 3. Fix vkm based framework
+# 4. Look at robot model

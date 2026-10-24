@@ -1,4 +1,4 @@
-#include "estimator/InEKF_estimator.hpp"
+#include "estimatorManager/InEKF_manager.hpp"
 #include <rclcpp/rclcpp.hpp>
 #include <unitree_hg/msg/low_state.hpp>
 #include <eigen3/Eigen/Dense>
@@ -32,7 +32,7 @@ private:
         // Initialize sensor and contact vectors
         Sensor_.resize(30, 1);  // [gyro(3), acc(3), encoder(12), encoderdot(12)]
         Sensor_.setZero();
-        Contact_.resize(estimator_IEKF.robot.num_legs, false);
+        Contact_.resize(estimator_IEKF.robot.model.num_legs, false);
         
         RCLCPP_INFO(this->get_logger(), "Estimator initialized from YAML configuration");
     }
@@ -62,7 +62,7 @@ private:
         // Extract contact information if available
         // TODO: Determine contact detection logic from message data
         // For now, using simple heuristic or you can subscribe to separate contact topic
-        // Contact_.assign(estimator_IEKF.robot.num_legs, false);  // Default: no contact
+        // Contact_.assign(estimator_IEKF.robot.model.num_legs, false);  // Default: no contact
         
         // Update mode machine if needed
         if (mode_machine_ != message->mode_machine) {
@@ -74,7 +74,11 @@ private:
         }
         
         // Call the estimator's Onestep function
-        estimator_IEKF.Onestep(Sensor_, Contact_);
+        Eigen::MatrixXd motor_data(2, 12);
+        motor_data.row(0) = Sensor_.block(6, 0, 12, 1).transpose();
+        motor_data.row(1) = Sensor_.block(18, 0, 12, 1).transpose();
+        estimator_IEKF.Onestep(Sensor_.topRows(6),
+            StepMeasurements{KinematicsMeasurement{Contact_, motor_data}});
         
         // Publish the estimated state
         publish_state();
@@ -95,11 +99,11 @@ private:
     }
 
     // Estimator and data members
-    InEKFilter estimator_IEKF{"../config/initialization_config.yaml", "../config/digit_config.yaml"};  // Constructor with config paths
+    INEKFilter_manager estimator_IEKF{"../config/initialization_config.yaml", "../config/digit_config.yaml"};  // Constructor with config paths
 
     Eigen::MatrixXd Sensor_;
     std::vector<bool> Contact_;
-    ROBOT_STATES state_;
+    RobotManager::ManagerState state_;
     
     // ROS2 communication
     rclcpp::Subscription<unitree_hg::msg::LowState>::SharedPtr low_state_sub_;

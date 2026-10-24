@@ -5,8 +5,38 @@
 #include "contact_detection.hpp"
 #include <cmath>
 #include <iostream>
+#include <stdexcept>
 
 namespace ContactDetection {
+
+    std::vector<bool> get_contacts(
+        const Eigen::VectorXd& motor_torques,
+        const Eigen::VectorXd& joint_velocities,
+        const Eigen::VectorXd& previous_d_v,
+        const std::vector<std::vector<int>>& leg_indices
+    ) {
+        if (motor_torques.size() != joint_velocities.size() ||
+            !motor_torques.allFinite() || !joint_velocities.allFinite()) {
+            throw std::invalid_argument("Expected matching finite motor torque and joint velocity vectors");
+        }
+        for (const auto& indices : leg_indices) {
+            for (int index : indices) {
+                if (index < 0 || index >= motor_torques.size()) {
+                    throw std::invalid_argument("Leg joint index is outside the latest motor frame");
+                }
+            }
+        }
+
+        Eigen::VectorXd leg_torque_sums = Eigen::VectorXd::Zero(leg_indices.size());
+        Eigen::VectorXd leg_speeds = Eigen::VectorXd::Zero(leg_indices.size());
+        for (std::size_t leg = 0; leg < leg_indices.size(); ++leg) {
+            for (int index : leg_indices[leg]) {
+                leg_torque_sums(leg) += motor_torques(index) * motor_torques(index);
+                leg_speeds(leg) += std::abs(joint_velocities(index));
+            }
+        }
+        return detect_contact(leg_torque_sums, previous_d_v, leg_speeds);
+    }
 
     std::vector<bool> detect_contact(
         const Eigen::VectorXd& leg_torques,

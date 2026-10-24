@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/saakee/Research/Saaketh_INEKF/g1_env/bin/python
 """
 Meshcat demo: point moving in an outward spiral (circular + radial velocity).
   omega  = 1 rad/s  (tangential, counter-clockwise)
@@ -17,6 +17,9 @@ Run:
   cd /home/saakee/Research/Saaketh_INEKF
   /home/saakee/Research/Saaketh_INEKF/g1_env/bin/python Extra_Files/meshcat_ball_velocity_demo.py
 """
+
+import sys
+sys.path.append('/opt/openrobots/lib/python3.10/site-packages')
 
 import numpy as np
 import pinocchio as pin

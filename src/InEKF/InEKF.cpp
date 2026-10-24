@@ -13,6 +13,7 @@
 
 #include "InEKF.h"
 #include "../utility/BasicFunctions_Estimator.hpp"
+#include <cmath>
 #include <unsupported/Eigen/MatrixFunctions>
 
 namespace inekf {
@@ -21,6 +22,25 @@ using namespace std;
 using namespace Eigen;
 
 void removeRowAndColumn(Eigen::MatrixXd& M, int index);
+
+Eigen::Vector3d rotationToRPY(const Eigen::Matrix3d& R) {
+    Eigen::Vector3d rpy;
+    rpy << std::atan2(R(2,1), R(2,2)),
+           std::atan2(-R(2,0), std::sqrt(R(2,1)*R(2,1) + R(2,2)*R(2,2))),
+           std::atan2(R(1,0), R(0,0));
+    return rpy;
+}
+
+void printDebugState(const char* label, RobotState& state, bool print_covariance) {
+    cout << "========== " << label << " ==========" << endl;
+    cout << "Position:\n" << state.getPosition() << endl;
+    cout << "RPY:\n" << rotationToRPY(state.getRotation()) << endl;
+    cout << "Velocity:\n" << state.getVelocity() << endl;
+    if (print_covariance) {
+        cout << "Covariance P:\n" << state.getP() << endl;
+    }
+    cout << "====================================" << endl;
+}
 
 // ------------ Observation -------------
 // Default constructor
@@ -143,11 +163,10 @@ void InEKF::Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector
     // Strapdown IMU motion model
     Eigen::Vector3d phi = w*dt; // Infinitesimal rotation
     Eigen::Matrix3d R_pred = R * Exp_SO3(phi); // Rotation update
-    JacobiSVD<Matrix3d> svd(R_pred, ComputeFullU|ComputeFullV); // Re-orthogonalization
-    R_pred = svd.matrixU() * svd.matrixV().transpose();
+    // JacobiSVD<Matrix3d> svd(R_pred, ComputeFullU|ComputeFullV); // Re-orthogonalization
+    // R_pred = svd.matrixU() * svd.matrixV().transpose();
 
-    Eigen::Vector3d v_pred = v + (R*a + g_)*dt; // I could do it with the new R but whatever, 
-                                                //or even the average of the two but its more expensive
+    Eigen::Vector3d v_pred = v + (R*a + g_)*dt;
     Eigen::Vector3d p_pred = p + v*dt + 0.5*(R*a + g_)*dt*dt;
 
     // Set new state (bias has constant dynamics)
@@ -161,9 +180,9 @@ void InEKF::Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector
     int dimTheta = state_.dimTheta();
     Eigen::MatrixXd A = Eigen::MatrixXd::Zero(dimP,dimP); // they included bias terms in A
     // Inertial terms
-    A.block<3,3>(3,0) = skew(g_); // TODO: Efficiency could be improved by not computing the constant terms every time; just declare it in the header bro
+    A.block<3,3>(3,0) = skew(g_);
     A.block<3,3>(6,3) = Eigen::Matrix3d::Identity();
-    A.block<3,3>(6,0) = 0.5 * BasicFunctions_Estimator::Hat_so3(g_) * dt; //added by Z1
+    // A.block<3,3>(6,0) = 0.5 * BasicFunctions_Estimator::Hat_so3(g_) * dt; //added by Z1
     // Bias terms
     A.block<3,3>(0,dimP-dimTheta) = -R;
     A.block<3,3>(3,dimP-dimTheta+3) = -R;
@@ -178,7 +197,7 @@ void InEKF::Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector
 
 
     Qk.block<3,3>(3,3) = noise_params_.getAccelerometerCov();
-    Qk.block<3,3>(6,6) = noise_params_.getAccelerometerCov() * (0.5*dt*dt); // Added by Z1
+    // Qk.block<3,3>(6,6) = noise_params_.getAccelerometerCov() * (0.5*dt*dt); // Added by Z1
     for(map<int,int>::iterator it=estimated_contact_positions_.begin(); it!=estimated_contact_positions_.end(); ++it) {
         Qk.block<3,3>(3+3*(it->second-3),3+3*(it->second-3)) = contact_cov_array[it->first] * Eigen::MatrixXd::Identity(3,3); // Contact noise terms
     }
@@ -186,20 +205,18 @@ void InEKF::Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector
     Qk.block<3,3>(dimP-dimTheta+3,dimP-dimTheta+3) = noise_params_.getAccelerometerBiasCov();
 
 
-//    cout << "Qk: \n";
-//    cout << Qk << endl;
-
     // Discretization
     Eigen::MatrixXd I = Eigen::MatrixXd::Identity(dimP,dimP);
-    // Eigen::MatrixXd Phi = I + A*dt; // Fast approximation of exp(A*dt). TODO: explore using the full exp() instead
     Eigen::MatrixXd Phi = (A*dt).exp(); // Matrix exponential for state transition matrix
     Eigen::MatrixXd Adj = I;
     Adj.block(0,0,dimP-dimTheta,dimP-dimTheta) = Adjoint_SEK3(X); // Approx 200 microseconds
     Eigen::MatrixXd PhiAdj = Phi * Adj;
-    Eigen::MatrixXd Qk_hat = PhiAdj * Qk * PhiAdj.transpose();
-    // Eigen::MatrixXd Qk_hat = Adj*dt * Qk * dt*Adj.transpose(); // Further simplified from PhiAdj*Qk*PhiAdj.transpose() to reduce computation time
+    // Model Qk as continuous-time white-noise spectral density: E[w(t)w(tau)^T] = Qk * delta(t-tau).
+    // This endpoint approximation of the covariance integral is first-order in dt;
+    // the dt scaling assumes noise intensity, rather than covariance of a held discrete sample.
+    Eigen::MatrixXd Qk_hat = PhiAdj * Qk * PhiAdj.transpose() * dt;
     // Propagate Covariance
-    Eigen::MatrixXd P_pred = Phi * P * Phi.transpose() + Qk_hat;
+    Eigen::MatrixXd P_pred = (Phi * P * Phi.transpose() + Qk_hat);
 
     // Set new covariance
     state_.setP(P_pred);
@@ -209,21 +226,41 @@ void InEKF::Propagate(const Eigen::Matrix<double,6,1>& m, double dt, std::vector
 
 // Correct State: Right-Invariant Observation
 void InEKF::Correct(const Observation& obs) {
-    // Compute Kalman Gain
+
+
     Eigen::MatrixXd P = state_.getP();
+
+    // Eigen::MatrixXd N = 1e-2 * Eigen::MatrixXd::Identity(obs.N.rows(),obs.N.cols()); // Add small value to avoid singularity
+    // P = Eigen::MatrixXd::Identity(state_.dimP(),state_.dimP()); // Copy covariance
+
+
     Eigen::MatrixXd PHT = P * obs.H.transpose();
-    Eigen::MatrixXd S = obs.H * PHT + obs.N;
-    Eigen::MatrixXd K = PHT * S.inverse();
+    Eigen::MatrixXd S = (obs.H * PHT + obs.N); //* 0 + Eigen::MatrixXd::Identity(obs.N.rows(),obs.N.cols());
+    Eigen::MatrixXd K = S.ldlt().solve(PHT.transpose()).transpose();
+
 
     // Copy X along the diagonals if more than one measurement
     Eigen::MatrixXd BigX;
     state_.copyDiagX(obs.Y.rows()/state_.dimX(), BigX);
+
+    // printDebugState("Before Correction", state_, true);
    
     // Compute correction terms
     Eigen::MatrixXd Z = BigX*obs.Y - obs.b;
+
+
     Eigen::VectorXd delta = K*obs.PI*Z;
+
     Eigen::MatrixXd dX = Exp_SEK3(delta.segment(0,delta.rows()-state_.dimTheta()));
     Eigen::VectorXd dTheta = delta.segment(delta.rows()-state_.dimTheta(), state_.dimTheta());
+
+    // // #------# VKM/correction debug: inspect the innovation and attitude/bias update.
+    // cout << "#------# correction innovation: " << Z.block<3,1>(0, 0).transpose()
+    //      << " | delta R: " << delta.head<3>().transpose()
+    //      << " | delta bg: " << dTheta.head<3>().transpose()
+    //      << " | bg before: " << state_.getGyroscopeBias().transpose()
+    //      << " | bg after: " << (state_.getGyroscopeBias() + dTheta.head<3>()).transpose()
+    //      << endl;
 
     // Update state
     Eigen::MatrixXd X_new = dX*state_.getX(); // Right-Invariant Update
@@ -237,7 +274,49 @@ void InEKF::Correct(const Observation& obs) {
     Eigen::MatrixXd P_new = IKH * P * IKH.transpose()+ K*obs.N*K.transpose(); // Joseph update form
 
     state_.setP(P_new); 
+    // printDebugState("After Correction", state_, true);
 }   
+
+// Freeze attitude and gyro bias for this observation; retain the other gain rows.
+void InEKF::CorrectWithoutAttitudeAndGyroBias(const Observation& obs) {
+    Eigen::MatrixXd P = state_.getP();
+    Eigen::MatrixXd PHT = P * obs.H.transpose();
+    Eigen::MatrixXd S = obs.H * PHT + obs.N;
+    Eigen::MatrixXd K = S.ldlt().solve(PHT.transpose()).transpose();
+    K.topRows(3).setZero();
+    K.middleRows(state_.dimP() - state_.dimTheta(), 3).setZero();
+
+    Eigen::MatrixXd BigX;
+    state_.copyDiagX(obs.Y.rows()/state_.dimX(), BigX);
+    Eigen::MatrixXd Z = BigX*obs.Y - obs.b;
+    Eigen::VectorXd delta = K*obs.PI*Z;
+    Eigen::MatrixXd dX = Exp_SEK3(delta.segment(0,delta.rows()-state_.dimTheta()));
+    Eigen::VectorXd dTheta = delta.segment(delta.rows()-state_.dimTheta(), state_.dimTheta());
+    Eigen::MatrixXd X_new = dX*state_.getX();
+    Eigen::VectorXd Theta_new = state_.getTheta() + dTheta;
+    state_.setX(X_new);
+    state_.setTheta(Theta_new);
+
+    Eigen::MatrixXd IKH = Eigen::MatrixXd::Identity(state_.dimP(),state_.dimP()) - K*obs.H;
+    Eigen::MatrixXd P_new = IKH * P * IKH.transpose() + K*obs.N*K.transpose();
+    state_.setP(P_new);
+}
+
+// Velocity of the IMU origin in IMU axes; variance is diagonal in those axes.
+void InEKF::CorrectBodyVelocity(const Eigen::Vector3d& velocity, const Eigen::Vector3d& variance) {
+    Eigen::VectorXd Y = Eigen::VectorXd::Zero(state_.dimX());
+    Eigen::VectorXd b = Eigen::VectorXd::Zero(state_.dimX());
+    Y.head<3>() = velocity;
+    Y(3) = b(3) = -1;
+    Eigen::MatrixXd H = Eigen::MatrixXd::Zero(3, state_.dimP());
+    H.block<3,3>(0,3).setIdentity();
+    Eigen::MatrixXd PI = Eigen::MatrixXd::Zero(3, state_.dimX());
+    PI.leftCols<3>().setIdentity();
+    const Eigen::Matrix3d R = state_.getRotation();
+    Eigen::MatrixXd N = R * variance.asDiagonal() * R.transpose();
+    Correct(Observation(Y, b, H, N, PI));
+    // CorrectWithoutAttitudeAndGyroBias(Observation(Y, b, H, N, PI));
+}
 
 // Create Observation from vector of landmark measurements
 void InEKF::CorrectLandmarks(const vectorLandmarks& measured_landmarks) {
@@ -366,6 +445,7 @@ void InEKF::CorrectLandmarks(const vectorLandmarks& measured_landmarks) {
 
     // Augment state with newly detected landmarks
     if (new_landmarks.size() > 0) {
+        R = state_.getRotation();
         Eigen::MatrixXd X_aug = state_.getX(); 
         Eigen::MatrixXd P_aug = state_.getP();
         Eigen::Vector3d p = state_.getPosition();
@@ -399,7 +479,12 @@ void InEKF::CorrectLandmarks(const vectorLandmarks& measured_landmarks) {
 }
 
 // Correct state using kinematics measured between imu and contact point
-void InEKF::CorrectKinematics(const vectorKinematics& measured_kinematics, bool flag) {
+void InEKF::CorrectKinematics(const std::string& mode, const vectorKinematics& measured_kinematics, bool flag) {
+    if (mode != "pkm" && mode != "vkm") {
+        std::cerr << "Unknown kinematics mode: " << mode << std::endl;
+        return;
+    }
+
 #if INEKF_USE_MUTEX
     lock_guard<mutex> mlock(estimated_contacts_mutex_);
 #endif
@@ -443,6 +528,63 @@ void InEKF::CorrectKinematics(const vectorKinematics& measured_kinematics, bool 
             int dimX = state_.dimX();
             int dimP = state_.dimP();
             int startIndex;
+
+            // VERY BUGGY DON'T USE
+            if (mode == "vkm") {
+                // r_v = v_F^W - [v + R((omega - b_g) x p_BF + v_F/B)].
+                // Without an NN measurement, v_F^W is the usual zero-velocity contact assumption.
+                const Eigen::Vector3d y_v = -skew(it->angular_velocity - state_.getGyroscopeBias()) * it->pose.block<3,1>(0,3) - it->foot_velocity;
+
+                // // #------# VKM debug: all quantities below are body-frame except the NN target.
+                // cout << "#------# VKM leg " << it->id
+                //      << " | gyro-bg: " << (it->angular_velocity - state_.getGyroscopeBias()).transpose()
+                //      << " | p_BF: " << it->pose.block<3,1>(0,3).transpose()
+                //      << " | v_F/B: " << it->foot_velocity.transpose()
+                //      << " | v_F^W target: " << it->world_foot_velocity.transpose()
+                //      << endl;
+
+                startIndex = Y.rows();
+                Y.conservativeResize(startIndex+dimX, Eigen::NoChange);
+                Y.segment(startIndex,dimX) = Eigen::VectorXd::Zero(dimX);
+                Y.segment(startIndex,3) = y_v;
+                Y(startIndex+3) = -1;
+
+                startIndex = b.rows();
+                b.conservativeResize(startIndex+dimX, Eigen::NoChange);
+                b.segment(startIndex,dimX) = Eigen::VectorXd::Zero(dimX);
+                if (it->use_world_foot_velocity) {
+                    b.segment(startIndex,3) = -it->world_foot_velocity;
+                }
+                b(startIndex+3) = -1;
+
+                startIndex = H.rows();
+                H.conservativeResize(startIndex+3, dimP);
+                H.block(startIndex,0,3,dimP) = Eigen::MatrixXd::Zero(3,dimP);
+                // Correct() uses delta = K * Z, so H stores -dZ/dx.
+                H.block(startIndex,3,3,3) = Eigen::Matrix3d::Identity();
+                // #------# VKM gyro-bias Jacobian: -dZ/db_g = R * skew(p_BF).
+                H.block(startIndex, dimP - state_.dimTheta(), 3, 3) =
+                    R * skew(it->pose.block<3,1>(0,3));
+
+                startIndex = N.rows();
+                N.conservativeResize(startIndex+3, startIndex+3);
+                N.block(startIndex,0,3,startIndex) = Eigen::MatrixXd::Zero(3,startIndex);
+                N.block(0,startIndex,startIndex,3) = Eigen::MatrixXd::Zero(startIndex,3);
+                if (it->use_world_foot_velocity) {
+                    N.block(startIndex,startIndex,3,3) = it->covariance.block<3,3>(0,0);
+                } else {
+                    N.block(startIndex,startIndex,3,3) = R * it->covariance.block<3,3>(0,0) * R.transpose();
+                }
+
+                startIndex = PI.rows();
+                int startIndex2 = PI.cols();
+                PI.conservativeResize(startIndex+3, startIndex2+dimX);
+                PI.block(startIndex,0,3,startIndex2) = Eigen::MatrixXd::Zero(3,startIndex2);
+                PI.block(0,startIndex2,startIndex,dimX) = Eigen::MatrixXd::Zero(startIndex,dimX);
+                PI.block(startIndex,startIndex2,3,dimX) = Eigen::MatrixXd::Zero(3,dimX);
+                PI.block(startIndex,startIndex2,3,3) = Eigen::Matrix3d::Identity();
+                continue;
+            }
 
             // Fill out Y Selector matrix to access X to itself (basically X has both the measurements and IMU readings both in it)
             startIndex = Y.rows();
@@ -540,6 +682,7 @@ void InEKF::CorrectKinematics(const vectorKinematics& measured_kinematics, bool 
 
     // Augment state with newly detected contacts
     if (new_contacts.size() > 0) {
+        R = state_.getRotation();
         Eigen::MatrixXd X_aug = state_.getX(); 
         Eigen::MatrixXd P_aug = state_.getP();
         Eigen::Vector3d p = state_.getPosition();
